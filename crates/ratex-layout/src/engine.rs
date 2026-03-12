@@ -2529,11 +2529,12 @@ fn layout_textcircled(body_box: LayoutBox, options: &LayoutOptions) -> LayoutBox
 
     // Center the content inside the circle
     let content_shift = (diameter - body_box.width) / 2.0;
-    let mut children = Vec::new();
-    children.push(circle_box);
     // Shift content to the right to center it
-    children.push(LayoutBox::new_kern(-(diameter) + content_shift));
-    children.push(body_box.clone());
+    let children = vec![
+        circle_box,
+        LayoutBox::new_kern(-(diameter) + content_shift),
+        body_box.clone(),
+    ];
 
     let height = r - cy.min(0.0);
     let depth = (r + cy).max(0.0);

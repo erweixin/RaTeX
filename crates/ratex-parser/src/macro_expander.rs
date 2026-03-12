@@ -907,7 +907,7 @@ impl<'a> MacroExpander<'a> {
                         for (j, t) in arg_tokens.iter().enumerate() {
                             tokens.insert(i - 1 + j, t.clone());
                         }
-                        i = if i > 1 { i - 1 } else { 0 };
+                        i = i.saturating_sub(1);
                     }
                 }
             }

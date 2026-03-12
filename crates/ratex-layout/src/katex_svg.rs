@@ -264,7 +264,7 @@ fn build_vec_arrow_filled(width_em: f64, height_em: f64) -> Vec<PathCommand> {
         // Arrowhead top edge
         PathCommand::LineTo { x: end_x - head_len, y: y - head_width },
         // Arrowhead tip
-        PathCommand::LineTo { x: end_x, y: y },
+        PathCommand::LineTo { x: end_x, y },
         // Arrowhead bottom edge
         PathCommand::LineTo { x: end_x - head_len, y: y + head_width },
         // Back to shaft bottom
