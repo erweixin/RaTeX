@@ -914,3 +914,8 @@ a+\left(\vcenter{\frac{\frac a b}c}\right)
 \Z
 \Zeta
 \zeta
+\hat{M}
+\hat{b}
+\hat{\aa}
+\hat{o}
+\tilde{M}

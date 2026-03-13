@@ -294,16 +294,16 @@ fn layout_node(node: &ParseNode, options: &LayoutOptions) -> LayoutBox {
         }
 
         ParseNode::Accent {
-            label, base, is_stretchy, ..
+            label, base, is_stretchy, is_shifty, ..
         } => {
             // Some text accents (e.g. \c cedilla) place the mark below
             let is_below = matches!(label.as_str(), "\\c");
-            layout_accent(label, base, is_stretchy.unwrap_or(false), is_below, options)
+            layout_accent(label, base, is_stretchy.unwrap_or(false), is_shifty.unwrap_or(false), is_below, options)
         }
 
         ParseNode::AccentUnder {
             label, base, is_stretchy, ..
-        } => layout_accent(label, base, is_stretchy.unwrap_or(false), true, options),
+        } => layout_accent(label, base, is_stretchy.unwrap_or(false), false, true, options),
 
         ParseNode::LeftRight {
             body, left, right, ..
@@ -1247,15 +1247,32 @@ fn layout_operatorname(body: &[ParseNode], options: &LayoutOptions) -> LayoutBox
 // Accent layout
 // ============================================================================
 
+/// Extract the skew (italic correction) of the innermost/last glyph in a box.
+/// Used by shifty accents (\hat, \tilde…) to horizontally centre the mark
+/// over italic math letters (e.g. M in MathItalic has skew ≈ 0.083em).
+fn glyph_skew(lb: &LayoutBox) -> f64 {
+    match &lb.content {
+        BoxContent::Glyph { font_id, char_code } => {
+            get_char_metrics(*font_id, *char_code)
+                .map(|m| m.skew)
+                .unwrap_or(0.0)
+        }
+        BoxContent::HBox(children) => {
+            children.last().map(glyph_skew).unwrap_or(0.0)
+        }
+        _ => 0.0,
+    }
+}
+
 fn layout_accent(
     label: &str,
     base: &ParseNode,
     is_stretchy: bool,
+    is_shifty: bool,
     is_below: bool,
     options: &LayoutOptions,
 ) -> LayoutBox {
     let body_box = layout_node(base, options);
-    let metrics = options.metrics();
     let base_w = body_box.width.max(0.5);
 
     // Special handling for \textcircled: draw a circle around the content
@@ -1359,18 +1376,12 @@ fn layout_accent(
 
     let skew = if use_arrow_path {
         0.0
+    } else if is_shifty {
+        // For shifty accents (\hat, \tilde, etc.) shift by the BASE character's skew,
+        // which encodes the italic correction in math-italic fonts (e.g. M → 0.083em).
+        glyph_skew(&body_box)
     } else {
-        let accent_char = {
-            let ch = resolve_symbol_char(label, Mode::Text);
-            if ch == label.chars().next().unwrap_or('?') {
-                resolve_symbol_char(label, Mode::Math)
-            } else {
-                ch
-            }
-        };
-        get_char_metrics(FontId::MainRegular, accent_char as u32)
-            .map(|m| m.skew)
-            .unwrap_or(0.0)
+        0.0
     };
 
     let gap = if use_arrow_path { 0.12 } else { 0.0 };
@@ -1380,8 +1391,21 @@ fn layout_accent(
     } else if use_arrow_path {
         body_box.height + gap
     } else {
-        // For glyph accents: place accent bottom at min(base_height, x_height) above baseline
-        let base_clearance = body_box.height.min(metrics.x_height);
+        // Clearance = how high above baseline the accent is positioned.
+        // - For simple letters (M, b, o): body_box.height is the letter top → use directly.
+        // - For a body that is itself an above-accent (\r{a} = \aa, \bar{x}, …):
+        //   body_box.height = inner_clearance + 0.35 (the 0.35 rendering correction is
+        //   already baked in). Using it as outer clearance adds ANOTHER 0.35 on top
+        //   (staircase effect), placing hat 0.35em above ring — too spaced.
+        //   Instead, read the inner accent's clearance directly from BoxContent and add
+        //   a small ε (0.07em ≈ 3px) so the marks don't pixel-overlap in the rasterizer.
+        //   This is equivalent to KaTeX's min(body.height, xHeight) approach.
+        let base_clearance = match &body_box.content {
+            BoxContent::Accent { clearance: inner_cl, is_below, .. } if !is_below => {
+                inner_cl + 0.3
+            }
+            _ => body_box.height,
+        };
         // \bar and \= (macron): add small extra gap so bar distance matches KaTeX reference
         if label == "\\bar" || label == "\\=" {
             base_clearance - 0.2
@@ -1395,15 +1419,18 @@ fn layout_accent(
     } else if use_arrow_path {
         (body_box.height + gap + accent_box.height, body_box.depth)
     } else {
-        // KaTeX uses a fixed strut height (0.78056em) only for \hat, \bar, \dot, \ddot.
-        // Other glyph accents (e.g. \tilde → 0.74842) use a lower height; keep original formula.
+        // to_display.rs shifts every glyph accent DOWN by max(0, accent.height - 0.35),
+        // so the actual visual top of the accent mark = clearance + min(0.35, accent.height).
+        // Use this for the layout height so nested accents (e.g. \hat{\r{a}}) see the
+        // correct base height instead of the over-estimated clearance + accent.height.
+        // For \hat, \bar, \dot, \ddot: also enforce KaTeX's 0.78056em strut so that
+        // short bases (x_height ≈ 0.43) produce consistent line spacing.
         const ACCENT_ABOVE_STRUT_HEIGHT_EM: f64 = 0.78056;
-        let use_fixed_strut = matches!(label, "\\hat" | "\\bar" | "\\=" | "\\dot" | "\\ddot");
-        let accent_top = clearance + accent_box.height;
-        let h = if use_fixed_strut {
-            body_box.height.max(ACCENT_ABOVE_STRUT_HEIGHT_EM)
+        let accent_visual_top = clearance + 0.35_f64.min(accent_box.height);
+        let h = if matches!(label, "\\hat" | "\\bar" | "\\=" | "\\dot" | "\\ddot") {
+            accent_visual_top.max(ACCENT_ABOVE_STRUT_HEIGHT_EM)
         } else {
-            body_box.height.max(accent_top)
+            body_box.height.max(accent_visual_top)
         };
         (h, body_box.depth)
     };
