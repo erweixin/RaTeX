@@ -22,17 +22,21 @@ cargo build --release -p ratex-ffi --manifest-path "$REPO_ROOT/Cargo.toml" \
     --target x86_64-apple-ios
 
 echo "==> Creating fat simulator binary..."
+# Both slices must use the same filename (libratex_ffi.a) so CocoaPods
+# accepts the xcframework.  Place each in its own temp directory.
+SIM_DIR=/tmp/ratex_sim
+rm -rf "$SIM_DIR" && mkdir -p "$SIM_DIR"
 lipo -create \
     "$REPO_ROOT/target/aarch64-apple-ios-sim/release/libratex_ffi.a" \
     "$REPO_ROOT/target/x86_64-apple-ios/release/libratex_ffi.a" \
-    -output /tmp/libratex_ffi_sim.a
+    -output "$SIM_DIR/libratex_ffi.a"
 
 echo "==> Packaging XCFramework..."
 rm -rf "$OUTPUT"
 xcodebuild -create-xcframework \
     -library "$REPO_ROOT/target/aarch64-apple-ios/release/libratex_ffi.a" \
     -headers "$HEADER_DIR" \
-    -library /tmp/libratex_ffi_sim.a \
+    -library "$SIM_DIR/libratex_ffi.a" \
     -headers "$HEADER_DIR" \
     -output "$OUTPUT"
 

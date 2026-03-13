@@ -1,0 +1,22 @@
+PODS:
+  - Flutter (1.0.0)
+  - ratex_flutter (0.0.3):
+    - Flutter
+
+DEPENDENCIES:
+  - Flutter (from `Flutter`)
+  - ratex_flutter (from `.symlinks/plugins/ratex_flutter/ios`)
+
+EXTERNAL SOURCES:
+  Flutter:
+    :path: Flutter
+  ratex_flutter:
+    :path: ".symlinks/plugins/ratex_flutter/ios"
+
+SPEC CHECKSUMS:
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  ratex_flutter: c2fafb0e74515b93e0e1ffe2ae888164e914e37f
+
+PODFILE CHECKSUM: 3c63482e143d1b91d2d2560aee9fb04ecc74ac7e
+
+COCOAPODS: 1.16.2

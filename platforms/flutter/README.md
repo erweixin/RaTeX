@@ -49,7 +49,7 @@ dependencies:
 ### Widget (recommended)
 
 ```dart
-import 'package:ratex_flutter/ratex.dart';
+import 'package:ratex_flutter/ratex_flutter.dart';
 
 class MathPage extends StatelessWidget {
   @override
@@ -68,7 +68,7 @@ class MathPage extends StatelessWidget {
 ### Low-level CustomPainter
 
 ```dart
-import 'package:ratex_flutter/ratex.dart';
+import 'package:ratex_flutter/ratex_flutter.dart';
 
 final dl      = RaTeXEngine.instance.parseAndLayout(r'\sum_{n=1}^\infty \frac{1}{n^2}');
 final painter = RaTeXPainter(displayList: dl, fontSize: 24);
@@ -103,7 +103,7 @@ the bounding box. The baseline is at Y = `height × fontSize`.
 | File | Purpose |
 |------|---------|
 | `pubspec.yaml` | Flutter plugin manifest |
-| `lib/ratex.dart` | Public API: `RaTeXEngine`, `RaTeXWidget` |
+| `lib/ratex_flutter.dart` | Public API: `RaTeXEngine`, `RaTeXWidget` |
 | `lib/src/display_list.dart` | Dart JSON types (DisplayList, DisplayItem, …) |
 | `lib/src/ratex_ffi.dart` | Dart FFI bindings to `libratex_ffi` |
 | `lib/src/ratex_painter.dart` | `CustomPainter` drawing loop |

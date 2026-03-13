@@ -8,8 +8,6 @@
 //     fontSize: 24,
 //   );
 
-library ratex_flutter;
-
 import 'package:flutter/material.dart';
 
 import 'src/display_list.dart';

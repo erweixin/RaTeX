@@ -2,6 +2,14 @@ name: ratex_flutter
 description: Flutter bindings for RaTeX — native LaTeX math rendering via Dart FFI.
 version: 0.0.3
 homepage: https://github.com/erweixin/RaTeX
+repository: https://github.com/erweixin/RaTeX
+issue_tracker: https://github.com/erweixin/RaTeX/issues
+
+topics:
+  - latex
+  - math
+  - flutter
+  - ffi
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -12,13 +20,89 @@ dependencies:
     sdk: flutter
   ffi: ^2.1.0
 
+dev_dependencies:
+  flutter_lints: ^5.0.0
+
 flutter:
   plugin:
     platforms:
       ios:
-        dartPluginClass: RaTeXPlugin
+        # FFI-only plugin: no Dart method channel.
+        # The native RaTeXPlugin.swift class handles plugin registration,
+        # and DynamicLibrary.process() resolves the C symbols at runtime.
         pluginClass: RaTeXPlugin
       android:
-        dartPluginClass: RaTeXPlugin
         package: io.ratex
         pluginClass: RaTeXPlugin
+
+  # KaTeX fonts bundled with the plugin.
+  # GlyphPath items in the DisplayList carry a font ID (e.g. "Math-Italic")
+  # and a Unicode char_code; the painter draws them with these font families.
+  # Fonts live in lib/fonts/ so apps can reference via packages/ratex_flutter/fonts/
+  fonts:
+    - family: KaTeX_AMS
+      fonts:
+        - asset: lib/fonts/KaTeX_AMS-Regular.ttf
+
+    - family: KaTeX_Caligraphic
+      fonts:
+        - asset: lib/fonts/KaTeX_Caligraphic-Regular.ttf
+        - asset: lib/fonts/KaTeX_Caligraphic-Bold.ttf
+          weight: 700
+
+    - family: KaTeX_Fraktur
+      fonts:
+        - asset: lib/fonts/KaTeX_Fraktur-Regular.ttf
+        - asset: lib/fonts/KaTeX_Fraktur-Bold.ttf
+          weight: 700
+
+    - family: KaTeX_Main
+      fonts:
+        - asset: lib/fonts/KaTeX_Main-Regular.ttf
+        - asset: lib/fonts/KaTeX_Main-Bold.ttf
+          weight: 700
+        - asset: lib/fonts/KaTeX_Main-Italic.ttf
+          style: italic
+        - asset: lib/fonts/KaTeX_Main-BoldItalic.ttf
+          weight: 700
+          style: italic
+
+    - family: KaTeX_Math
+      fonts:
+        - asset: lib/fonts/KaTeX_Math-Italic.ttf
+          style: italic
+        - asset: lib/fonts/KaTeX_Math-BoldItalic.ttf
+          weight: 700
+          style: italic
+
+    - family: KaTeX_SansSerif
+      fonts:
+        - asset: lib/fonts/KaTeX_SansSerif-Regular.ttf
+        - asset: lib/fonts/KaTeX_SansSerif-Bold.ttf
+          weight: 700
+        - asset: lib/fonts/KaTeX_SansSerif-Italic.ttf
+          style: italic
+
+    - family: KaTeX_Script
+      fonts:
+        - asset: lib/fonts/KaTeX_Script-Regular.ttf
+
+    - family: KaTeX_Typewriter
+      fonts:
+        - asset: lib/fonts/KaTeX_Typewriter-Regular.ttf
+
+    - family: KaTeX_Size1
+      fonts:
+        - asset: lib/fonts/KaTeX_Size1-Regular.ttf
+
+    - family: KaTeX_Size2
+      fonts:
+        - asset: lib/fonts/KaTeX_Size2-Regular.ttf
+
+    - family: KaTeX_Size3
+      fonts:
+        - asset: lib/fonts/KaTeX_Size3-Regular.ttf
+
+    - family: KaTeX_Size4
+      fonts:
+        - asset: lib/fonts/KaTeX_Size4-Regular.ttf
