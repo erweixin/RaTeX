@@ -16,3 +16,6 @@ ratex-types  = { workspace = true }
 ratex-parser = { workspace = true }
 ratex-layout = { workspace = true }
 serde_json = { workspace = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = { version = "0.21", default-features = false }

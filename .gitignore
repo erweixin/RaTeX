@@ -7,3 +7,4 @@ venv
 platforms/web/dist/
 # Local deploy / build copy (do not commit)
 deploy/
+.gradle/

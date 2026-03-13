@@ -1,0 +1,24 @@
+name: ratex_flutter
+description: Flutter bindings for RaTeX — native LaTeX math rendering via Dart FFI.
+version: 0.0.3
+homepage: https://github.com/erweixin/RaTeX
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ffi: ^2.1.0
+
+flutter:
+  plugin:
+    platforms:
+      ios:
+        dartPluginClass: RaTeXPlugin
+        pluginClass: RaTeXPlugin
+      android:
+        dartPluginClass: RaTeXPlugin
+        package: io.ratex
+        pluginClass: RaTeXPlugin
