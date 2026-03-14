@@ -84,11 +84,14 @@ fn handle_prefix(
     _opt_args: Vec<Option<ParseNode>>,
 ) -> ParseResult<ParseNode> {
     ctx.parser.consume_spaces()?;
-    let token_text = ctx.parser.fetch()?.text.clone();
+    let mut next_tok = ctx.parser.fetch()?.clone();
+    let token_text = next_tok.text.clone();
 
     if let Some(global_ver) = global_version(&token_text) {
         if ctx.func_name == "\\global" || ctx.func_name == "\\\\globallong" {
-            ctx.parser.gullet.set_top_text(global_ver.to_string());
+            next_tok.text = global_ver.to_string();
+            ctx.parser.gullet.push_token(next_tok);
+            ctx.parser.consume();
         }
         let result = ctx.parser.parse_function(None, None)?;
         match result {
