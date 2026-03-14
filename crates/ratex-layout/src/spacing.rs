@@ -25,7 +25,7 @@ pub enum MathClass {
 const SPACING_TABLE: [[i8; 8]; 8] = [
 //       Ord  Op  Bin  Rel Open Close Punct Inner
 /*Ord*/  [ 0,  3,  4,   5,  0,   0,   0,    3],
-/*Op*/   [ 3,  3,  0,   5,  0,   0,   0,    3],
+/*Op*/   [ 3,  4,  0,   5,  0,   0,   0,    3],
 /*Bin*/  [ 4,  4,  0,   0,  4,   0,   0,    4],
 /*Rel*/  [ 5,  5,  0,   0,  5,   0,   0,    5],
 /*Open*/ [ 0,  0,  0,   0,  0,   0,   0,    0],

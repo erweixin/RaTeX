@@ -991,9 +991,12 @@ fn build_op_base(
             Some(m) => (m.width, m.height, m.depth, m.italic),
             None => (1.0, 0.75, 0.25, 0.0),
         };
+        // Include italic correction in width so limits centered above/below don't overlap
+        // the operator's right-side extension (e.g. integral ∫ has non-zero italic).
+        let width_with_italic = width + italic;
 
         let base = LayoutBox {
-            width,
+            width: width_with_italic,
             height,
             depth,
             content: BoxContent::Glyph {
@@ -1113,19 +1116,22 @@ fn layout_op_limits_inner(
     let sup_ratio = sup_style.size_multiplier() / options.style.size_multiplier();
     let sub_ratio = sub_style.size_multiplier() / options.style.size_multiplier();
 
+    // Extra vertical padding so limits don't sit too close to the operator (e.g. ∫_0^1).
+    let extra_clearance = 0.08_f64;
+
     let sup_data = sup_node.map(|s| {
         let sup_opts = options.with_style(sup_style);
         let elem = layout_node(s, &sup_opts);
-        let kern = (metrics.big_op_spacing1)
-            .max(metrics.big_op_spacing3 - elem.depth * sup_ratio);
+        let kern = (metrics.big_op_spacing1 + extra_clearance)
+            .max(metrics.big_op_spacing3 - elem.depth * sup_ratio + extra_clearance);
         (elem, kern)
     });
 
     let sub_data = sub_node.map(|s| {
         let sub_opts = options.with_style(sub_style);
         let elem = layout_node(s, &sub_opts);
-        let kern = (metrics.big_op_spacing2)
-            .max(metrics.big_op_spacing4 - elem.height * sub_ratio);
+        let kern = (metrics.big_op_spacing2 + extra_clearance)
+            .max(metrics.big_op_spacing4 - elem.height * sub_ratio + extra_clearance);
         (elem, kern)
     });
 
