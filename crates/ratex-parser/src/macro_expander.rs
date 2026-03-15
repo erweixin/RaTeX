@@ -348,7 +348,7 @@ impl<'a> MacroExpander<'a> {
             ("\\bra", "\\mathinner{\\langle{#1}|}"),
             ("\\ket", "\\mathinner{|{#1}\\rangle}"),
             ("\\braket", "\\mathinner{\\langle{#1}\\rangle}"),
-            ("\\Braket", "\\mathinner{\\langle{#1}\\rangle}"),
+            ("\\Braket", "\\bra@ket{\\left\\langle}{\\;\\middle\\vert\\;}{\\;\\middle\\Vert\\;}{\\right\\rangle}"),
             ("\\Bra", "\\left\\langle#1\\right|"),
             ("\\Ket", "\\left|#1\\right\\rangle"),
 
@@ -675,6 +675,69 @@ impl<'a> MacroExpander<'a> {
                 }),
             );
         }
+
+        // \bra@ket: like \bra@set but replaces ALL | at depth 0 (for \Braket)
+        self.macros.set(
+            "\\bra@ket".to_string(),
+            MacroDefinition::Function(|me: &mut MacroExpander| -> ParseResult<Vec<Token>> {
+                let args = me.consume_args(4)?;
+                let left = args[0].clone();
+                let middle = args[1].clone();
+                let middle_double = args[2].clone();
+                let right = args[3].clone();
+
+                let content = me.consume_args(1)?;
+                let content = content.into_iter().next().unwrap();
+
+                // Convert stack-order (reversed) to logical order, replace all | at depth 0,
+                // then reverse back to stack order.
+                let logical: Vec<Token> = content.into_iter().rev().collect();
+                let mut new_logical: Vec<Token> = Vec::new();
+                let mut depth: i32 = 0;
+                let mut i = 0;
+                while i < logical.len() {
+                    let t = &logical[i];
+                    if t.text == "{" {
+                        depth += 1;
+                        new_logical.push(t.clone());
+                    } else if t.text == "}" {
+                        depth -= 1;
+                        new_logical.push(t.clone());
+                    } else if depth == 0 && t.text == "|" {
+                        // Check for || (double pipe) → middleDouble
+                        if !middle_double.is_empty()
+                            && i + 1 < logical.len()
+                            && logical[i + 1].text == "|"
+                        {
+                            // middle_double is in stack/reversed order; reverse to logical order
+                            new_logical.extend(middle_double.iter().rev().cloned());
+                            i += 2;
+                            continue;
+                        }
+                        // middle is in stack/reversed order; reverse to logical order
+                        new_logical.extend(middle.iter().rev().cloned());
+                    } else {
+                        new_logical.push(t.clone());
+                    }
+                    i += 1;
+                }
+
+                // Reverse back to stack order
+                let content_rev: Vec<Token> = new_logical.into_iter().rev().collect();
+
+                // Build: right + content + left (reversed for stack)
+                let mut to_expand = Vec::new();
+                to_expand.extend(right);
+                to_expand.extend(content_rev);
+                to_expand.extend(left);
+
+                me.begin_group();
+                let expanded = me.expand_tokens(to_expand)?;
+                me.end_group();
+
+                Ok(expanded)
+            }),
+        );
 
         // \bra@set: braket set notation helper
         // Only replaces the FIRST | with middle tokens (one-shot), matching KaTeX
