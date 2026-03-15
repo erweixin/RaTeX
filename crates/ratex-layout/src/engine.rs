@@ -1427,7 +1427,12 @@ fn layout_accent(
         0.0
     };
 
-    let gap = if use_arrow_path { 0.12 } else { 0.0 };
+    // gap = clearance between body top and bottom of accent SVG.
+    // For arrow accents, the SVG path is centered (height=h/2, depth=h/2).
+    // The gap prevents the visible arrowhead boundary from overlapping with body top.
+    let gap = if use_arrow_path {
+        if label == "\\Overrightarrow" { 0.21 } else { 0.12 }
+    } else { 0.0 };
 
     let clearance = if is_below {
         body_box.height + body_box.depth + accent_box.depth + gap
@@ -2701,37 +2706,50 @@ fn layout_xarrow(
         color: options.color,
     };
 
+    // KaTeX positions xarrows centered on the math axis, with a 0.111em (2mu) gap
+    // between the arrow and the text above/below (see amsmath.dtx reference).
     let metrics = options.metrics();
-    let _sp1 = 0.111; // bigOpSpacing1 — above the superscript
-    let _sp2 = 0.166; // bigOpSpacing2 — below the subscript
-    let sp3 = 0.2;   // bigOpSpacing3 — gap between base and script
-    let sp5 = metrics.big_op_spacing5;
+    let axis = metrics.axis_height;        // 0.25em
+    let arrow_half = actual_arrow_h / 2.0;
+    let gap = 0.111;                       // 2mu gap (KaTeX constant)
 
-    let total_w = arrow_w;
+    // Center the arrow on the math axis by shifting it up.
+    let base_shift = -axis;
+
+    // sup_kern: gap between arrow top and text bottom.
+    // In the OpLimits renderer:
+    //   sup_y = y - (arrow_half - base_shift) - sup_kern - sup_box.depth * ratio
+    //         = y - (arrow_half + axis) - sup_kern - sup_box.depth * ratio
+    // KaTeX: text_baseline = -(axis + arrow_half + gap)
+    //   (with extra -= depth when depth > 0.25, but that's rare for typical text)
+    // Matching: sup_kern = gap
+    let sup_kern = gap;
+    let sub_kern = gap;
+
     let sup_h = body_box.height * sup_ratio;
     let sup_d = body_box.depth * sup_ratio;
 
-    let height = arrow_box.height + sp3 + sup_h + sup_d + sp5;
-    let mut depth = arrow_box.depth + sp5;
+    // Height: from baseline to top of upper text
+    let height = axis + arrow_half + gap + sup_h + sup_d;
+    // Depth: arrow bottom below baseline = arrow_half - axis
+    let mut depth = (arrow_half - axis).max(0.0);
 
     if let Some(ref bel) = below_box {
         let sub_h = bel.height * sub_ratio;
         let sub_d = bel.depth * sub_ratio;
-        depth = arrow_box.depth + sp3 + sub_h + sub_d + sp5;
+        // Lower text positioned symmetrically below the arrow
+        depth = (arrow_half - axis) + gap + sub_h + sub_d;
     }
 
-    let sup_kern = sp3;
-    let sub_kern = sp3;
-
     LayoutBox {
-        width: total_w,
+        width: arrow_w,
         height,
         depth,
         content: BoxContent::OpLimits {
             base: Box::new(arrow_box),
             sup: Some(Box::new(body_box)),
             sub: below_box.map(Box::new),
-            base_shift: 0.0,
+            base_shift,
             sup_kern,
             sub_kern,
             slant: 0.0,

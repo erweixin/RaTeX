@@ -233,3 +233,4 @@ fn golden_test_pass_rate() {
          Many failures are from unimplemented node types, not rendering bugs."
     );
 }
+
