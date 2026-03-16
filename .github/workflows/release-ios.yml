@@ -9,6 +9,8 @@ on:
 jobs:
   build-and-release:
     runs-on: macos-15
+    permissions:
+      contents: write   # 允许 GITHUB_TOKEN 推送 tag 和创建 Release
 
     steps:
       - uses: actions/checkout@v4

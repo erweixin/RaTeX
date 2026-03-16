@@ -42,6 +42,9 @@ group = "io.github.erweixin"
 version = libraryVersion
 
 afterEvaluate {
+    tasks.matching { it.name.endsWith("SourcesJar") }.configureEach {
+        (this as org.gradle.api.tasks.bundling.Jar).duplicatesStrategy = org.gradle.api.file.DuplicatesStrategy.INCLUDE_LAST
+    }
     publishing {
         publications {
             create<MavenPublication>("release") {

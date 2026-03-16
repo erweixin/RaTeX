@@ -10,8 +10,9 @@ plugins {
 nexusPublishing {
     repositories {
         sonatype {
-            nexusUrl.set(uri("https://s01.oss.sonatype.com/service/local/"))
-            snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.com/content/repositories/snapshots/"))
+            // 使用新版 Central API，避免 s01.oss.sonatype.com 在部分环境（如 GitHub Actions）DNS 解析失败
+            nexusUrl.set(uri("https://ossrh-staging-api.central.sonatype.com/service/local/"))
+            snapshotRepositoryUrl.set(uri("https://central.sonatype.com/repository/maven-snapshots/"))
             username.set(project.findProperty("SONATYPE_NEXUS_USERNAME")?.toString() ?: "")
             password.set(project.findProperty("SONATYPE_NEXUS_PASSWORD")?.toString() ?: "")
         }
