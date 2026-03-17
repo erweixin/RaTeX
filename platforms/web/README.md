@@ -29,10 +29,10 @@ No bundler required — works with any framework or plain HTML.
 
 ```html
 <!-- 1. Fonts (once; the component also attempts auto-injection) -->
-<link rel="stylesheet" href="node_modules/ratex-web/fonts.css" />
+<link rel="stylesheet" href="node_modules/ratex-wasm/fonts.css" />
 
 <!-- 2. Register the custom element -->
-<script type="module" src="node_modules/ratex-web/dist/ratex-formula.js"></script>
+<script type="module" src="node_modules/ratex-wasm/dist/ratex-formula.js"></script>
 
 <!-- 3. Use it -->
 <ratex-formula latex="\frac{-b \pm \sqrt{b^2-4ac}}{2a}" font-size="48" padding="16"></ratex-formula>
@@ -59,7 +59,7 @@ renderLatexToCanvas('\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}', canvas, {
 });
 ```
 
-**Note:** The page must load a math font, or letters/numbers will show as boxes. You can use KaTeX’s CSS (see repo-root `demo/`) or provide Latin Modern Math. This package **bundles KaTeX fonts** (no CDN): use `<link rel="stylesheet" href="node_modules/ratex-web/fonts.css" />` or `import 'ratex-web/fonts.css';` and fonts load from the package.
+**Note:** The page must load a math font, or letters/numbers will show as boxes. You can use KaTeX’s CSS (see repo-root `demo/`) or provide Latin Modern Math. This package **bundles KaTeX fonts** (no CDN): use `<link rel="stylesheet" href="node_modules/ratex-wasm/fonts.css" />` or `import 'ratex-wasm/fonts.css';` and fonts load from the package.
 
 ### Option 2: DisplayList JSON only
 

@@ -1,0 +1,15 @@
+# Control what gets published; overrides .gitignore for this package.
+# We intentionally INCLUDE ios/RaTeX.xcframework and android jniLibs — do not list them here.
+
+# Dart / Pub
+.dart_tool/
+.packages
+.pub-cache/
+.pub/
+*.iml
+.idea/
+.vscode/
+
+# Build / IDE
+*.log
+.DS_Store

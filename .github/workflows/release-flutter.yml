@@ -1,0 +1,94 @@
+name: Release Flutter (pub.dev)
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write   # Required for pub.dev OIDC authentication
+
+jobs:
+  publish:
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Pub version in tag: $VERSION"
+
+      - name: Verify pubspec version matches tag
+        run: |
+          PUB_VERSION=$(grep '^version:' platforms/flutter/pubspec.yaml | sed 's/version: *//; s/ *$//')
+          if [ "$PUB_VERSION" != "${{ steps.version.outputs.version }}" ]; then
+            echo "::error::pubspec version '$PUB_VERSION' does not match tag ${{ steps.version.outputs.version }}"
+            exit 1
+          fi
+          echo "Version OK: $PUB_VERSION"
+
+      - name: Install Rust (Android + iOS targets)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: >
+            aarch64-linux-android,
+            armv7-linux-androideabi,
+            x86_64-linux-android,
+            aarch64-apple-ios,
+            aarch64-apple-ios-sim,
+            x86_64-apple-ios
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Install Android NDK
+        uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r27
+
+      - name: Build Android native libs
+        run: bash platforms/android/build-android.sh
+        env:
+          ANDROID_NDK_HOME: ${{ steps.ndk.outputs.ndk-path }}
+
+      - name: Build iOS XCFramework
+        run: bash platforms/ios/build-ios.sh
+
+      - name: Inject native libs into Flutter package
+        run: |
+          mkdir -p platforms/flutter/android/src/main/jniLibs
+          cp -R platforms/android/src/main/jniLibs/* platforms/flutter/android/src/main/jniLibs/
+          rm -rf platforms/flutter/ios/RaTeX.xcframework
+          cp -R platforms/ios/RaTeX.xcframework platforms/flutter/ios/
+          echo "jniLibs and xcframework copied into platforms/flutter"
+
+      - name: Setup Dart (with pub.dev OIDC credentials)
+        uses: dart-lang/setup-dart@v1
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Validate package
+        run: |
+          cd platforms/flutter
+          flutter pub get
+          dart analyze
+
+      - name: Publish to pub.dev
+        run: |
+          cd platforms/flutter
+          dart pub publish --force

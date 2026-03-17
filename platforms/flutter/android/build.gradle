@@ -1,0 +1,53 @@
+// Flutter plugin for RaTeX — Android side.
+// All rendering is done via Dart FFI (DynamicLibrary.open("libratex_ffi.so")).
+// No method channels; this module only registers the plugin and provides jniLibs.
+// Build native libs: from repo root run ./platforms/android/build-android.sh
+
+group 'io.ratex'
+version '0.0.3'
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+android {
+    namespace 'io.ratex'
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 21
+        targetSdk 34
+
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+        }
+    }
+
+    // jniLibs in package (for pub.dev). Prebuilt .so must be present under
+    // android/src/main/jniLibs/{abi}/ before publishing. To build from repo root:
+    //   ./platforms/android/build-android.sh
+    // then copy platforms/android/src/main/jniLibs/* into this android/src/main/jniLibs/
+    sourceSets {
+        main {
+            jniLibs.srcDirs = ['src/main/jniLibs']
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8'
+}

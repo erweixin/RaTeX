@@ -27,12 +27,13 @@ xcuserdata/
 .build/
 *.resolved
 
-# iOS — generated XCFramework (built locally via build-ios.sh)
-platforms/ios/RaTeX.xcframework/
-platforms/flutter/ios/RaTeX.xcframework/
-
 # Android — native libs built by platforms/android/build-android.sh (do not commit)
 platforms/android/src/main/jniLibs/
+
+# iOS — XCFramework built by platforms/ios/build-ios.sh (do not commit)
+platforms/ios/RaTeX.xcframework/
+# Flutter 插件内的副本由 CI 在发布前从上面复制，也不纳入版本控制
+platforms/flutter/ios/RaTeX.xcframework/
 
 # macOS
 .DS_Store

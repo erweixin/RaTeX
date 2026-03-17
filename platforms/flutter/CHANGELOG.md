@@ -1,3 +1,7 @@
+## 0.0.8
+
+- Publish to pub.dev with bundled Android jniLibs and iOS RaTeX.xcframework (out-of-the-box)
+
 ## 0.0.3
 
 - Add KaTeX font bundling for glyph rendering via `ParagraphBuilder`

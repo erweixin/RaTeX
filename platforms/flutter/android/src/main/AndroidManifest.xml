@@ -1,0 +1,3 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- FFI-only plugin: no permissions or components required. -->
+</manifest>
