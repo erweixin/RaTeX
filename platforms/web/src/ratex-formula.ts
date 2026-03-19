@@ -2,8 +2,8 @@
  * <ratex-formula> Web Component — drop-in, works with any framework or plain HTML.
  *
  * Usage:
- *   1. Load fonts (once): <link rel="stylesheet" href="node_modules/ratex-web/fonts.css" />
- *   2. Register component: <script type="module" src="node_modules/ratex-web/dist/ratex-formula.js"></script>
+ *   1. Load fonts (once): <link rel="stylesheet" href="node_modules/ratex-wasm/fonts.css" />
+ *   2. Register component: <script type="module" src="node_modules/ratex-wasm/dist/ratex-formula.js"></script>
  *   3. Use: <ratex-formula latex="\frac{-b \pm \sqrt{b^2-4ac}}{2a}"></ratex-formula>
  *
  * If fonts.css is not imported, the component will attempt auto-injection
@@ -20,7 +20,7 @@ const DEFAULT_EM = 48;
 const DEFAULT_PAD = 16;
 
 function ensureFontsLoaded(): void {
-  const id = "ratex-web-fonts";
+  const id = "ratex-wasm-fonts";
   if (document.getElementById(id)) return;
   try {
     const href = new URL("../fonts.css", import.meta.url).href;
@@ -30,7 +30,7 @@ function ensureFontsLoaded(): void {
     link.href = href;
     document.head.appendChild(link);
   } catch {
-    console.warn("[ratex-formula] Could not auto-load fonts.css. Include <link rel=\"stylesheet\" href=\"ratex-web/fonts.css\"> for math glyphs.");
+    console.warn("[ratex-formula] Could not auto-load fonts.css. Include <link rel=\"stylesheet\" href=\"ratex-wasm/fonts.css\"> for math glyphs.");
   }
 }
 

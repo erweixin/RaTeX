@@ -2,7 +2,7 @@
 
 ## Context
 
-Most low-scoring test cases in `docs/LOW_SCORE_CASES.md` are caused by SVG path differences between RaTeX and KaTeX. Currently:
+Many **stretchy** math elements still differ from KaTeX because of SVG path data; the **current** set of worst golden scores (not only arrows) is tracked in [`LOW_SCORE_CASES.md`](./LOW_SCORE_CASES.md). Historically, a large share of low scores were arrow/brace path issues. Currently:
 - `katex_stretchy_arrow_path()` only handles 5 arrow types (rightarrow, leftarrow, twoheadright, twoheadleft, xmapsto)
 - All other stretchy arrows fall back to `stretchy_accent_path()` in engine.rs, which draws **custom simplified arrows** that look very different from KaTeX
 - `horiz_brace_path()` uses custom quadratic curves instead of KaTeX's actual brace paths

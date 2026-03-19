@@ -97,7 +97,7 @@ npx serve .
 
 ## Relation to other platforms
 
-- **ratex-ffi**: C ABI for iOS/Android.
+- **ratex-ffi**: C ABI for iOS, Android (JNI), Flutter, React Native.
 - **ratex-render**: Native tiny-skia rendering to PNG.
 - **ratex-wasm + platforms/web**: Same DisplayList in the browser, drawn by **web-render** on Canvas 2D.
 

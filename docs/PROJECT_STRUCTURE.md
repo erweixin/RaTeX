@@ -10,11 +10,15 @@ Current layout as of the codebase. RA (Rust) + TeX.
 RaTeX/
 ├── Cargo.toml                    # Workspace root
 ├── README.md
+├── CONTRIBUTING.md               # Build, test, golden workflow, PR notes
+├── SECURITY.md                   # How to report vulnerabilities
 ├── LICENSE                       # MIT
 ├── .gitignore
 ├── .github/
 │   └── workflows/
-│       └── ci.yml                # Build + Clippy + Test
+│       ├── ci.yml                # Build + Clippy + Test
+│       ├── pages.yml             # GitHub Pages (demo)
+│       └── release-*.yml         # crates.io, npm, pub.dev, iOS/Android/RN
 │
 ├── crates/                       # Rust crates
 │   ├── ratex-types/              # Shared types (DisplayList, Color, etc.)
@@ -22,15 +26,16 @@ RaTeX/
 │   ├── ratex-lexer/               # LaTeX → token stream
 │   ├── ratex-parser/             # Token stream → ParseNode AST
 │   ├── ratex-layout/             # AST → LayoutBox → DisplayList
-│   ├── ratex-ffi/                # C ABI export (iOS/Android/Flutter/RN) — stub
+│   ├── ratex-ffi/                # C ABI: LaTeX → DisplayList JSON (+ Android JNI)
 │   ├── ratex-render/             # DisplayList → PNG (tiny-skia, server-side)
 │   └── ratex-wasm/               # WASM: LaTeX → DisplayList JSON (browser)
 │
 ├── platforms/
-│   ├── ios/                      # Swift (binding layer in progress)
-│   ├── android/                  # Android (binding layer in progress)
-│   ├── flutter/                  # Flutter (binding layer in progress)
-│   └── web/                      # WASM + TypeScript web-render (working)
+│   ├── ios/                      # Swift + XCFramework + CoreGraphics
+│   ├── android/                  # Kotlin + AAR + JNI/Canvas
+│   ├── flutter/                  # Dart FFI + widget
+│   ├── react-native/             # Native module + iOS/Android views
+│   └── web/                      # npm package `ratex-wasm`: WASM + TypeScript web-render
 │
 ├── tools/                        # Dev / comparison scripts
 │   ├── convert_metrics.py        # KaTeX fontMetricsData.js → Rust
@@ -49,7 +54,7 @@ RaTeX/
 ├── scripts/
 │   └── update_golden_output.sh    # Renders all test_cases.txt → output/
 │
-└── demo/                         # Web demo (support table, index)
+└── demo/                         # Web demo + sample apps (web, ios, android, flutter, RN)
 ```
 
 ---
@@ -71,7 +76,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.0.2"
+version = "0.0.10"   # bump with VERSION + scripts/set-version.sh; see RELEASING.md
 edition = "2021"
 authors = ["RaTeX Contributors"]
 license = "MIT"
@@ -100,7 +105,7 @@ serde_json = "1.0"
 | **ratex-lexer** | LaTeX string → token stream |
 | **ratex-parser** | Token stream → ParseNode AST (macro expansion, functions) |
 | **ratex-layout** | AST → LayoutBox tree → `to_display_list` → DisplayList |
-| **ratex-ffi** | C ABI for native platforms (currently stub) |
+| **ratex-ffi** | C ABI: `ratex_parse_and_layout` → DisplayList JSON; Android `jni` module when targeting Android |
 | **ratex-render** | DisplayList → PNG via tiny-skia + ab_glyph (server/CI) |
 | **ratex-wasm** | WASM: parse + layout → DisplayList JSON for browser |
 
@@ -153,7 +158,7 @@ crates/ratex-font/
 
 ## ratex-ffi
 
-Currently a stub: `crates/ratex-ffi/src/lib.rs` only. C ABI entrypoints for iOS/Android/Flutter/RN will be added here.
+Exports a C ABI used by iOS (static lib / XCFramework), Android (JNI), Flutter (Dart FFI), and React Native (native module). Main entry: parse LaTeX and return a heap-allocated JSON `DisplayList` string; callers free with `ratex_free_display_list`. On failure, use `ratex_get_last_error`. See crate-level docs in `crates/ratex-ffi/src/lib.rs`.
 
 ---
 
@@ -195,7 +200,7 @@ ratex-layout
     ├── ratex-render (PNG)
     └── ratex-wasm   (browser JSON)
     ↑
-platforms/ (ios, android, flutter, web)
+platforms/ (ios, android, flutter, react-native, web)
 ```
 
 ---
@@ -206,4 +211,4 @@ platforms/ (ios, android, flutter, web)
 2. **RaTeX output**: `scripts/update_golden_output.sh` runs `ratex-render` to produce `tests/golden/output/*.png`.
 3. **Comparison**: `tools/golden_compare/compare_golden.py` (or Rust test `crates/ratex-render/tests/golden_test.rs`) compares output vs fixtures (e.g. ink-coverage threshold).
 
-See also `docs/LOW_SCORE_CASES.md` for low-scoring cases and `docs/KATEX_SVG_PATH_PLAN.md` for stretchy SVG path improvements.
+See also `docs/LOW_SCORE_CASES.md` for low-scoring cases and `docs/KATEX_SVG_PATH_PLAN.md` for stretchy SVG path improvements. Contributing: root `CONTRIBUTING.md`; releases: `RELEASING.md`.

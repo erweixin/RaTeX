@@ -35,8 +35,8 @@ RaTeX cuts the web stack out entirely. One Rust core, one display list, every pl
 
 ## Key facts
 
-- **~99%** of KaTeX formula syntax — parses and lays out the same LaTeX source
-- **~80%** visual similarity to KaTeX (golden test score against KaTeX reference renders)
+- **~99%** of KaTeX formula syntax — **intended** coverage: parse + layout on the same path as KaTeX for that share of the language. **The ~80% golden score below is a poor proxy for “how much formula support exists”** — it only measures PNG raster similarity.
+- **~80%** aggregate golden score vs KaTeX reference PNGs (ink-coverage metric — **not** formula coverage or project completeness; **many** cases already score very high; see **Project status** below)
 - **One display list** output: flat, serializable drawing commands consumed by any renderer
 - **C ABI** (`ratex-ffi`) for FFI from Swift, Kotlin, Dart, Go, C++
 - **Platform glue layers**: iOS / Android / Flutter / React Native bindings ready — **out of the box**
@@ -48,6 +48,20 @@ RaTeX cuts the web stack out entirely. One Rust core, one display list, every pl
 
 ---
 
+## Project status
+
+**Intended formula coverage is broad** — the ~**99%** figure is the **goal** for how much of KaTeX’s formula surface RaTeX should handle the same way; **implementation is ongoing**, and you should **validate** against your own LaTeX. The headline **~80%** number **does not** summarize how far along that is; it is **only** the outcome of an automated **PNG vs PNG** golden pass.
+
+**Syntax coverage and pixel-level parity are different.** For sources in scope, the aim is the same parse/layout path as KaTeX; **there are still** syntax and layout edge cases to fix, but that backlog **should not** be inferred from the ~80% raster score alone.
+
+**Golden tests** rasterize RaTeX and KaTeX to PNG and score pairs with an **ink-coverage** metric (ink-pixel overlap / IoU-style signals, plus geometry checks). The **suite-wide aggregate** is about **~80%** — that is **not** 1:1 pixel agreement with KaTeX for every case, and it is **not** “only 80% of formulas are supported” or “the project is ~80% finished.” **Many** individual `test_cases` already reach **very high** similarity to KaTeX; the average reflects harder cases (metrics, paths, hinting, anti-aliasing, and other raster/layout details).
+
+**Why the ink score punishes tiny shifts:** The metric is computed on a **pixel grid**: it compares which pixels count as “ink” in the reference vs candidate. A **small** layout delta—**spacing or kerning between two letters** nudged by even a **sub-pixel** amount—moves glyph outlines on that grid, so the two ink masks **misalign** and IoU-style overlap **falls** even when the formula still **looks** almost the same to the eye. **Anti-aliasing** makes it worse: stroke edges are partially transparent, so slight positional differences change many border pixels at once. The ~80% headline is therefore a **strict raster** summary: it mixes real layout gaps with **pixel-level strictness**, not a plain “visual quality percentage.”
+
+**LaTeX math is complex** — edge cases stack quickly. **We need real-world feedback:** if something looks wrong, please open an issue with the **exact LaTeX** (and a screenshot if you can) so we can turn it into a regression test. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
+---
+
 ## Platform targets
 
 | Platform | How | Status |
@@ -56,10 +70,10 @@ RaTeX cuts the web stack out entirely. One Rust core, one display list, every pl
 | **Server / CI** | tiny-skia → PNG rasterizer | Working |
 | **iOS** | Swift/ObjC bindings to C ABI · XCFramework | Out of the box |
 | **Android** | JNI → Kotlin/Java · AAR | Out of the box |
-| **React Native** | Native module via C ABI | Binding layer in progress |
+| **React Native** | Native module via C ABI · iOS/Android views | Out of the box |
 | **Flutter** | Dart FFI via C ABI | Out of the box |
 
-> Rust core and per-platform glue layers are ready; integrate and ship.
+> Rust core and all platform glue layers (iOS, Android, Flutter, React Native, Web) are ready; integrate and ship.
 
 ---
 
@@ -174,12 +188,16 @@ echo '\sum_{i=1}^n i = \frac{n(n+1)}{2}' | cargo run --release -p ratex-render -
 
 ### Use in the browser (WASM)
 
+```bash
+npm install ratex-wasm
+```
+
 ```html
 <!-- 1. Fonts -->
-<link rel="stylesheet" href="node_modules/ratex-web/fonts.css" />
+<link rel="stylesheet" href="node_modules/ratex-wasm/fonts.css" />
 
 <!-- 2. Register the Web Component -->
-<script type="module" src="node_modules/ratex-web/dist/ratex-formula.js"></script>
+<script type="module" src="node_modules/ratex-wasm/dist/ratex-formula.js"></script>
 
 <!-- 3. Done -->
 <ratex-formula latex="\frac{-b \pm \sqrt{b^2-4ac}}{2a}" font-size="48"></ratex-formula>
@@ -194,6 +212,7 @@ See [`platforms/web/README.md`](platforms/web/README.md) for the full WASM + web
 | iOS | [`platforms/ios/README.md`](platforms/ios/README.md) — XCFramework + Swift/CoreGraphics |
 | Android | [`platforms/android/README.md`](platforms/android/README.md) — AAR + Kotlin/Canvas |
 | Flutter | [`platforms/flutter/README.md`](platforms/flutter/README.md) — Dart FFI |
+| React Native | [`platforms/react-native/README.md`](platforms/react-native/README.md) — Native module + Fabric/Bridge views |
 | Web | [`platforms/web/README.md`](platforms/web/README.md) — WASM + Web Component |
 
 ### Run tests
@@ -221,14 +240,20 @@ cargo test --all
 
 ## KaTeX compatibility
 
-- **Formula support (~99%):** The same LaTeX source rendered by KaTeX in the browser and by RaTeX on device. We continue to close remaining gaps.
-- **Visual similarity (~80%):** Golden tests compare RaTeX-rendered PNGs to KaTeX reference PNGs using an ink-coverage score (IoU of ink pixels, recall, aspect and width similarity). 80% is the visual likeness score — not the share of formulas supported, which is ~99%.
+- **Formula support (~99%):** The same LaTeX source is **intended** to work in KaTeX (browser) and RaTeX (native / WASM). Coverage is **wide** for KaTeX-aligned formulas, but **not** every edge case is settled yet — and **none** of that is well summarized by the ~80% golden figure.
+- **Golden / visual score (~80% aggregate):** PNG pairs are scored with an **ink-coverage** metric (ink-pixel overlap, recall, aspect and width similarity). This measures **raster** likeness across the suite — **not** how complete formula support is; **many** cases score much higher than the average. See **Project status** above.
 
 ---
 
 ## Acknowledgement: KaTeX
 
 Ratex owes a great debt to [KaTeX](https://katex.org/). KaTeX is the de facto reference for fast, rigorous LaTeX math on the web; its parser, symbol tables, and layout semantics follow Donald Knuth's TeX standard. We use KaTeX’s font metrics and golden outputs to validate Ratex, and we aim for **syntax and visual compatibility** so that the same LaTeX source can be rendered consistently by KaTeX in the browser and by Ratex on native platforms. We thank the KaTeX project and contributors for their open, well-documented work—without it, this engine would not exist.
+
+---
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md). To report a security issue privately, see [`SECURITY.md`](SECURITY.md).
 
 ---
 

@@ -1,7 +1,7 @@
 /**
  * RaTeX Web math fonts (bundled in package, no CDN required)
- * Usage: <link rel="stylesheet" href="node_modules/ratex-web/fonts.css" />
- * Or: import 'ratex-web/fonts.css';
+ * Usage: <link rel="stylesheet" href="node_modules/ratex-wasm/fonts.css" />
+ * Or: import 'ratex-wasm/fonts.css';
  * Fonts from KaTeX 0.16.9, licensed under the OFL.
  */
 @font-face {

@@ -4,6 +4,12 @@
 
 ---
 
+## Document scope
+
+This file is a **design and rationale** summary (historical estimates, KaTeX mapping, architecture). For **what exists today**—crate layout, `ratex-ffi` C ABI, npm package **`ratex-wasm`**, golden tests—see [`PROJECT_STRUCTURE.md`](./PROJECT_STRUCTURE.md) and the per-platform READMEs under `platforms/`.
+
+---
+
 ## 1. Background and Goals
 
 ### 1.1 Starting Point: SwiftMath

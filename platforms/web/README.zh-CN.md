@@ -97,7 +97,7 @@ npx serve .
 
 ## 与其他平台的关系
 
-- **ratex-ffi**：iOS/Android 的 C ABI。
+- **ratex-ffi**：iOS、Android（JNI）、Flutter、React Native 的 C ABI。
 - **ratex-render**：原生 tiny-skia 渲染为 PNG。
 - **ratex-wasm + platforms/web**：同一 DisplayList 在浏览器中由 **web-render** 在 Canvas 2D 上绘制。
 
