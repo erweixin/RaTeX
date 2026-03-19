@@ -703,6 +703,22 @@ fn layout_supsub(
     sub: Option<&ParseNode>,
     options: &LayoutOptions,
 ) -> LayoutBox {
+    let horiz_brace_over = matches!(
+        base,
+        Some(ParseNode::HorizBrace {
+            is_over: true,
+            ..
+        })
+    );
+    let horiz_brace_under = matches!(
+        base,
+        Some(ParseNode::HorizBrace {
+            is_over: false,
+            ..
+        })
+    );
+    let center_scripts = horiz_brace_over || horiz_brace_under;
+
     let base_box = base
         .map(|b| layout_node(b, options))
         .unwrap_or_else(LayoutBox::new_empty);
@@ -787,6 +803,18 @@ fn layout_supsub(
             .max(sup_depth_scaled + 0.25 * metrics.x_height);
     }
 
+    // `\overbrace{…}^{…}` / `\underbrace{…}_{…}`: default sup_shift = height - sup_drop places
+    // the script baseline *inside* tall atoms (by design for single glyphs). For stretchy
+    // horizontal braces the label must sit above/below the ink with limit-style clearance.
+    if horiz_brace_over && sup_box.is_some() {
+        sup_shift += sup_style_metrics.sup_drop * sup_ratio;
+        sup_shift += metrics.big_op_spacing1 + 0.3;
+    }
+    if horiz_brace_under && sub_box.is_some() {
+        sub_shift += sub_style_metrics.sub_drop * sub_ratio;
+        sub_shift += metrics.big_op_spacing2 + 0.2;
+    }
+
     // Compute total dimensions (using scaled child dimensions)
     let mut height = base_box.height;
     let mut depth = base_box.depth;
@@ -794,11 +822,19 @@ fn layout_supsub(
 
     if let Some(ref sup_b) = sup_box {
         height = height.max(sup_shift + sup_height_scaled);
-        total_width = total_width.max(base_box.width + sup_b.width * sup_ratio);
+        if center_scripts {
+            total_width = total_width.max(sup_b.width * sup_ratio);
+        } else {
+            total_width = total_width.max(base_box.width + sup_b.width * sup_ratio);
+        }
     }
     if let Some(ref sub_b) = sub_box {
         depth = depth.max(sub_shift + sub_depth_scaled);
-        total_width = total_width.max(base_box.width + sub_b.width * sub_ratio);
+        if center_scripts {
+            total_width = total_width.max(sub_b.width * sub_ratio);
+        } else {
+            total_width = total_width.max(base_box.width + sub_b.width * sub_ratio);
+        }
     }
 
     LayoutBox {
@@ -813,6 +849,7 @@ fn layout_supsub(
             sub_shift,
             sup_scale: sup_ratio,
             sub_scale: sub_ratio,
+            center_scripts,
         },
         color: options.color,
     }
@@ -2476,9 +2513,10 @@ fn layout_spacing_command(text: &str, options: &LayoutOptions) -> LayoutBox {
         "\\!" | "\\negthinspace" => -3.0 * mu,
         "\\negmedspace" => -4.0 * mu,
         "\\negthickspace" => -5.0 * mu,
-        "~" | "\\nobreakspace" | "\\ " | "\\space" => {
+        " " | "~" | "\\nobreakspace" | "\\ " | "\\space" => {
             // KaTeX renders these by placing the U+00A0 glyph (char 160) via mathsym.
             // Look up its width from MainRegular; fall back to 0.25em (the font-defined value).
+            // Literal space in `\text{ … }` becomes SpacingNode with text " ".
             get_char_metrics(FontId::MainRegular, 160)
                 .map(|m| m.width)
                 .unwrap_or(0.25)

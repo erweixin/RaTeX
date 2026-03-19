@@ -171,15 +171,31 @@ fn emit_box(lbox: &LayoutBox, x: f64, y: f64, scale: f64, items: &mut Vec<Displa
             sub_shift,
             sup_scale: ss,
             sub_scale: bs,
+            center_scripts,
         } => {
-            emit_box(base, x, y, scale, items);
+            let base_x = if *center_scripts {
+                x + (lbox.width - base.width) * scale / 2.0
+            } else {
+                x
+            };
+            emit_box(base, base_x, y, scale, items);
             if let Some(sup_box) = sup {
                 let child_scale = scale * ss;
-                emit_box(sup_box, x + base.width * scale, y - sup_shift * scale, child_scale, items);
+                let sup_x = if *center_scripts {
+                    x + (lbox.width * scale - sup_box.width * child_scale) / 2.0
+                } else {
+                    base_x + base.width * scale
+                };
+                emit_box(sup_box, sup_x, y - sup_shift * scale, child_scale, items);
             }
             if let Some(sub_box) = sub {
                 let child_scale = scale * bs;
-                emit_box(sub_box, x + base.width * scale, y + sub_shift * scale, child_scale, items);
+                let sub_x = if *center_scripts {
+                    x + (lbox.width * scale - sub_box.width * child_scale) / 2.0
+                } else {
+                    base_x + base.width * scale
+                };
+                emit_box(sub_box, sub_x, y + sub_shift * scale, child_scale, items);
             }
         }
 

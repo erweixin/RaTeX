@@ -61,6 +61,8 @@ pub enum BoxContent {
         sub_shift: f64,
         sup_scale: f64,
         sub_scale: f64,
+        /// When true, place scripts centered on the base width (e.g. `\overbrace` / `\underbrace`).
+        center_scripts: bool,
     },
 
     /// A radical (square root).
