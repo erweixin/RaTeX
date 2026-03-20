@@ -33,9 +33,12 @@ pub enum BoxContent {
         char_code: u32,
     },
 
-    /// Horizontal rule (fraction bar, overline, etc.).
+    /// Filled rectangle from `\rule[<raise>]{width}{height}`.
+    /// `thickness` is the ink height; `raise` is the distance (in em) from the baseline
+    /// to the bottom edge of the rectangle, positive toward the top of the line.
     Rule {
         thickness: f64,
+        raise: f64,
     },
 
     /// Empty space (kern).
@@ -205,12 +208,12 @@ impl LayoutBox {
         }
     }
 
-    pub fn new_rule(width: f64, height: f64, depth: f64, thickness: f64) -> Self {
+    pub fn new_rule(width: f64, height: f64, depth: f64, thickness: f64, raise: f64) -> Self {
         Self {
             width,
             height,
             depth,
-            content: BoxContent::Rule { thickness },
+            content: BoxContent::Rule { thickness, raise },
             color: Color::BLACK,
         }
     }

@@ -292,9 +292,22 @@ fn layout_node(node: &ParseNode, options: &LayoutOptions) -> LayoutBox {
 
         ParseNode::Sizing { size, body, .. } => layout_sizing(*size, body, options),
 
-        ParseNode::Text { body, .. } => layout_text(body, options),
+        ParseNode::Text { body, font, mode, .. } => match font.as_deref() {
+            Some(f) => {
+                let group = ParseNode::OrdGroup {
+                    mode: *mode,
+                    body: body.clone(),
+                    semisimple: None,
+                    loc: None,
+                };
+                layout_font(f, &group, options)
+            }
+            None => layout_text(body, options),
+        },
 
         ParseNode::Font { font, body, .. } => layout_font(font, body, options),
+
+        ParseNode::Href { body, .. } => layout_href(body, options),
 
         ParseNode::Overline { body, .. } => layout_overline(body, options),
         ParseNode::Underline { body, .. } => layout_underline(body, options),
@@ -302,11 +315,18 @@ fn layout_node(node: &ParseNode, options: &LayoutOptions) -> LayoutBox {
         ParseNode::Rule {
             width: w,
             height: h,
+            shift,
             ..
         } => {
             let width = measurement_to_em(w, options);
-            let height = measurement_to_em(h, options);
-            LayoutBox::new_rule(width, height, 0.0, height)
+            let ink_h = measurement_to_em(h, options);
+            let raise = shift
+                .as_ref()
+                .map(|s| measurement_to_em(s, options))
+                .unwrap_or(0.0);
+            let box_height = (raise + ink_h).max(0.0);
+            let box_depth = (-raise).max(0.0);
+            LayoutBox::new_rule(width, box_height, box_depth, ink_h, raise)
         }
 
         ParseNode::Phantom { body, .. } => {
@@ -1571,6 +1591,7 @@ fn node_contains_middle(node: &ParseNode) -> bool {
                 || scriptscript.iter().any(node_contains_middle)
         }
         ParseNode::HorizBrace { base, .. } => node_contains_middle(base),
+        ParseNode::Href { body, .. } => body.iter().any(node_contains_middle),
         _ => false,
     }
 }
@@ -2513,6 +2534,31 @@ fn layout_underline(body: &ParseNode, options: &LayoutOptions) -> LayoutBox {
             rule_thickness: rule,
         },
         color: options.color,
+    }
+}
+
+/// `\href` / `\url`: link color on the glyphs and an underline in the same color (KaTeX-style).
+fn layout_href(body: &[ParseNode], options: &LayoutOptions) -> LayoutBox {
+    let link_color = Color::from_name("blue").unwrap_or_else(|| Color::rgb(0.0, 0.0, 1.0));
+    let body_opts = options.with_color(link_color);
+    let body_box = layout_expression(body, &body_opts, true);
+    layout_underline_laid_out(body_box, options, link_color)
+}
+
+/// Same geometry as [`layout_underline`], but for an already computed inner box.
+fn layout_underline_laid_out(body_box: LayoutBox, options: &LayoutOptions, color: Color) -> LayoutBox {
+    let metrics = options.metrics();
+    let rule = metrics.default_rule_thickness;
+    let depth = body_box.depth + 3.0 * rule;
+    LayoutBox {
+        width: body_box.width,
+        height: body_box.height,
+        depth,
+        content: BoxContent::Underline {
+            body: Box::new(body_box),
+            rule_thickness: rule,
+        },
+        color,
     }
 }
 
