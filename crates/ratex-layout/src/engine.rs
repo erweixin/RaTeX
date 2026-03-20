@@ -805,7 +805,9 @@ fn layout_supsub(
     // horizontal braces the label must sit above/below the ink with limit-style clearance.
     if horiz_brace_over && sup_box.is_some() {
         sup_shift += sup_style_metrics.sup_drop * sup_ratio;
-        sup_shift += metrics.big_op_spacing1 + 0.3;
+        // Same order of gap as `\xrightarrow` labels (`big_op_spacing1` ≈ 2mu); extra +0.3em
+        // pushed the script too far above the brace vs KaTeX reference (golden 0603).
+        sup_shift += metrics.big_op_spacing1;
     }
     if horiz_brace_under && sub_box.is_some() {
         sub_shift += sub_style_metrics.sub_drop * sub_ratio;
@@ -2730,11 +2732,16 @@ fn layout_horiz_brace(
     let w = body_box.width.max(0.5);
 
     let label = if is_over { "overbrace" } else { "underbrace" };
-    let (raw_commands, brace_h) = crate::katex_svg::katex_stretchy_path(label, w)
-        .unwrap_or_else(|| {
-            let h = 0.35_f64;
-            (horiz_brace_path(w, h, is_over), h)
-        });
+    // KaTeXSize4 brace glyphs are closed contours meant for fill (like stretchy arrows).
+    // fill=false strokes outlines → hollow “wireframe” and exaggerated bar ends.
+    let (raw_commands, brace_h, brace_fill) =
+        match crate::katex_svg::katex_stretchy_path(label, w) {
+            Some((c, h)) => (c, h, true),
+            None => {
+                let h = 0.35_f64;
+                (horiz_brace_path(w, h, is_over), h, false)
+            }
+        };
 
     // Shift y-coordinates: centered commands → positioned for over/under
     // For overbrace: foot at y=0 (bottom), peak goes up → shift by -brace_h/2
@@ -2748,7 +2755,7 @@ fn layout_horiz_brace(
         depth: if is_over { 0.0 } else { brace_h },
         content: BoxContent::SvgPath {
             commands,
-            fill: false,
+            fill: brace_fill,
         },
         color: options.color,
     };

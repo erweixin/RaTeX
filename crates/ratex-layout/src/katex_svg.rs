@@ -855,7 +855,9 @@ fn katex_image_data(label: &str) -> Option<KatexImageData> {
         "xmapsto"            => Some(KatexImageData { paths: &["leftmapsto", "rightarrow"], _min_width: 1.5, vb_height: 522.0, align: None }),
         "xtofrom"            => Some(KatexImageData { paths: &["leftToFrom", "rightToFrom"], _min_width: 1.75, vb_height: 528.0, align: None }),
         "xrightleftarrows"   => Some(KatexImageData { paths: &["baraboveleftarrow", "rightarrowabovebar"], _min_width: 1.75, vb_height: 901.0, align: None }),
-        // overbrace/underbrace: not using KaTeX three-segment joining; drawn as a single path by the engine's horiz_brace_path
+        // Overbrace/underbrace: KaTeX Size4 glyphs (viewBox 400000×548), same 3-piece horizontal joining as stretchy arrows.
+        "overbrace"  => Some(KatexImageData { paths: &["leftbrace", "midbrace", "rightbrace"], _min_width: 0.888, vb_height: 548.0, align: None }),
+        "underbrace" => Some(KatexImageData { paths: &["leftbraceunder", "midbraceunder", "rightbraceunder"], _min_width: 0.888, vb_height: 548.0, align: None }),
         _ => None,
     }
 }
@@ -973,9 +975,28 @@ pub fn katex_stretchy_path(label: &str, width_em: f64) -> Option<(Vec<PathComman
             let lc = make_cmds(data.paths[0], 0.0)?;
             let mc = make_cmds(data.paths[1], x_m)?;
             let rc = make_cmds(data.paths[2], x_r)?;
-            let mut out = clip_path_to_rect(&lc, 0.0, width_em, y_min, y_max);
-            out.extend(clip_path_to_rect(&mc, 0.0, width_em, y_min, y_max));
-            out.extend(clip_path_to_rect(&rc, 0.0, width_em, y_min, y_max));
+            // KaTeX `stretchy.ts` + `katex.scss`: three stacked spans with overflow hidden —
+            // `.brace-left` 25.1%, `.brace-center` 50% at left 25%, `.brace-right` 25.1% from the
+            // right. Each child SVG is 400em wide with `preserveAspectRatio` slice so only the
+            // correct horizontal band shows. Clipping all three to `[0, width]` exposes the
+            // middle glyph’s full 400-unit shaft on the entire width → thick bar past the curls.
+            let key = label.trim_start_matches('\\');
+            let w = width_em;
+            let out = if key == "overbrace" || key == "underbrace" {
+                let left_max = w * 0.251;
+                let center_min = w * 0.25;
+                let center_max = w * 0.75;
+                let right_min = w * (1.0 - 0.251);
+                let mut o = clip_path_to_rect(&lc, 0.0, left_max, y_min, y_max);
+                o.extend(clip_path_to_rect(&mc, center_min, center_max, y_min, y_max));
+                o.extend(clip_path_to_rect(&rc, right_min, w, y_min, y_max));
+                o
+            } else {
+                let mut o = clip_path_to_rect(&lc, 0.0, w, y_min, y_max);
+                o.extend(clip_path_to_rect(&mc, 0.0, w, y_min, y_max));
+                o.extend(clip_path_to_rect(&rc, 0.0, w, y_min, y_max));
+                o
+            };
             Some((out, height_em))
         }
         _ => None,
