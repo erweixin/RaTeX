@@ -1,6 +1,4 @@
-use ratex_font::{
-    get_char_metrics, get_global_metrics, FontId, MathConstants,
-};
+use ratex_font::{get_char_metrics, get_global_metrics, FontId};
 use ratex_parser::parse_node::{AtomFamily, Mode, ParseNode};
 use ratex_types::color::Color;
 use ratex_types::math_style::MathStyle;
@@ -8,57 +6,9 @@ use ratex_types::path_command::PathCommand;
 
 use crate::hbox::make_hbox;
 use crate::layout_box::{BoxContent, LayoutBox};
+use crate::layout_options::LayoutOptions;
 use crate::spacing::{atom_spacing, mu_to_em, MathClass};
-
-/// Layout options passed through the layout tree.
-#[derive(Debug, Clone)]
-pub struct LayoutOptions {
-    pub style: MathStyle,
-    pub color: Color,
-    /// When set (e.g. in align/aligned), cap relation spacing to this many mu for consistency.
-    pub align_relation_spacing: Option<f64>,
-    /// When inside \\left...\\right, the stretch height for \\middle delimiters (second pass only).
-    pub leftright_delim_height: Option<f64>,
-}
-
-impl Default for LayoutOptions {
-    fn default() -> Self {
-        Self {
-            style: MathStyle::Display,
-            color: Color::BLACK,
-            align_relation_spacing: None,
-            leftright_delim_height: None,
-        }
-    }
-}
-
-impl LayoutOptions {
-    pub fn metrics(&self) -> &'static MathConstants {
-        get_global_metrics(self.style.size_index())
-    }
-
-    pub fn size_multiplier(&self) -> f64 {
-        self.style.size_multiplier()
-    }
-
-    pub fn with_style(&self, style: MathStyle) -> Self {
-        Self {
-            style,
-            color: self.color,
-            align_relation_spacing: self.align_relation_spacing,
-            leftright_delim_height: self.leftright_delim_height,
-        }
-    }
-
-    pub fn with_color(&self, color: Color) -> Self {
-        Self {
-            style: self.style,
-            color,
-            align_relation_spacing: self.align_relation_spacing,
-            leftright_delim_height: self.leftright_delim_height,
-        }
-    }
-}
+use crate::stacked_delim::make_stacked_delim_if_needed;
 
 /// Main entry point: lay out a list of ParseNodes into a LayoutBox.
 pub fn layout(nodes: &[ParseNode], options: &LayoutOptions) -> LayoutBox {
@@ -1327,6 +1277,11 @@ fn layout_operatorname(body: &[ParseNode], options: &LayoutOptions) -> LayoutBox
 // Accent layout
 // ============================================================================
 
+/// `\vec` KaTeX SVG: nudge vs raster reference (e.g. golden `0922`) — slightly lower, slightly right.
+const VEC_CLEARANCE_PULL_DOWN_EM: f64 = 0.082;
+const VEC_SKEW_EXTRA_RIGHT_EM: f64 = 0.018;
+const VEC_CLEARANCE_MIN_FLOOR_EM: f64 = 0.30;
+
 /// Extract the skew (italic correction) of the innermost/last glyph in a box.
 /// Used by shifty accents (\hat, \tilde…) to horizontally centre the mark
 /// over italic math letters (e.g. M in MathItalic has skew ≈ 0.083em).
@@ -1372,18 +1327,33 @@ fn layout_accent(
             content: BoxContent::SvgPath { commands, fill },
             color: options.color,
         };
+        // KaTeX `accent.ts` uses `clearance = min(body.height, xHeight)` for ordinary accents.
+        // That matches fixed-size `\vec` (svgData.vec); using it for *width-scaled* SVG accents
+        // (\widehat, \widetilde, \overgroup, …) pulls the path down onto the base (golden 0604/0885/0886).
         let gap = 0.08;
-        // clearance determines accent bottom position: accent_bottom = baseline - clearance
-        // accent_y = baseline - clearance - accent.depth  (reference above the bottom)
         let clearance = if is_below {
             body_box.height + body_box.depth + gap
+        } else if label == "\\vec" {
+            (body_box.height.min(options.metrics().x_height) - VEC_CLEARANCE_PULL_DOWN_EM)
+                .max(VEC_CLEARANCE_MIN_FLOOR_EM)
         } else {
             body_box.height + gap
         };
         let (height, depth) = if is_below {
             (body_box.height, body_box.depth + h + gap)
+        } else if label == "\\vec" {
+            (body_box.height + h, body_box.depth)
         } else {
             (body_box.height + gap + h, body_box.depth)
+        };
+        let vec_skew = if label == "\\vec" {
+            (if is_shifty {
+                glyph_skew(&body_box)
+            } else {
+                0.0
+            }) + VEC_SKEW_EXTRA_RIGHT_EM
+        } else {
+            0.0
         };
         return LayoutBox {
             width: body_box.width,
@@ -1393,7 +1363,7 @@ fn layout_accent(
                 base: Box::new(body_box),
                 accent: Box::new(accent_box),
                 clearance,
-                skew: 0.0,
+                skew: vec_skew,
                 is_below,
             },
             color: options.color,
@@ -1798,6 +1768,11 @@ fn make_stretchy_delim(delim: &str, total_height: f64, options: &LayoutOptions) 
                 break;
             }
         }
+    }
+
+    let best_total = best_h + best_d;
+    if let Some(stacked) = make_stacked_delim_if_needed(delim, total_height, best_total, options) {
+        return stacked;
     }
 
     LayoutBox {

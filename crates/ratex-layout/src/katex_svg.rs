@@ -8,12 +8,12 @@ pub fn katex_accent_path(
 ) -> Option<(Vec<PathCommand>, f64, f64, bool)> {
     match label {
         "\\vec" => {
-            // KaTeX uses SVG for \vec (from PR #1018) to avoid combining character issues.
-            // Use a filled arrow shape for precise control over thickness.
-            let h_em = 0.12; // Small compact height
-            let w_em = base_width_em.max(0.35);
-            let cmds = build_vec_arrow_filled(w_em, h_em);
-            Some((cmds, w_em, h_em, true)) // true = fill
+            // KaTeX `svgGeometry.path.vec` (glyph U+20D7) + `svgData.vec` fixed size — not stretched to base width.
+            const W_EM: f64 = 0.471;
+            const H_EM: f64 = 0.714;
+            let raw = parse_svg_path(KATEX_VEC_PATH);
+            let cmds = scale_svg_path_thousandths(&raw);
+            Some((cmds, W_EM, H_EM, true))
         }
         "\\widehat" | "\\widecheck" => {
             let is_hat = label == "\\widehat";
@@ -242,37 +242,45 @@ fn clip_segment_to_rect(
     vec![(a, b)]
 }
 
-/// Build a filled vector arrow for \vec accent.
-/// The arrow is centered horizontally over the base and points to the right.
-fn build_vec_arrow_filled(width_em: f64, height_em: f64) -> Vec<PathCommand> {
-    // Filled rightward arrow with thin shaft and small arrowhead
-    let mid_y = height_em / 2.0;
-    let shaft_thickness = 0.02; // Thin shaft
-    let arrow_len = width_em * 0.85;
-    let head_len = height_em * 0.6; // Arrowhead length
-    let head_width = height_em * 0.45; // Arrowhead half-width
-    let start_x = (width_em - arrow_len) / 2.0;
-    let end_x = start_x + arrow_len;
-    let y = -mid_y; // Center y (negative because SVG y points down)
+/// KaTeX `svgGeometry.js` path `vec` (from Main U+20D7); viewBox `0 0 471 714` (= 1000×0.471 by 1000×0.714).
+const KATEX_VEC_PATH: &str = "M377 20c0-5.333 1.833-10 5.5-14S391 0 397 0c4.667 0 8.667 1.667 12 5 3.333 2.667 6.667 9 10 19 6.667 24.667 20.333 43.667 41 57 7.333 4.667 11 10.667 11 18 0 6-1 10-3 12s-6.667 5-14 9c-28.667 14.667-53.667 35.667-75 63 -1.333 1.333-3.167 3.5-5.5 6.5s-4 4.833-5 5.5c-1 .667-2.5 1.333-4.5 2s-4.333 1 -7 1c-4.667 0-9.167-1.833-13.5-5.5S337 184 337 178c0-12.667 15.667-32.333 47-59 H213l-171-1c-8.667-6-13-12.333-13-19 0-4.667 4.333-11.333 13-20h359 c-16-25.333-24-45-24-59z";
 
-    // Build a filled arrow shape: shaft rectangle + triangular head
-    vec![
-        // Start at shaft top-left
-        PathCommand::MoveTo { x: start_x, y: y - shaft_thickness },
-        // Shaft top edge to where head begins
-        PathCommand::LineTo { x: end_x - head_len, y: y - shaft_thickness },
-        // Arrowhead top edge
-        PathCommand::LineTo { x: end_x - head_len, y: y - head_width },
-        // Arrowhead tip
-        PathCommand::LineTo { x: end_x, y },
-        // Arrowhead bottom edge
-        PathCommand::LineTo { x: end_x - head_len, y: y + head_width },
-        // Back to shaft bottom
-        PathCommand::LineTo { x: end_x - head_len, y: y + shaft_thickness },
-        // Shaft bottom edge back to start
-        PathCommand::LineTo { x: start_x, y: y + shaft_thickness },
-        PathCommand::Close,
-    ]
+fn scale_svg_path_thousandths(cmds: &[PathCommand]) -> Vec<PathCommand> {
+    let s = 0.001;
+    cmds.iter()
+        .map(|c| match *c {
+            PathCommand::MoveTo { x, y } => PathCommand::MoveTo {
+                x: x * s,
+                y: y * s,
+            },
+            PathCommand::LineTo { x, y } => PathCommand::LineTo {
+                x: x * s,
+                y: y * s,
+            },
+            PathCommand::CubicTo {
+                x1,
+                y1,
+                x2,
+                y2,
+                x,
+                y,
+            } => PathCommand::CubicTo {
+                x1: x1 * s,
+                y1: y1 * s,
+                x2: x2 * s,
+                y2: y2 * s,
+                x: x * s,
+                y: y * s,
+            },
+            PathCommand::QuadTo { x1, y1, x, y } => PathCommand::QuadTo {
+                x1: x1 * s,
+                y1: y1 * s,
+                x: x * s,
+                y: y * s,
+            },
+            PathCommand::Close => PathCommand::Close,
+        })
+        .collect()
 }
 
 /// KaTeX selects widehat/widecheck variant by character count.
@@ -463,6 +471,11 @@ fn scale_cmd_xy(cmd: &PathCommand, sx: f64, sy: f64) -> PathCommand {
 // ---------------------------------------------------------------------------
 // Minimal SVG path data parser
 // ---------------------------------------------------------------------------
+
+/// Parse a KaTeX-style SVG path `d` string into [`PathCommand`]s (for delimiters, accents).
+pub(crate) fn parse_svg_path_data(d: &str) -> Vec<PathCommand> {
+    parse_svg_path(d)
+}
 
 fn parse_svg_path(d: &str) -> Vec<PathCommand> {
     let tokens = tokenize_svg(d);
@@ -977,6 +990,19 @@ mod tests {
     fn test_parse_simple_path() {
         let cmds = parse_svg_path("M0 0 L10 20 Z");
         assert_eq!(cmds.len(), 3);
+    }
+
+    #[test]
+    fn test_parse_katex_vec_path() {
+        let cmds = scale_svg_path_thousandths(&parse_svg_path(KATEX_VEC_PATH));
+        assert!(cmds.len() >= 8, "vec path should parse to multiple segments");
+        match cmds[0] {
+            PathCommand::MoveTo { x, y } => {
+                assert!((x - 0.377).abs() < 0.001);
+                assert!((y - 0.02).abs() < 0.001);
+            }
+            _ => panic!("expected MoveTo"),
+        }
     }
 
     #[test]
