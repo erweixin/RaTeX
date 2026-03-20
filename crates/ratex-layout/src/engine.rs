@@ -1485,10 +1485,21 @@ fn layout_accent(
 
     // gap = clearance between body top and bottom of accent SVG.
     // For arrow accents, the SVG path is centered (height=h/2, depth=h/2).
-    // The gap prevents the visible arrowhead boundary from overlapping with body top.
+    // The gap prevents the visible arrowhead / harpoon tip from overlapping the base top.
+    //
+    // KaTeX stretchy arrows with vb_height 522 have h/2 ≈ 0.261em; default gap=0.12 left
+    // too little room for tall caps (`\overleftrightarrow{AB}`, `\overleftarrow{AB}`,
+    // `\overleftharpoon{AB}`, …).  `\Overrightarrow` uses a taller glyph (vb 560) and keeps
+    // the slightly smaller kern used in prior tuning.
     let gap = if use_arrow_path {
-        if label == "\\Overrightarrow" { 0.21 } else { 0.12 }
-    } else { 0.0 };
+        if label == "\\Overrightarrow" {
+            0.21
+        } else {
+            0.26
+        }
+    } else {
+        0.0
+    };
 
     let clearance = if is_below {
         body_box.height + body_box.depth + accent_box.depth + gap
