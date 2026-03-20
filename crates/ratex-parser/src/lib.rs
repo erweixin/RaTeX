@@ -1,6 +1,7 @@
 pub mod environments;
 pub mod error;
 pub mod functions;
+pub mod mhchem;
 pub mod macro_expander;
 pub mod parse_node;
 pub mod parser;

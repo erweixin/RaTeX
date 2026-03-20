@@ -750,6 +750,12 @@ const RIGHTHARPOONDOWN: &str = "M399747 511c0 7.3 6.7 11 20 11 8 0 13-.8 15-2.5s
 // rightharpoondownplus (viewBox 400000×716)
 const RIGHTHARPOONDOWNPLUS: &str = "M399747 705c0 7.3 6.7 11 20 11 8 0 13-.8 15-2.5s4.7-6.8 8-15.5c40-94 99.3-166.3 178-217 13.3-8 20.3-12.3 21-13 5.3-3.3 8.5-5.8 9.5-7.5 1-1.7 1.5-5.2 1.5-10.5s-2.3-10.3-7-15H0v40h399908c-34 25.3-64.7 57-92 95-27.3 38-48.7 77.7-64 119-3.3 8.7-5 14-5 16zM0 435v40h399900v-40z m0-194v40h400000v-40zm0 0v40h400000v-40z";
 
+// mhchem \\xrightequilibrium / \\xleftequilibrium (KaTeX katexImagesData, viewBox 400000×716)
+const BARABOVESHORTLEFTHARPOON: &str = "M507,435c-4,4,-6.3,8.7,-7,14c0,5.3,0.7,9,2,11c1.3,2,5.3,5.3,12,10c90.7,54,156,130,196,228c3.3,10.7,6.3,16.3,9,17c2,0.7,5,1,9,1c0,0,5,0,5,0c10.7,0,16.7,-2,18,-6c2,-2.7,1,-9.7,-3,-21c-32,-87.3,-82.7,-157.7,-152,-211c0,0,-3,-3,-3,-3l399351,0l0,-40c-398570,0,-399437,0,-399437,0z M593 435 v40 H399500 v-40zM0 281 v-40 H399908 v40z M0 281 v-40 H399908 v40z";
+const RIGHTHARPOONABOVESHORTBAR: &str = "M0,241 l0,40c399126,0,399993,0,399993,0c4.7,-4.7,7,-9.3,7,-14c0,-9.3,-3.7,-15.3,-11,-18c-92.7,-56.7,-159,-133.7,-199,-231c-3.3,-9.3,-6,-14.7,-8,-16c-2,-1.3,-7,-2,-15,-2c-10.7,0,-16.7,2,-18,6c-2,2.7,-1,9.7,3,21c15.3,42,36.7,81.8,64,119.5c27.3,37.7,58,69.2,92,94.5zM0 241 v40 H399908 v-40z M0 475 v-40 H399500 v40z M0 475 v-40 H399500 v40z";
+const SHORTBARABOVELEFTHARPOON: &str = "M7,435c-4,4,-6.3,8.7,-7,14c0,5.3,0.7,9,2,11c1.3,2,5.3,5.3,12,10c90.7,54,156,130,196,228c3.3,10.7,6.3,16.3,9,17c2,0.7,5,1,9,1c0,0,5,0,5,0c10.7,0,16.7,-2,18,-6c2,-2.7,1,-9.7,-3,-21c-32,-87.3,-82.7,-157.7,-152,-211c0,0,-3,-3,-3,-3l399907,0l0,-40c-399126,0,-399993,0,-399993,0zM93 435 v40 H400000 v-40z M500 241 v40 H400000 v-40z M500 241 v40 H400000 v-40z";
+const SHORTRIGHTHARPOONABOVEBAR: &str = "M53,241l0,40c398570,0,399437,0,399437,0c4.7,-4.7,7,-9.3,7,-14c0,-9.3,-3.7,-15.3,-11,-18c-92.7,-56.7,-159,-133.7,-199,-231c-3.3,-9.3,-6,-14.7,-8,-16c-2,-1.3,-7,-2,-15,-2c-10.7,0,-16.7,2,-18,6c-2,2.7,-1,9.7,3,21c15.3,42,36.7,81.8,64,119.5c27.3,37.7,58,69.2,92,94.5zM500 241 v40 H399408 v-40z M500 435 v40 H400000 v-40z";
+
 // lefthook from glyph U+21A9 in font KaTeX Main (viewBox 400000×522)
 const LEFTHOOK: &str = "M400000 281 H103s-33-11.2-61-33.5S0 197.3 0 164s14.2-61.2 42.5-83.5C70.8 58.2 104 47 142 47 c16.7 0 25 6.7 25 20 0 12-8.7 18.7-26 20-40 3.3-68.7 15.7-86 37-10 12-15 25.3-15 40 0 22.7 9.8 40.7 29.5 54 19.7 13.3 43.5 21 71.5 23h399859zM103 281v-40h399897v40z";
 
@@ -846,6 +852,8 @@ fn katex_image_data(label: &str) -> Option<KatexImageData> {
         "xLeftrightarrow"    => Some(KatexImageData { paths: &["doubleleftarrow", "doublerightarrow"], _min_width: 1.75, vb_height: 560.0, align: None }),
         "xrightleftharpoons" => Some(KatexImageData { paths: &["leftharpoondownplus", "rightharpoonplus"], _min_width: 1.75, vb_height: 716.0, align: None }),
         "xleftrightharpoons" => Some(KatexImageData { paths: &["leftharpoonplus", "rightharpoondownplus"], _min_width: 1.75, vb_height: 716.0, align: None }),
+        "xrightequilibrium" => Some(KatexImageData { paths: &["baraboveshortleftharpoon", "rightharpoonaboveshortbar"], _min_width: 1.75, vb_height: 716.0, align: None }),
+        "xleftequilibrium" => Some(KatexImageData { paths: &["shortbaraboveleftharpoon", "shortrightharpoonabovebar"], _min_width: 1.75, vb_height: 716.0, align: None }),
         "xhookleftarrow"     => Some(KatexImageData { paths: &["leftarrow", "righthook"],  _min_width: 1.08, vb_height: 522.0, align: None }),
         "xhookrightarrow"    => Some(KatexImageData { paths: &["lefthook", "rightarrow"],  _min_width: 1.08, vb_height: 522.0, align: None }),
         "overlinesegment"    => Some(KatexImageData { paths: &["leftlinesegment", "rightlinesegment"], _min_width: 0.888, vb_height: 522.0, align: None }),
@@ -877,6 +885,10 @@ fn path_for_name(name: &str) -> Option<&'static str> {
         "rightharpoonplus"     => Some(RIGHTHARPOONPLUS),
         "rightharpoondown"     => Some(RIGHTHARPOONDOWN),
         "rightharpoondownplus" => Some(RIGHTHARPOONDOWNPLUS),
+        "baraboveshortleftharpoon" => Some(BARABOVESHORTLEFTHARPOON),
+        "rightharpoonaboveshortbar" => Some(RIGHTHARPOONABOVESHORTBAR),
+        "shortbaraboveleftharpoon" => Some(SHORTBARABOVELEFTHARPOON),
+        "shortrightharpoonabovebar" => Some(SHORTRIGHTHARPOONABOVEBAR),
         "lefthook"             => Some(LEFTHOOK),
         "righthook"            => Some(RIGHTHOOK),
         "leftbrace"            => Some(LEFTBRACE),

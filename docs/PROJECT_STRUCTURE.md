@@ -38,6 +38,10 @@ RaTeX/
 │   └── web/                      # npm package `ratex-wasm`: WASM + TypeScript web-render
 │
 ├── tools/                        # Dev / comparison scripts
+│   ├── mhchem_reference.js       # KaTeX mhchem.js reference; → data/*.json via generate_mhchem_data.mjs
+│   ├── generate_mhchem_data.mjs  # Export machines.json + patterns_regex.json (see docs/MHCHEM_DATA.md)
+│   ├── dump_mhchem_structure.mjs # Optional: state machine stats dump
+│   ├── extract_mhchem_manual_examples.mjs  # gh-pages manual → tests/golden/test_case_ce.txt
 │   ├── convert_metrics.py        # KaTeX fontMetricsData.js → Rust
 │   ├── convert_symbols.py        # KaTeX symbols.js → Rust
 │   ├── golden_compare/           # Golden PNG comparison (compare_golden.py)
@@ -48,8 +52,11 @@ RaTeX/
 ├── tests/
 │   └── golden/                   # Golden test assets
 │       ├── fixtures/              # KaTeX reference PNGs (per test case)
+│       ├── fixtures_ce/           # KaTeX+mhchem reference PNGs (optional; for test_case_ce)
 │       ├── output/                # RaTeX-rendered PNGs (from ratex-render)
-│       └── test_cases.txt         # One LaTeX formula per line
+│       ├── output_ce/             # RaTeX mhchem renders (from update_golden_output.sh)
+│       ├── test_cases.txt         # One LaTeX formula per line
+│       ├── test_case_ce.txt       # mhchem \\ce / \\pu examples (fixtures_ce/ refs); parser uses Rust mhchem
 │
 ├── scripts/
 │   └── update_golden_output.sh    # Renders all test_cases.txt → output/
@@ -211,4 +218,4 @@ platforms/ (ios, android, flutter, react-native, web)
 2. **RaTeX output**: `scripts/update_golden_output.sh` runs `ratex-render` to produce `tests/golden/output/*.png`.
 3. **Comparison**: `tools/golden_compare/compare_golden.py` (or Rust test `crates/ratex-render/tests/golden_test.rs`) compares output vs fixtures (e.g. ink-coverage threshold).
 
-See also `docs/LOW_SCORE_CASES.md` for low-scoring cases and `docs/KATEX_SVG_PATH_PLAN.md` for stretchy SVG path improvements. Contributing: root `CONTRIBUTING.md`; releases: `RELEASING.md`.
+See also `docs/MHCHEM_DATA.md` (updating `\ce` / `\pu` JSON from KaTeX mhchem), `docs/LOW_SCORE_CASES.md` for low-scoring cases, and `docs/KATEX_SVG_PATH_PLAN.md` for stretchy SVG path improvements. Contributing: root `CONTRIBUTING.md`; releases: `RELEASING.md`.

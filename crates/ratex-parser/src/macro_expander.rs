@@ -119,6 +119,21 @@ impl MacroNamespace {
     }
 }
 
+/// Tokenize a macro expansion string into stack order (same as [`MacroDefinition::Text`] bodies).
+fn lex_string_to_stack_tokens(text: &str) -> Vec<Token> {
+    let mut body_lexer = Lexer::new(text);
+    let mut tokens = Vec::new();
+    loop {
+        let tok = body_lexer.lex();
+        if tok.is_eof() {
+            break;
+        }
+        tokens.push(tok);
+    }
+    tokens.reverse();
+    tokens
+}
+
 impl<'a> MacroExpander<'a> {
     pub fn new(input: &'a str, mode: Mode) -> Self {
         let mut me = Self {
@@ -456,6 +471,12 @@ impl<'a> MacroExpander<'a> {
             // ── equation numbering (display math; no-op in parser) ──
             ("\\nonumber", "\\relax"),
             ("\\notag", "\\relax"),
+
+            // ── KaTeX mhchem (\\tripledash for \\bond ~ forms) ──
+            (
+                "\\tripledash",
+                "{\\vphantom{-}\\raisebox{2.56mu}{$\\mkern2mu\\tiny\\text{-}\\mkern1mu\\text{-}\\mkern1mu\\text{-}\\mkern2mu$}}",
+            ),
         ];
 
         for &(name, expansion) in builtins {
@@ -795,6 +816,28 @@ impl<'a> MacroExpander<'a> {
                 me.end_group();
 
                 Ok(expanded)
+            }),
+        );
+
+        // \\ce / \\pu: KaTeX mhchem 3.3.0 (Rust port in `crate::mhchem`)
+        self.macros.set(
+            "\\ce".to_string(),
+            MacroDefinition::Function(|me: &mut MacroExpander| -> ParseResult<Vec<Token>> {
+                let args = me.consume_args(1)?;
+                let s = crate::mhchem::mhchem_arg_tokens_to_string(&args[0]);
+                let tex = crate::mhchem::chem_parse_str(&s, "ce")
+                    .map_err(|e| ParseError::msg(format!("\\ce: {e}")))?;
+                Ok(lex_string_to_stack_tokens(&tex))
+            }),
+        );
+        self.macros.set(
+            "\\pu".to_string(),
+            MacroDefinition::Function(|me: &mut MacroExpander| -> ParseResult<Vec<Token>> {
+                let args = me.consume_args(1)?;
+                let s = crate::mhchem::mhchem_arg_tokens_to_string(&args[0]);
+                let tex = crate::mhchem::chem_parse_str(&s, "pu")
+                    .map_err(|e| ParseError::msg(format!("\\pu: {e}")))?;
+                Ok(lex_string_to_stack_tokens(&tex))
             }),
         );
     }

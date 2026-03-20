@@ -9,6 +9,7 @@ Uses ink-coverage-based comparison instead of raw pixel diff:
 
 Usage:
     python3 compare_golden.py [--fixtures DIR] [--output DIR] [--threshold FLOAT]
+    python3 compare_golden.py --ce   # mhchem: fixtures_ce vs output_ce, test_case_ce.txt
 """
 import argparse
 import os
@@ -167,13 +168,35 @@ def save_diff_image(ref_img, test_img, diff_path):
 
 def main():
     parser = argparse.ArgumentParser(description="Golden test comparison (ink-based)")
-    parser.add_argument("--fixtures", default="tests/golden/fixtures")
-    parser.add_argument("--output", default="tests/golden/output")
+    parser.add_argument(
+        "--ce",
+        "--mhchem",
+        action="store_true",
+        dest="ce",
+        help="mhchem suite: fixtures_ce vs output_ce (implies --test-cases test_case_ce.txt)",
+    )
+    parser.add_argument("--fixtures", default=None)
+    parser.add_argument("--output", default=None)
     parser.add_argument("--threshold", type=float, default=0.30, help="Combined score threshold to pass")
     parser.add_argument("--diff-dir", default=None)
-    parser.add_argument("--test-cases", default="tests/golden/test_cases.txt")
+    parser.add_argument("--test-cases", default=None)
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
+
+    repo_root = Path(__file__).resolve().parents[2]
+    golden = repo_root / "tests" / "golden"
+
+    if args.ce:
+        args.fixtures = str(golden / "fixtures_ce")
+        args.output = str(golden / "output_ce")
+        args.test_cases = str(golden / "test_case_ce.txt")
+    else:
+        if args.fixtures is None:
+            args.fixtures = str(golden / "fixtures")
+        if args.output is None:
+            args.output = str(golden / "output")
+        if args.test_cases is None:
+            args.test_cases = str(golden / "test_cases.txt")
 
     test_lines = []
     if os.path.exists(args.test_cases):

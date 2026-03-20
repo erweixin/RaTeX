@@ -3,6 +3,12 @@
  * Generate KaTeX reference PNGs for golden test comparison.
  * Reads test_cases.txt, renders each formula with KaTeX in a headless browser,
  * and saves screenshots to the fixtures directory.
+ *
+ * Usage:
+ *   node generate_reference.mjs [test_cases.txt] [fixtures_dir] [--mhchem]
+ *
+ * --mhchem: load contrib/mhchem (for tests/golden/test_case_ce.txt → fixtures_ce).
+ * KaTeX dist is resolved from tools/golden_compare/node_modules or tools/lexer_compare/node_modules.
  */
 import { readFileSync, writeFileSync, unlinkSync, mkdirSync, existsSync } from 'fs';
 import { dirname, join } from 'path';
@@ -10,11 +16,34 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import puppeteer from 'puppeteer';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const KATEX_DIST = join(__dirname, 'node_modules', 'katex', 'dist');
+
+function resolveKatexDist() {
+    const candidates = [
+        join(__dirname, 'node_modules', 'katex', 'dist'),
+        join(__dirname, '..', 'lexer_compare', 'node_modules', 'katex', 'dist'),
+    ];
+    for (const c of candidates) {
+        if (existsSync(join(c, 'katex.min.js'))) return c;
+    }
+    throw new Error(
+        'KaTeX dist not found. Run: (cd tools/golden_compare && npm install) or npm install under tools/lexer_compare'
+    );
+}
 
 async function main() {
-    const testCasesPath = process.argv[2] || join(__dirname, '..', '..', 'tests', 'golden', 'test_cases.txt');
-    const outputDir = process.argv[3] || join(__dirname, '..', '..', 'tests', 'golden', 'fixtures');
+    const rawArgs = process.argv.slice(2);
+    const withMhchem = rawArgs.includes('--mhchem');
+    const args = rawArgs.filter((a) => a !== '--mhchem');
+    const testCasesPath =
+        args[0] || join(__dirname, '..', '..', 'tests', 'golden', 'test_cases.txt');
+    const outputDir =
+        args[1] || join(__dirname, '..', '..', 'tests', 'golden', 'fixtures');
+
+    const KATEX_DIST = resolveKatexDist();
+    const fontPx = withMhchem ? 40 : 20;
+    const mhchemScript = withMhchem
+        ? '<script src="contrib/mhchem.min.js"></script>'
+        : '';
 
     if (!existsSync(outputDir)) {
         mkdirSync(outputDir, { recursive: true });
@@ -24,7 +53,9 @@ async function main() {
         .split('\n')
         .filter(l => l.trim() && !l.trim().startsWith('#'));
 
-    console.log(`Generating ${lines.length} reference PNGs...`);
+    console.log(
+        `Generating ${lines.length} reference PNGs (KaTeX${withMhchem ? ' + mhchem' : ''}, ${fontPx}px)...`
+    );
 
     // Write temp HTML in KaTeX dist dir so relative font paths resolve correctly
     const tempHtml = join(KATEX_DIST, '_golden_render.html');
@@ -37,10 +68,11 @@ body { margin: 0; padding: 0; background: white; }
 #formula {
     display: inline-block;
     padding: 10px;
-    font-size: 20px;
+    font-size: ${fontPx}px;
 }
 </style>
 <script src="katex.min.js"></script>
+${mhchemScript}
 </head>
 <body>
 <div id="formula"></div>
@@ -70,8 +102,15 @@ body { margin: 0; padding: 0; background: white; }
             await page.evaluate(async (expr) => {
                 const el = document.getElementById('formula');
                 el.innerHTML = '';
-                katex.render(expr, el, {
-                    displayMode: true,
+                // displayMode: true + outer `$...$` breaks KaTeX; strip one pair for display.
+                let toRender = expr;
+                let displayMode = true;
+                const outer = toRender.match(/^\$(.*)\$$/s);
+                if (outer) {
+                    toRender = outer[1];
+                }
+                katex.render(toRender, el, {
+                    displayMode,
                     throwOnError: false,
                     trust: true,
                 });

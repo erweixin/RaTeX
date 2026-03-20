@@ -164,14 +164,14 @@ fn ink_compare(
     0.4 * iou + 0.2 * recall + 0.2 * aspect_sim + 0.2 * width_sim
 }
 
-#[test]
-fn golden_test_pass_rate() {
-    let root = project_root();
-    let tc_path = root.join("tests/golden/test_cases.txt");
-    let fixtures = root.join("tests/golden/fixtures");
-
-    if !tc_path.exists() || !fixtures.exists() {
-        eprintln!("Skipping golden test: fixtures not found");
+fn run_golden_suite(
+    label: &str,
+    tc_path: &std::path::Path,
+    fixtures_dir: &std::path::Path,
+    min_pass_rate: f64,
+) {
+    if !tc_path.exists() || !fixtures_dir.exists() {
+        eprintln!("Skipping {label}: path missing");
         return;
     }
 
@@ -179,7 +179,7 @@ fn golden_test_pass_rate() {
     let render_opts = RenderOptions { font_size: 40.0, padding: 10.0, font_dir };
     let layout_opts = LayoutOptions::default();
 
-    let lines: Vec<String> = std::fs::read_to_string(&tc_path).unwrap()
+    let lines: Vec<String> = std::fs::read_to_string(tc_path).unwrap()
         .lines()
         .filter(|l| !l.trim().is_empty() && !l.trim().starts_with('#'))
         .map(|l| l.to_string())
@@ -191,7 +191,7 @@ fn golden_test_pass_rate() {
 
     for (i, expr) in lines.iter().enumerate() {
         let idx = format!("{:04}", i + 1);
-        let ref_path = fixtures.join(format!("{idx}.png"));
+        let ref_path = fixtures_dir.join(format!("{idx}.png"));
         if !ref_path.exists() { skipped += 1; continue; }
 
         let ast = match parse(expr) { Ok(a) => a, Err(_) => { skipped += 1; continue; } };
@@ -219,18 +219,45 @@ fn golden_test_pass_rate() {
         } else {
             failed += 1;
             if failed <= 10 {
-                eprintln!("FAIL {idx}: score={score:.3} | {}", &expr[..expr.len().min(60)]);
+                eprintln!("FAIL {label} {idx}: score={score:.3} | {}", &expr[..expr.len().min(60)]);
             }
         }
     }
 
     let total = passed + failed;
     let rate = if total > 0 { passed as f64 / total as f64 * 100.0 } else { 100.0 };
-    eprintln!("\nGolden Test (ink-based): {passed}/{total} passed ({rate:.1}%), {skipped} skipped");
+    eprintln!("\n{label} (ink-based): {passed}/{total} passed ({rate:.1}%), {skipped} skipped");
 
-    assert!(rate >= 75.0,
-        "Golden test pass rate {rate:.1}% below 75% ({passed}/{total}). \
-         Many failures are from unimplemented node types, not rendering bugs."
+    if total == 0 {
+        eprintln!("{label}: no reference PNGs — add tests/golden/fixtures_ce/{{0001,…}}.png (KaTeX+mhchem) to enable.");
+        return;
+    }
+
+    assert!(rate >= min_pass_rate,
+        "{label} pass rate {rate:.1}% below {min_pass_rate:.0}% ({passed}/{total})."
+    );
+}
+
+#[test]
+fn golden_test_pass_rate() {
+    let root = project_root();
+    run_golden_suite(
+        "Golden (main)",
+        &root.join("tests/golden/test_cases.txt"),
+        &root.join("tests/golden/fixtures"),
+        75.0,
+    );
+}
+
+/// mhchem (`\\ce` / `\\pu`): uses [tests/golden/test_case_ce.txt](../../tests/golden/test_case_ce.txt) and `fixtures_ce/`.
+#[test]
+fn golden_mhchem_pass_rate() {
+    let root = project_root();
+    run_golden_suite(
+        "Golden (mhchem)",
+        &root.join("tests/golden/test_case_ce.txt"),
+        &root.join("tests/golden/fixtures_ce"),
+        50.0,
     );
 }
 
