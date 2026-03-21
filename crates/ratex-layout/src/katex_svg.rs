@@ -822,7 +822,8 @@ const _VEC_KATEX: &str = "M377 20c0-5.333 1.833-10 5.5-14S391 0 397 0c4.667 0 8.
 
 struct KatexImageData {
     paths: &'static [&'static str],
-    _min_width: f64,
+    /// KaTeX `katexImagesData` minimum arrow shaft width (em).
+    min_width: f64,
     vb_height: f64,
     align: Option<&'static str>,
 }
@@ -830,44 +831,50 @@ struct KatexImageData {
 fn katex_image_data(label: &str) -> Option<KatexImageData> {
     let key = label.trim_start_matches('\\');
     match key {
-        "overrightarrow"  => Some(KatexImageData { paths: &["rightarrow"],  _min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
-        "overleftarrow"   => Some(KatexImageData { paths: &["leftarrow"],   _min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
-        "underrightarrow" => Some(KatexImageData { paths: &["rightarrow"],  _min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
-        "underleftarrow"  => Some(KatexImageData { paths: &["leftarrow"],   _min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
-        "xrightarrow"     => Some(KatexImageData { paths: &["rightarrow"],  _min_width: 1.469, vb_height: 522.0, align: Some("xMaxYMin") }),
-        "xleftarrow"      => Some(KatexImageData { paths: &["leftarrow"],   _min_width: 1.469, vb_height: 522.0, align: Some("xMinYMin") }),
-        "Overrightarrow"  => Some(KatexImageData { paths: &["doublerightarrow"], _min_width: 0.888, vb_height: 560.0, align: Some("xMaxYMin") }),
-        "xRightarrow"     => Some(KatexImageData { paths: &["doublerightarrow"], _min_width: 1.526, vb_height: 560.0, align: Some("xMaxYMin") }),
-        "xLeftarrow"      => Some(KatexImageData { paths: &["doubleleftarrow"],  _min_width: 1.526, vb_height: 560.0, align: Some("xMinYMin") }),
-        "overleftharpoon" | "xleftharpoonup"    => Some(KatexImageData { paths: &["leftharpoon"],  _min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
-        "xleftharpoondown"                      => Some(KatexImageData { paths: &["leftharpoondown"], _min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
-        "overrightharpoon" | "xrightharpoonup"  => Some(KatexImageData { paths: &["rightharpoon"], _min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
-        "xrightharpoondown"                     => Some(KatexImageData { paths: &["rightharpoondown"], _min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
-        "xlongequal"         => Some(KatexImageData { paths: &["longequal"],   _min_width: 0.888, vb_height: 334.0, align: Some("xMinYMin") }),
-        "xtwoheadleftarrow"  => Some(KatexImageData { paths: &["twoheadleftarrow"],  _min_width: 0.888, vb_height: 334.0, align: Some("xMinYMin") }),
-        "xtwoheadrightarrow" => Some(KatexImageData { paths: &["twoheadrightarrow"], _min_width: 0.888, vb_height: 334.0, align: Some("xMaxYMin") }),
-        "overleftrightarrow"  => Some(KatexImageData { paths: &["leftarrow", "rightarrow"], _min_width: 0.888, vb_height: 522.0, align: None }),
-        "underleftrightarrow" => Some(KatexImageData { paths: &["leftarrow", "rightarrow"], _min_width: 0.888, vb_height: 522.0, align: None }),
-        "xleftrightarrow"    => Some(KatexImageData { paths: &["leftarrow", "rightarrow"], _min_width: 1.75, vb_height: 522.0, align: None }),
-        "xLeftrightarrow"    => Some(KatexImageData { paths: &["doubleleftarrow", "doublerightarrow"], _min_width: 1.75, vb_height: 560.0, align: None }),
-        "xrightleftharpoons" => Some(KatexImageData { paths: &["leftharpoondownplus", "rightharpoonplus"], _min_width: 1.75, vb_height: 716.0, align: None }),
-        "xleftrightharpoons" => Some(KatexImageData { paths: &["leftharpoonplus", "rightharpoondownplus"], _min_width: 1.75, vb_height: 716.0, align: None }),
-        "xrightequilibrium" => Some(KatexImageData { paths: &["baraboveshortleftharpoon", "rightharpoonaboveshortbar"], _min_width: 1.75, vb_height: 716.0, align: None }),
-        "xleftequilibrium" => Some(KatexImageData { paths: &["shortbaraboveleftharpoon", "shortrightharpoonabovebar"], _min_width: 1.75, vb_height: 716.0, align: None }),
-        "xhookleftarrow"     => Some(KatexImageData { paths: &["leftarrow", "righthook"],  _min_width: 1.08, vb_height: 522.0, align: None }),
-        "xhookrightarrow"    => Some(KatexImageData { paths: &["lefthook", "rightarrow"],  _min_width: 1.08, vb_height: 522.0, align: None }),
-        "overlinesegment"    => Some(KatexImageData { paths: &["leftlinesegment", "rightlinesegment"], _min_width: 0.888, vb_height: 522.0, align: None }),
-        "underlinesegment"   => Some(KatexImageData { paths: &["leftlinesegment", "rightlinesegment"], _min_width: 0.888, vb_height: 522.0, align: None }),
-        "overgroup"          => Some(KatexImageData { paths: &["leftgroup", "rightgroup"], _min_width: 0.888, vb_height: 342.0, align: None }),
-        "undergroup"         => Some(KatexImageData { paths: &["leftgroupunder", "rightgroupunder"], _min_width: 0.888, vb_height: 342.0, align: None }),
-        "xmapsto"            => Some(KatexImageData { paths: &["leftmapsto", "rightarrow"], _min_width: 1.5, vb_height: 522.0, align: None }),
-        "xtofrom"            => Some(KatexImageData { paths: &["leftToFrom", "rightToFrom"], _min_width: 1.75, vb_height: 528.0, align: None }),
-        "xrightleftarrows"   => Some(KatexImageData { paths: &["baraboveleftarrow", "rightarrowabovebar"], _min_width: 1.75, vb_height: 901.0, align: None }),
+        "overrightarrow"  => Some(KatexImageData { paths: &["rightarrow"],  min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
+        "overleftarrow"   => Some(KatexImageData { paths: &["leftarrow"],   min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
+        "underrightarrow" => Some(KatexImageData { paths: &["rightarrow"],  min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
+        "underleftarrow"  => Some(KatexImageData { paths: &["leftarrow"],   min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
+        "xrightarrow"     => Some(KatexImageData { paths: &["rightarrow"],  min_width: 1.469, vb_height: 522.0, align: Some("xMaxYMin") }),
+        "xleftarrow"      => Some(KatexImageData { paths: &["leftarrow"],   min_width: 1.469, vb_height: 522.0, align: Some("xMinYMin") }),
+        "Overrightarrow"  => Some(KatexImageData { paths: &["doublerightarrow"], min_width: 0.888, vb_height: 560.0, align: Some("xMaxYMin") }),
+        "xRightarrow"     => Some(KatexImageData { paths: &["doublerightarrow"], min_width: 1.526, vb_height: 560.0, align: Some("xMaxYMin") }),
+        "xLeftarrow"      => Some(KatexImageData { paths: &["doubleleftarrow"],  min_width: 1.526, vb_height: 560.0, align: Some("xMinYMin") }),
+        "overleftharpoon" | "xleftharpoonup"    => Some(KatexImageData { paths: &["leftharpoon"],  min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
+        "xleftharpoondown"                      => Some(KatexImageData { paths: &["leftharpoondown"], min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
+        "overrightharpoon" | "xrightharpoonup"  => Some(KatexImageData { paths: &["rightharpoon"], min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
+        "xrightharpoondown"                     => Some(KatexImageData { paths: &["rightharpoondown"], min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
+        "xlongequal"         => Some(KatexImageData { paths: &["longequal"],   min_width: 0.888, vb_height: 334.0, align: Some("xMinYMin") }),
+        "xtwoheadleftarrow"  => Some(KatexImageData { paths: &["twoheadleftarrow"],  min_width: 0.888, vb_height: 334.0, align: Some("xMinYMin") }),
+        "xtwoheadrightarrow" => Some(KatexImageData { paths: &["twoheadrightarrow"], min_width: 0.888, vb_height: 334.0, align: Some("xMaxYMin") }),
+        "overleftrightarrow"  => Some(KatexImageData { paths: &["leftarrow", "rightarrow"], min_width: 0.888, vb_height: 522.0, align: None }),
+        "underleftrightarrow" => Some(KatexImageData { paths: &["leftarrow", "rightarrow"], min_width: 0.888, vb_height: 522.0, align: None }),
+        "xleftrightarrow"    => Some(KatexImageData { paths: &["leftarrow", "rightarrow"], min_width: 1.75, vb_height: 522.0, align: None }),
+        "xLeftrightarrow"    => Some(KatexImageData { paths: &["doubleleftarrow", "doublerightarrow"], min_width: 1.75, vb_height: 560.0, align: None }),
+        "xrightleftharpoons" => Some(KatexImageData { paths: &["leftharpoondownplus", "rightharpoonplus"], min_width: 1.75, vb_height: 716.0, align: None }),
+        "xleftrightharpoons" => Some(KatexImageData { paths: &["leftharpoonplus", "rightharpoondownplus"], min_width: 1.75, vb_height: 716.0, align: None }),
+        "xrightequilibrium" => Some(KatexImageData { paths: &["baraboveshortleftharpoon", "rightharpoonaboveshortbar"], min_width: 1.75, vb_height: 716.0, align: None }),
+        "xleftequilibrium" => Some(KatexImageData { paths: &["shortbaraboveleftharpoon", "shortrightharpoonabovebar"], min_width: 1.75, vb_height: 716.0, align: None }),
+        "xhookleftarrow"     => Some(KatexImageData { paths: &["leftarrow", "righthook"],  min_width: 1.08, vb_height: 522.0, align: None }),
+        "xhookrightarrow"    => Some(KatexImageData { paths: &["lefthook", "rightarrow"],  min_width: 1.08, vb_height: 522.0, align: None }),
+        "overlinesegment"    => Some(KatexImageData { paths: &["leftlinesegment", "rightlinesegment"], min_width: 0.888, vb_height: 522.0, align: None }),
+        "underlinesegment"   => Some(KatexImageData { paths: &["leftlinesegment", "rightlinesegment"], min_width: 0.888, vb_height: 522.0, align: None }),
+        "overgroup"          => Some(KatexImageData { paths: &["leftgroup", "rightgroup"], min_width: 0.888, vb_height: 342.0, align: None }),
+        "undergroup"         => Some(KatexImageData { paths: &["leftgroupunder", "rightgroupunder"], min_width: 0.888, vb_height: 342.0, align: None }),
+        "xmapsto"            => Some(KatexImageData { paths: &["leftmapsto", "rightarrow"], min_width: 1.5, vb_height: 522.0, align: None }),
+        "xtofrom"            => Some(KatexImageData { paths: &["leftToFrom", "rightToFrom"], min_width: 1.75, vb_height: 528.0, align: None }),
+        "xrightleftarrows"   => Some(KatexImageData { paths: &["baraboveleftarrow", "rightarrowabovebar"], min_width: 1.75, vb_height: 901.0, align: None }),
         // Overbrace/underbrace: KaTeX Size4 glyphs (viewBox 400000×548), same 3-piece horizontal joining as stretchy arrows.
-        "overbrace"  => Some(KatexImageData { paths: &["leftbrace", "midbrace", "rightbrace"], _min_width: 0.888, vb_height: 548.0, align: None }),
-        "underbrace" => Some(KatexImageData { paths: &["leftbraceunder", "midbraceunder", "rightbraceunder"], _min_width: 0.888, vb_height: 548.0, align: None }),
+        "overbrace"  => Some(KatexImageData { paths: &["leftbrace", "midbrace", "rightbrace"], min_width: 0.888, vb_height: 548.0, align: None }),
+        "underbrace" => Some(KatexImageData { paths: &["leftbraceunder", "midbraceunder", "rightbraceunder"], min_width: 0.888, vb_height: 548.0, align: None }),
         _ => None,
     }
+}
+
+/// KaTeX [`katexImagesData`](https://github.com/KaTeX/KaTeX/blob/main/src/katexImagesData.js) `minWidth`
+/// for `\\xrightarrow`, `\\xleftrightarrow`, mhchem `\\xrightequilibrium`, etc.
+pub(crate) fn katex_stretchy_min_width_em(label: &str) -> Option<f64> {
+    katex_image_data(label).map(|d| d.min_width)
 }
 
 /// Look up the SVG path data for a named path key.

@@ -2904,9 +2904,16 @@ fn layout_xarrow(
         .map(|b| b.width * sub_ratio)
         .unwrap_or(0.0);
 
-    let min_arrow_w = 1.0;
-    let padding = 0.5;
-    let arrow_w = body_w.max(below_w).max(min_arrow_w) + padding;
+    // KaTeX `katexImagesData` minWidth on the stretchy SVG, plus `.x-arrow-pad { padding: 0 0.5em }`
+    // on each label row (em = that row's font). In parent em: +0.5·sup_ratio + 0.5·sup_ratio, etc.
+    let min_w = crate::katex_svg::katex_stretchy_min_width_em(label).unwrap_or(1.0);
+    let upper_w = body_w + sup_ratio;
+    let lower_w = if below_box.is_some() {
+        below_w + sub_ratio
+    } else {
+        0.0
+    };
+    let arrow_w = upper_w.max(lower_w).max(min_w);
     let arrow_h = 0.3;
 
     let (commands, actual_arrow_h, fill_arrow) =
