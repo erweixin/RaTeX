@@ -15,6 +15,45 @@ pub fn layout(nodes: &[ParseNode], options: &LayoutOptions) -> LayoutBox {
     layout_expression(nodes, options, true)
 }
 
+/// KaTeX `binLeftCanceller` / `binRightCanceller` (TeXbook p.442–446, Rules 5–6).
+/// Binary operators become ordinary in certain contexts so spacing matches TeX/KaTeX.
+fn apply_bin_cancellation(raw: &[Option<MathClass>]) -> Vec<Option<MathClass>> {
+    let n = raw.len();
+    let mut eff = raw.to_vec();
+    for i in 0..n {
+        if raw[i] != Some(MathClass::Bin) {
+            continue;
+        }
+        let prev = if i == 0 { None } else { raw[i - 1] };
+        let left_cancel = matches!(
+            prev,
+            None
+                | Some(MathClass::Bin)
+                | Some(MathClass::Open)
+                | Some(MathClass::Rel)
+                | Some(MathClass::Op)
+                | Some(MathClass::Punct)
+        );
+        if left_cancel {
+            eff[i] = Some(MathClass::Ord);
+        }
+    }
+    for i in 0..n {
+        if raw[i] != Some(MathClass::Bin) {
+            continue;
+        }
+        let next = if i + 1 < n { raw[i + 1] } else { None };
+        let right_cancel = matches!(
+            next,
+            None | Some(MathClass::Rel) | Some(MathClass::Close) | Some(MathClass::Punct)
+        );
+        if right_cancel {
+            eff[i] = Some(MathClass::Ord);
+        }
+    }
+    eff
+}
+
 /// Lay out an expression (list of nodes) as a horizontal sequence with spacing.
 fn layout_expression(
     nodes: &[ParseNode],
@@ -31,12 +70,16 @@ fn layout_expression(
         return layout_multiline(nodes, options, is_real_group);
     }
 
+    let raw_classes: Vec<Option<MathClass>> =
+        nodes.iter().map(|n| node_math_class(n)).collect();
+    let eff_classes = apply_bin_cancellation(&raw_classes);
+
     let mut children = Vec::new();
     let mut prev_class: Option<MathClass> = None;
 
-    for node in nodes {
+    for (i, node) in nodes.iter().enumerate() {
         let lbox = layout_node(node, options);
-        let cur_class = node_math_class(node);
+        let cur_class = eff_classes.get(i).copied().flatten();
 
         if is_real_group {
             if let (Some(prev), Some(cur)) = (prev_class, cur_class) {
