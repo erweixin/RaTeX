@@ -288,8 +288,9 @@ impl<'a> MacroExpander<'a> {
             ("\\varsupsetneqq", "\\@varsupsetneqq"),
 
             // ── delimiters / text (compose from existing) ──
-            ("\\lBrace", "\\lbrace"),
-            ("\\rBrace", "\\rbrace"),
+            // Match KaTeX `macros.ts` html@mathml first branch (STIX-style white tortoise brackets).
+            ("\\lBrace", "\\mathopen{\\{\\mkern-3.2mu[}"),
+            ("\\rBrace", "\\mathclose{]\\mkern-3.2mu\\}}"),
             ("\\llbracket", "\\mathopen{[\\mkern-3.2mu[}"),
             ("\\rrbracket", "\\mathclose{]\\mkern-3.2mu]}"),
             ("\\copyright", "\\textcircled{c}"),
