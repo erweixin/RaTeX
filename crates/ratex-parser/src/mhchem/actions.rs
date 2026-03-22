@@ -332,17 +332,16 @@ fn ce_output(ctx: &ParserCtx, buffer: &mut Buffer, entity: Option<&Value>) -> Mh
         }
 
         let mut d_type = buffer.d_type.clone();
-        if buffer.o.is_some() {
-            if d_type.as_deref() == Some("kv") {
-                if matches!(
-                    match_pattern(ctx.data, "d-oxidation$", buffer.d.as_deref().unwrap_or("")).ok().flatten(),
-                    Some(_)
-                ) {
-                    d_type = Some("oxidation".into());
-                } else if buffer.q.is_none() {
-                    d_type = None;
-                }
-            }
+        if buffer.o.is_some()
+            && d_type.as_deref() == Some("kv")
+            && match_pattern(ctx.data, "d-oxidation$", buffer.d.as_deref().unwrap_or(""))
+                .ok()
+                .flatten()
+                .is_some()
+        {
+            d_type = Some("oxidation".into());
+        } else if buffer.o.is_some() && d_type.as_deref() == Some("kv") && buffer.q.is_none() {
+            d_type = None;
         }
 
         if buffer.o.is_none() && buffer.q.is_none() && buffer.d.is_none() && buffer.b.is_none() && buffer.p.is_none()

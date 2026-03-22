@@ -71,7 +71,7 @@ fn layout_expression(
     }
 
     let raw_classes: Vec<Option<MathClass>> =
-        nodes.iter().map(|n| node_math_class(n)).collect();
+        nodes.iter().map(node_math_class).collect();
     let eff_classes = apply_bin_cancellation(&raw_classes);
 
     let mut children = Vec::new();
