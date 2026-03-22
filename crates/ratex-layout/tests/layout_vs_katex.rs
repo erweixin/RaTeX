@@ -323,3 +323,48 @@ fn text_hello() {
 fn mathrm_sin() {
     check("\\mathrm{sin}", 0.6679, 0.0);
 }
+
+/// `\mathrm{mm^{2}}` (e.g. mhchem `\pu{123 mm2}`): base of superscript must stay roman, not math italic.
+#[test]
+fn mathrm_mm_squared_both_m_upright() {
+    use ratex_font::FontId;
+    use ratex_layout::layout_box::{BoxContent, LayoutBox};
+
+    fn collect_m_fonts(lb: &LayoutBox) -> Vec<FontId> {
+        let mut v = Vec::new();
+        match &lb.content {
+            BoxContent::Glyph { font_id, char_code } => {
+                if *char_code == 'm' as u32 {
+                    v.push(*font_id);
+                }
+            }
+            BoxContent::HBox(children) => {
+                for c in children {
+                    v.extend(collect_m_fonts(c));
+                }
+            }
+            BoxContent::SupSub { base, sup, sub, .. } => {
+                v.extend(collect_m_fonts(base));
+                if let Some(s) = sup {
+                    v.extend(collect_m_fonts(s));
+                }
+                if let Some(s) = sub {
+                    v.extend(collect_m_fonts(s));
+                }
+            }
+            BoxContent::Scaled { body, .. } => v.extend(collect_m_fonts(body)),
+            _ => {}
+        }
+        v
+    }
+
+    let ast = parse(r"\mathrm{mm^{2}}").expect("parse");
+    let options = LayoutOptions::default();
+    let lbox = layout(&ast, &options);
+    let m_fonts = collect_m_fonts(&lbox);
+    assert_eq!(m_fonts.len(), 2, "expected exactly two 'm' glyphs");
+    assert!(
+        m_fonts.iter().all(|&f| f == FontId::MainRegular),
+        "both m should be MainRegular, got {m_fonts:?}"
+    );
+}

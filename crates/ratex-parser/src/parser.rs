@@ -1181,9 +1181,23 @@ fn is_valid_unit(unit: &str) -> bool {
     )
 }
 
+/// If the whole expression is wrapped in TeX inline/display math delimiters, parse the inside only.
+/// The parser already runs in math mode; a leading `$` would otherwise hit the `$` / `\\(` "switch to math"
+/// handler, which is disallowed in math mode (see `functions::math`).
+fn strip_outer_math_delimiters(input: &str) -> &str {
+    let s = input.trim();
+    if s.len() >= 4 && s.starts_with("$$") && s.ends_with("$$") {
+        return s[2..s.len() - 2].trim();
+    }
+    if s.len() >= 2 && s.starts_with('$') && s.ends_with('$') {
+        return s[1..s.len() - 1].trim();
+    }
+    s
+}
+
 /// Convenience function: parse a LaTeX string and return the AST.
 pub fn parse(input: &str) -> ParseResult<Vec<ParseNode>> {
-    Parser::new(input).parse()
+    Parser::new(strip_outer_math_delimiters(input)).parse()
 }
 
 #[cfg(test)]
@@ -1195,6 +1209,18 @@ mod tests {
         let result = parse("x").unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].type_name(), "mathord");
+    }
+
+    #[test]
+    fn test_parse_strips_outer_dollar_inline_math() {
+        let inner = r"C_p[\ce{H2O(l)}] = \pu{75.3 J // mol K}";
+        let wrapped = format!("${inner}$");
+        let a = parse(&wrapped).expect("wrapped");
+        let b = parse(inner).expect("inner");
+        assert_eq!(a.len(), b.len());
+        for (x, y) in a.iter().zip(b.iter()) {
+            assert_eq!(x.type_name(), y.type_name());
+        }
     }
 
     #[test]

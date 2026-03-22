@@ -1,6 +1,4 @@
-use ratex_font::{
-    get_char_metrics, get_global_metrics, FontId, MathConstants,
-};
+use ratex_font::{get_char_metrics, get_global_metrics, FontId};
 use ratex_parser::parse_node::{AtomFamily, Mode, ParseNode};
 use ratex_types::color::Color;
 use ratex_types::math_style::MathStyle;
@@ -8,61 +6,52 @@ use ratex_types::path_command::PathCommand;
 
 use crate::hbox::make_hbox;
 use crate::layout_box::{BoxContent, LayoutBox};
+use crate::layout_options::LayoutOptions;
 use crate::spacing::{atom_spacing, mu_to_em, MathClass};
-
-/// Layout options passed through the layout tree.
-#[derive(Debug, Clone)]
-pub struct LayoutOptions {
-    pub style: MathStyle,
-    pub color: Color,
-    /// When set (e.g. in align/aligned), cap relation spacing to this many mu for consistency.
-    pub align_relation_spacing: Option<f64>,
-    /// When inside \\left...\\right, the stretch height for \\middle delimiters (second pass only).
-    pub leftright_delim_height: Option<f64>,
-}
-
-impl Default for LayoutOptions {
-    fn default() -> Self {
-        Self {
-            style: MathStyle::Display,
-            color: Color::BLACK,
-            align_relation_spacing: None,
-            leftright_delim_height: None,
-        }
-    }
-}
-
-impl LayoutOptions {
-    pub fn metrics(&self) -> &'static MathConstants {
-        get_global_metrics(self.style.size_index())
-    }
-
-    pub fn size_multiplier(&self) -> f64 {
-        self.style.size_multiplier()
-    }
-
-    pub fn with_style(&self, style: MathStyle) -> Self {
-        Self {
-            style,
-            color: self.color,
-            align_relation_spacing: self.align_relation_spacing,
-            leftright_delim_height: self.leftright_delim_height,
-        }
-    }
-
-    pub fn with_color(&self, color: Color) -> Self {
-        Self {
-            style: self.style,
-            color,
-            align_relation_spacing: self.align_relation_spacing,
-            leftright_delim_height: self.leftright_delim_height,
-        }
-    }
-}
+use crate::stacked_delim::make_stacked_delim_if_needed;
 
 /// Main entry point: lay out a list of ParseNodes into a LayoutBox.
 pub fn layout(nodes: &[ParseNode], options: &LayoutOptions) -> LayoutBox {
     layout_expression(nodes, options, true)
+}
+
+/// KaTeX `binLeftCanceller` / `binRightCanceller` (TeXbook p.442–446, Rules 5–6).
+/// Binary operators become ordinary in certain contexts so spacing matches TeX/KaTeX.
+fn apply_bin_cancellation(raw: &[Option<MathClass>]) -> Vec<Option<MathClass>> {
+    let n = raw.len();
+    let mut eff = raw.to_vec();
+    for i in 0..n {
+        if raw[i] != Some(MathClass::Bin) {
+            continue;
+        }
+        let prev = if i == 0 { None } else { raw[i - 1] };
+        let left_cancel = matches!(
+            prev,
+            None
+                | Some(MathClass::Bin)
+                | Some(MathClass::Open)
+                | Some(MathClass::Rel)
+                | Some(MathClass::Op)
+                | Some(MathClass::Punct)
+        );
+        if left_cancel {
+            eff[i] = Some(MathClass::Ord);
+        }
+    }
+    for i in 0..n {
+        if raw[i] != Some(MathClass::Bin) {
+            continue;
+        }
+        let next = if i + 1 < n { raw[i + 1] } else { None };
+        let right_cancel = matches!(
+            next,
+            None | Some(MathClass::Rel) | Some(MathClass::Close) | Some(MathClass::Punct)
+        );
+        if right_cancel {
+            eff[i] = Some(MathClass::Ord);
+        }
+    }
+    eff
 }
 
 /// Lay out an expression (list of nodes) as a horizontal sequence with spacing.
@@ -81,12 +70,16 @@ fn layout_expression(
         return layout_multiline(nodes, options, is_real_group);
     }
 
+    let raw_classes: Vec<Option<MathClass>> =
+        nodes.iter().map(node_math_class).collect();
+    let eff_classes = apply_bin_cancellation(&raw_classes);
+
     let mut children = Vec::new();
     let mut prev_class: Option<MathClass> = None;
 
-    for node in nodes {
+    for (i, node) in nodes.iter().enumerate() {
         let lbox = layout_node(node, options);
-        let cur_class = node_math_class(node);
+        let cur_class = eff_classes.get(i).copied().flatten();
 
         if is_real_group {
             if let (Some(prev), Some(cur)) = (prev_class, cur_class) {
@@ -183,7 +176,7 @@ fn layout_node(node: &ParseNode, options: &LayoutOptions) -> LayoutBox {
                     return layout_op_with_limits(base_node, sup.as_deref(), sub.as_deref(), options);
                 }
             }
-            layout_supsub(base.as_deref(), sup.as_deref(), sub.as_deref(), options)
+            layout_supsub(base.as_deref(), sup.as_deref(), sub.as_deref(), options, None)
         }
 
         ParseNode::GenFrac {
@@ -209,7 +202,7 @@ fn layout_node(node: &ParseNode, options: &LayoutOptions) -> LayoutBox {
             let has_right = right_delim.as_ref().is_some_and(|d| !d.is_empty() && d != ".");
 
             if has_left || has_right {
-                let total_h = frac.height + frac.depth;
+                let total_h = genfrac_delim_target_height(options);
                 let left_d = left_delim.as_deref().unwrap_or(".");
                 let right_d = right_delim.as_deref().unwrap_or(".");
                 let left_box = make_stretchy_delim(left_d, total_h, options);
@@ -342,9 +335,22 @@ fn layout_node(node: &ParseNode, options: &LayoutOptions) -> LayoutBox {
 
         ParseNode::Sizing { size, body, .. } => layout_sizing(*size, body, options),
 
-        ParseNode::Text { body, .. } => layout_text(body, options),
+        ParseNode::Text { body, font, mode, .. } => match font.as_deref() {
+            Some(f) => {
+                let group = ParseNode::OrdGroup {
+                    mode: *mode,
+                    body: body.clone(),
+                    semisimple: None,
+                    loc: None,
+                };
+                layout_font(f, &group, options)
+            }
+            None => layout_text(body, options),
+        },
 
         ParseNode::Font { font, body, .. } => layout_font(font, body, options),
+
+        ParseNode::Href { body, .. } => layout_href(body, options),
 
         ParseNode::Overline { body, .. } => layout_overline(body, options),
         ParseNode::Underline { body, .. } => layout_underline(body, options),
@@ -352,11 +358,18 @@ fn layout_node(node: &ParseNode, options: &LayoutOptions) -> LayoutBox {
         ParseNode::Rule {
             width: w,
             height: h,
+            shift,
             ..
         } => {
             let width = measurement_to_em(w, options);
-            let height = measurement_to_em(h, options);
-            LayoutBox::new_rule(width, height, 0.0, height)
+            let ink_h = measurement_to_em(h, options);
+            let raise = shift
+                .as_ref()
+                .map(|s| measurement_to_em(s, options))
+                .unwrap_or(0.0);
+            let box_height = (raise + ink_h).max(0.0);
+            let box_depth = (-raise).max(0.0);
+            LayoutBox::new_rule(width, box_height, box_depth, ink_h, raise)
         }
 
         ParseNode::Phantom { body, .. } => {
@@ -494,6 +507,36 @@ fn layout_node(node: &ParseNode, options: &LayoutOptions) -> LayoutBox {
 // Symbol layout
 // ============================================================================
 
+/// Advance width for glyphs missing from bundled KaTeX fonts (e.g. CJK in `\text{…}`).
+///
+/// The placeholder width must match what system font fallback draws at ~1em: using 0.5em
+/// collapses.advance and Core Text / platform rasterizers still paint a full-width ideograph,
+/// so neighbors overlap and the row looks "too large" / clipped.
+fn missing_glyph_width_em(ch: char) -> f64 {
+    match ch as u32 {
+        // Hiragana / Katakana
+        0x3040..=0x30FF | 0x31F0..=0x31FF => 1.0,
+        // CJK Unified + extension / compatibility ideographs
+        0x3400..=0x4DBF | 0x4E00..=0x9FFF | 0xF900..=0xFAFF => 1.0,
+        // Hangul syllables
+        0xAC00..=0xD7AF => 1.0,
+        // Fullwidth ASCII, punctuation, currency
+        0xFF01..=0xFF60 | 0xFFE0..=0xFFEE => 1.0,
+        _ => 0.5,
+    }
+}
+
+fn missing_glyph_metrics_fallback(ch: char, options: &LayoutOptions) -> (f64, f64, f64) {
+    let m = get_global_metrics(options.style.size_index());
+    let w = missing_glyph_width_em(ch);
+    if w >= 0.99 {
+        let h = (m.quad * 0.92).max(m.x_height);
+        (w, h, 0.0)
+    } else {
+        (w, m.x_height, 0.0)
+    }
+}
+
 fn layout_symbol(text: &str, mode: Mode, options: &LayoutOptions) -> LayoutBox {
     let ch = resolve_symbol_char(text, mode);
     let mut font_id = select_font(text, ch, mode, options);
@@ -510,10 +553,7 @@ fn layout_symbol(text: &str, mode: Mode, options: &LayoutOptions) -> LayoutBox {
 
     let (width, height, depth) = match metrics {
         Some(m) => (m.width, m.height, m.depth),
-        None => {
-            let m = get_global_metrics(options.style.size_index());
-            (0.5, m.x_height, 0.0)
-        }
+        None => missing_glyph_metrics_fallback(ch, options),
     };
 
     LayoutBox {
@@ -702,7 +742,13 @@ fn layout_supsub(
     sup: Option<&ParseNode>,
     sub: Option<&ParseNode>,
     options: &LayoutOptions,
+    inherited_font: Option<FontId>,
 ) -> LayoutBox {
+    let layout_child = |n: &ParseNode, opts: &LayoutOptions| match inherited_font {
+        Some(fid) => layout_with_font(n, fid, opts),
+        None => layout_node(n, opts),
+    };
+
     let horiz_brace_over = matches!(
         base,
         Some(ParseNode::HorizBrace {
@@ -720,7 +766,7 @@ fn layout_supsub(
     let center_scripts = horiz_brace_over || horiz_brace_under;
 
     let base_box = base
-        .map(|b| layout_node(b, options))
+        .map(|b| layout_child(b, options))
         .unwrap_or_else(LayoutBox::new_empty);
 
     let is_char_box = base.is_some_and(is_character_box);
@@ -734,12 +780,12 @@ fn layout_supsub(
 
     let sup_box = sup.map(|s| {
         let sup_opts = options.with_style(sup_style);
-        layout_node(s, &sup_opts)
+        layout_child(s, &sup_opts)
     });
 
     let sub_box = sub.map(|s| {
         let sub_opts = options.with_style(sub_style);
-        layout_node(s, &sub_opts)
+        layout_child(s, &sub_opts)
     });
 
     let sup_height_scaled = sup_box.as_ref().map(|b| b.height * sup_ratio).unwrap_or(0.0);
@@ -808,7 +854,9 @@ fn layout_supsub(
     // horizontal braces the label must sit above/below the ink with limit-style clearance.
     if horiz_brace_over && sup_box.is_some() {
         sup_shift += sup_style_metrics.sup_drop * sup_ratio;
-        sup_shift += metrics.big_op_spacing1 + 0.3;
+        // Same order of gap as `\xrightarrow` labels (`big_op_spacing1` ≈ 2mu); extra +0.3em
+        // pushed the script too far above the brace vs KaTeX reference (golden 0603).
+        sup_shift += metrics.big_op_spacing1;
     }
     if horiz_brace_under && sub_box.is_some() {
         sub_shift += sub_style_metrics.sub_drop * sub_ratio;
@@ -1160,7 +1208,7 @@ fn layout_op_with_limits(
             suppress_base_shift.unwrap_or(false),
         ),
         ParseNode::OperatorName { body, .. } => (None, false, Some(body.as_slice()), false),
-        _ => return layout_supsub(Some(base_node), sup_node, sub_node, options),
+        _ => return layout_supsub(Some(base_node), sup_node, sub_node, options, None),
     };
 
     let (base_box, slant) = build_op_base(name, symbol, body, options);
@@ -1327,6 +1375,11 @@ fn layout_operatorname(body: &[ParseNode], options: &LayoutOptions) -> LayoutBox
 // Accent layout
 // ============================================================================
 
+/// `\vec` KaTeX SVG: nudge vs raster reference (e.g. golden `0922`) — slightly lower, slightly right.
+const VEC_CLEARANCE_PULL_DOWN_EM: f64 = 0.082;
+const VEC_SKEW_EXTRA_RIGHT_EM: f64 = 0.018;
+const VEC_CLEARANCE_MIN_FLOOR_EM: f64 = 0.30;
+
 /// Extract the skew (italic correction) of the innermost/last glyph in a box.
 /// Used by shifty accents (\hat, \tilde…) to horizontally centre the mark
 /// over italic math letters (e.g. M in MathItalic has skew ≈ 0.083em).
@@ -1372,18 +1425,33 @@ fn layout_accent(
             content: BoxContent::SvgPath { commands, fill },
             color: options.color,
         };
+        // KaTeX `accent.ts` uses `clearance = min(body.height, xHeight)` for ordinary accents.
+        // That matches fixed-size `\vec` (svgData.vec); using it for *width-scaled* SVG accents
+        // (\widehat, \widetilde, \overgroup, …) pulls the path down onto the base (golden 0604/0885/0886).
         let gap = 0.08;
-        // clearance determines accent bottom position: accent_bottom = baseline - clearance
-        // accent_y = baseline - clearance - accent.depth  (reference above the bottom)
         let clearance = if is_below {
             body_box.height + body_box.depth + gap
+        } else if label == "\\vec" {
+            (body_box.height.min(options.metrics().x_height) - VEC_CLEARANCE_PULL_DOWN_EM)
+                .max(VEC_CLEARANCE_MIN_FLOOR_EM)
         } else {
             body_box.height + gap
         };
         let (height, depth) = if is_below {
             (body_box.height, body_box.depth + h + gap)
+        } else if label == "\\vec" {
+            (body_box.height + h, body_box.depth)
         } else {
             (body_box.height + gap + h, body_box.depth)
+        };
+        let vec_skew = if label == "\\vec" {
+            (if is_shifty {
+                glyph_skew(&body_box)
+            } else {
+                0.0
+            }) + VEC_SKEW_EXTRA_RIGHT_EM
+        } else {
+            0.0
         };
         return LayoutBox {
             width: body_box.width,
@@ -1393,7 +1461,7 @@ fn layout_accent(
                 base: Box::new(body_box),
                 accent: Box::new(accent_box),
                 clearance,
-                skew: 0.0,
+                skew: vec_skew,
                 is_below,
             },
             color: options.color,
@@ -1466,10 +1534,21 @@ fn layout_accent(
 
     // gap = clearance between body top and bottom of accent SVG.
     // For arrow accents, the SVG path is centered (height=h/2, depth=h/2).
-    // The gap prevents the visible arrowhead boundary from overlapping with body top.
+    // The gap prevents the visible arrowhead / harpoon tip from overlapping the base top.
+    //
+    // KaTeX stretchy arrows with vb_height 522 have h/2 ≈ 0.261em; default gap=0.12 left
+    // too little room for tall caps (`\overleftrightarrow{AB}`, `\overleftarrow{AB}`,
+    // `\overleftharpoon{AB}`, …).  `\Overrightarrow` uses a taller glyph (vb 560) and keeps
+    // the slightly smaller kern used in prior tuning.
     let gap = if use_arrow_path {
-        if label == "\\Overrightarrow" { 0.21 } else { 0.12 }
-    } else { 0.0 };
+        if label == "\\Overrightarrow" {
+            0.21
+        } else {
+            0.26
+        }
+    } else {
+        0.0
+    };
 
     let clearance = if is_below {
         body_box.height + body_box.depth + accent_box.depth + gap
@@ -1601,6 +1680,7 @@ fn node_contains_middle(node: &ParseNode) -> bool {
                 || scriptscript.iter().any(node_contains_middle)
         }
         ParseNode::HorizBrace { base, .. } => node_contains_middle(base),
+        ParseNode::Href { body, .. } => body.iter().any(node_contains_middle),
         _ => false,
     }
 }
@@ -1608,6 +1688,37 @@ fn node_contains_middle(node: &ParseNode) -> bool {
 /// Returns true if any node in the slice (recursing into all container nodes) is a Middle node.
 fn body_contains_middle(nodes: &[ParseNode]) -> bool {
     nodes.iter().any(node_contains_middle)
+}
+
+/// KaTeX genfrac HTML Rule 15e: `\binom`, `\brace`, `\brack`, `\atop` use `delim1`/`delim2`
+/// from font metrics, not the `\left`/`\right` height formula (`makeLeftRightDelim` vs genfrac).
+fn genfrac_delim_target_height(options: &LayoutOptions) -> f64 {
+    let m = options.metrics();
+    if options.style.is_display() {
+        m.delim1
+    } else if matches!(
+        options.style,
+        MathStyle::ScriptScript | MathStyle::ScriptScriptCramped
+    ) {
+        options
+            .with_style(MathStyle::Script)
+            .metrics()
+            .delim2
+    } else {
+        m.delim2
+    }
+}
+
+/// Required total height for `\left`/`\right` stretchy delimiters (TeX `\sigma_4` rule).
+fn left_right_delim_total_height(inner: &LayoutBox, options: &LayoutOptions) -> f64 {
+    let metrics = options.metrics();
+    let inner_height = inner.height;
+    let inner_depth = inner.depth;
+    let axis = metrics.axis_height;
+    let max_dist = (inner_height - axis).max(inner_depth + axis);
+    let delim_factor = 901.0;
+    let delim_extend = 5.0 / metrics.pt_per_em;
+    (max_dist / 500.0 * delim_factor).max(2.0 * max_dist - delim_extend)
 }
 
 fn layout_left_right(
@@ -1623,15 +1734,7 @@ fn layout_left_right(
             ..options.clone()
         };
         let inner_first = layout_expression(body, &opts_first, true);
-        let metrics = options.metrics();
-        let inner_height = inner_first.height;
-        let inner_depth = inner_first.depth;
-        let axis = metrics.axis_height;
-        let max_dist = (inner_height - axis).max(inner_depth + axis);
-        let delim_factor = 901.0;
-        let delim_extend = 5.0 / metrics.pt_per_em;
-        let total_height =
-            (max_dist / 500.0 * delim_factor).max(2.0 * max_dist - delim_extend);
+        let total_height = left_right_delim_total_height(&inner_first, options);
         // Second pass: layout with total_height so \middle stretches to match \left and \right.
         let opts_second = LayoutOptions {
             leftright_delim_height: Some(total_height),
@@ -1641,15 +1744,7 @@ fn layout_left_right(
         (inner_second, total_height)
     } else {
         let inner = layout_expression(body, options, true);
-        let metrics = options.metrics();
-        let inner_height = inner.height;
-        let inner_depth = inner.depth;
-        let axis = metrics.axis_height;
-        let max_dist = (inner_height - axis).max(inner_depth + axis);
-        let delim_factor = 901.0;
-        let delim_extend = 5.0 / metrics.pt_per_em;
-        let total_height =
-            (max_dist / 500.0 * delim_factor).max(2.0 * max_dist - delim_extend);
+        let total_height = left_right_delim_total_height(&inner, options);
         (inner, total_height)
     };
 
@@ -1798,6 +1893,11 @@ fn make_stretchy_delim(delim: &str, total_height: f64, options: &LayoutOptions) 
                 break;
             }
         }
+    }
+
+    let best_total = best_h + best_d;
+    if let Some(stacked) = make_stacked_delim_if_needed(delim, total_height, best_total, options) {
+        return stacked;
     }
 
     LayoutBox {
@@ -2110,7 +2210,7 @@ fn layout_text(body: &[ParseNode], options: &LayoutOptions) -> LayoutBox {
                 let m = get_char_metrics(FontId::MainRegular, char_code);
                 let (w, h, d) = match m {
                     Some(m) => (m.width, m.height, m.depth),
-                    None => (0.5, 0.43, 0.0),
+                    None => missing_glyph_metrics_fallback(ch, options),
                 };
                 children.push(LayoutBox {
                     width: w,
@@ -2476,6 +2576,16 @@ fn layout_with_font(node: &ParseNode, font_id: FontId, options: &LayoutOptions) 
             let children: Vec<LayoutBox> = body.iter().map(|n| layout_with_font(n, font_id, options)).collect();
             make_hbox(children)
         }
+        ParseNode::SupSub {
+            base, sup, sub, ..
+        } => {
+            if let Some(base_node) = base.as_deref() {
+                if should_use_op_limits(base_node, options) {
+                    return layout_op_with_limits(base_node, sup.as_deref(), sub.as_deref(), options);
+                }
+            }
+            layout_supsub(base.as_deref(), sup.as_deref(), sub.as_deref(), options, Some(font_id))
+        }
         ParseNode::MathOrd { text, .. }
         | ParseNode::TextOrd { text, .. }
         | ParseNode::Atom { text, .. } => {
@@ -2538,6 +2648,31 @@ fn layout_underline(body: &ParseNode, options: &LayoutOptions) -> LayoutBox {
             rule_thickness: rule,
         },
         color: options.color,
+    }
+}
+
+/// `\href` / `\url`: link color on the glyphs and an underline in the same color (KaTeX-style).
+fn layout_href(body: &[ParseNode], options: &LayoutOptions) -> LayoutBox {
+    let link_color = Color::from_name("blue").unwrap_or_else(|| Color::rgb(0.0, 0.0, 1.0));
+    let body_opts = options.with_color(link_color);
+    let body_box = layout_expression(body, &body_opts, true);
+    layout_underline_laid_out(body_box, options, link_color)
+}
+
+/// Same geometry as [`layout_underline`], but for an already computed inner box.
+fn layout_underline_laid_out(body_box: LayoutBox, options: &LayoutOptions, color: Color) -> LayoutBox {
+    let metrics = options.metrics();
+    let rule = metrics.default_rule_thickness;
+    let depth = body_box.depth + 3.0 * rule;
+    LayoutBox {
+        width: body_box.width,
+        height: body_box.height,
+        depth,
+        content: BoxContent::Underline {
+            body: Box::new(body_box),
+            rule_thickness: rule,
+        },
+        color,
     }
 }
 
@@ -2629,6 +2764,8 @@ fn node_math_class(node: &ParseNode) -> Option<MathClass> {
         ParseNode::Lap { .. } => None,
         ParseNode::LeftRight { .. } => Some(MathClass::Inner),
         ParseNode::AccentToken { .. } => Some(MathClass::Ord),
+        // \xrightarrow etc. are mathrel in TeX/KaTeX; without this they collapse to Ord–Ord (no kern).
+        ParseNode::XArrow { .. } => Some(MathClass::Rel),
         _ => Some(MathClass::Ord),
     }
 }
@@ -2682,11 +2819,16 @@ fn layout_horiz_brace(
     let w = body_box.width.max(0.5);
 
     let label = if is_over { "overbrace" } else { "underbrace" };
-    let (raw_commands, brace_h) = crate::katex_svg::katex_stretchy_path(label, w)
-        .unwrap_or_else(|| {
-            let h = 0.35_f64;
-            (horiz_brace_path(w, h, is_over), h)
-        });
+    // KaTeXSize4 brace glyphs are closed contours meant for fill (like stretchy arrows).
+    // fill=false strokes outlines → hollow “wireframe” and exaggerated bar ends.
+    let (raw_commands, brace_h, brace_fill) =
+        match crate::katex_svg::katex_stretchy_path(label, w) {
+            Some((c, h)) => (c, h, true),
+            None => {
+                let h = 0.35_f64;
+                (horiz_brace_path(w, h, is_over), h, false)
+            }
+        };
 
     // Shift y-coordinates: centered commands → positioned for over/under
     // For overbrace: foot at y=0 (bottom), peak goes up → shift by -brace_h/2
@@ -2700,7 +2842,7 @@ fn layout_horiz_brace(
         depth: if is_over { 0.0 } else { brace_h },
         content: BoxContent::SvgPath {
             commands,
-            fill: false,
+            fill: brace_fill,
         },
         color: options.color,
     };
@@ -2762,9 +2904,16 @@ fn layout_xarrow(
         .map(|b| b.width * sub_ratio)
         .unwrap_or(0.0);
 
-    let min_arrow_w = 1.0;
-    let padding = 0.5;
-    let arrow_w = body_w.max(below_w).max(min_arrow_w) + padding;
+    // KaTeX `katexImagesData` minWidth on the stretchy SVG, plus `.x-arrow-pad { padding: 0 0.5em }`
+    // on each label row (em = that row's font). In parent em: +0.5·sup_ratio + 0.5·sup_ratio, etc.
+    let min_w = crate::katex_svg::katex_stretchy_min_width_em(label).unwrap_or(1.0);
+    let upper_w = body_w + sup_ratio;
+    let lower_w = if below_box.is_some() {
+        below_w + sub_ratio
+    } else {
+        0.0
+    };
+    let arrow_w = upper_w.max(lower_w).max(min_w);
     let arrow_h = 0.3;
 
     let (commands, actual_arrow_h, fill_arrow) =

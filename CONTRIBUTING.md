@@ -29,6 +29,21 @@ Reference PNGs live under `tests/golden/fixtures/`. Regenerate RaTeX outputs wit
 
 Comparison helpers: `tools/golden_compare/`, and `crates/ratex-render/tests/golden_test.rs`. See `docs/LOW_SCORE_CASES.md` for known weak cases.
 
+**mhchem (`\ce` / `\pu`) golden**: reference PNGs in `tests/golden/fixtures_ce/` (KaTeX + mhchem, via Puppeteer):
+
+```bash
+cd tools/golden_compare && npm install
+node generate_reference.mjs ../../tests/golden/test_case_ce.txt ../../tests/golden/fixtures_ce --mhchem
+```
+
+Ink score for that suite:
+
+```bash
+cargo test -p ratex-render golden_mhchem_pass_rate -- --nocapture
+```
+
+RaTeX renders for inspection: `./scripts/update_golden_output.sh` (writes `tests/golden/output_ce/`). Compare with KaTeX refs using `python3 tools/golden_compare/compare_golden.py --ce` (same ink metric as the main golden script).
+
 ## Regenerating font data (advanced)
 
 KaTeX-derived metrics/symbols in `crates/ratex-font/src/data/` are generated from scripts in `tools/` (`convert_metrics.py`, `convert_symbols.py`). Only rerun when intentionally updating KaTeX baseline data.

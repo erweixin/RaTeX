@@ -13,6 +13,7 @@ struct ContentView: View {
         ("Middle delimiter",     #"\left( \frac{a}{b} \middle| \frac{c}{d} \right)"#),
         ("Schrödinger equation", #"i\hbar\frac{\partial}{\partial t}\Psi(\mathbf{r},t) = \left[-\frac{\hbar^2}{2m}\nabla^2 + V(\mathbf{r},t)\right]\Psi(\mathbf{r},t)"#),
         ("Taylor series",        #"f(x) = \sum_{n=0}^{\infty}\frac{f^{(n)}(0)}{n!}x^n = f(0) + f'(0)x + \frac{f''(0)}{2!}x^2 + \frac{f'''(0)}{3!}x^3 + \cdots"#),
+        ("酸碱中和",             #"\text{酸} + \text{碱} \rightarrow 盐 + 水"#),
     ]
 
     @State private var customLatex: String = #"\frac{d}{dx}\left[\int_a^x f(t)\,dt\right] = f(x)"#

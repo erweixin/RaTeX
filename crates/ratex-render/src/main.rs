@@ -23,12 +23,20 @@ fn main() {
         .cloned()
         .unwrap_or_else(|| "output".to_string());
 
+    let device_pixel_ratio = args
+        .iter()
+        .position(|a| a == "--dpr")
+        .and_then(|i| args.get(i + 1))
+        .and_then(|s| s.parse::<f32>().ok())
+        .unwrap_or(1.0);
+
     std::fs::create_dir_all(&output_dir).expect("Failed to create output dir");
 
     let options = RenderOptions {
         font_size: 40.0,
         padding: 10.0,
         font_dir,
+        device_pixel_ratio,
     };
 
     let layout_opts = LayoutOptions::default();

@@ -123,10 +123,12 @@ fn emit_box(lbox: &LayoutBox, x: f64, y: f64, scale: f64, items: &mut Vec<Displa
             });
         }
 
-        BoxContent::Rule { thickness } => {
+        BoxContent::Rule { thickness, raise } => {
+            // Baseline at `y` (downward screen coords); bottom of ink is `raise` em above baseline.
+            let cy = y - (raise + thickness / 2.0) * scale;
             items.push(DisplayItem::Line {
                 x,
-                y: y - lbox.height * scale / 2.0,
+                y: cy,
                 width: lbox.width * scale,
                 thickness: thickness * scale,
                 color: lbox.color,

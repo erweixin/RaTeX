@@ -11,6 +11,9 @@ pub struct RenderOptions {
     pub font_size: f32,
     pub padding: f32,
     pub font_dir: String,
+    /// Multiplies pixels-per-em (and padding) so the same layout renders at higher resolution
+    /// (e.g. 2.0 to align RaTeX PNG pixel density with Puppeteer `deviceScaleFactor: 2` refs).
+    pub device_pixel_ratio: f32,
 }
 
 impl Default for RenderOptions {
@@ -19,6 +22,7 @@ impl Default for RenderOptions {
             font_size: 40.0,
             padding: 10.0,
             font_dir: String::new(),
+            device_pixel_ratio: 1.0,
         }
     }
 }
@@ -29,10 +33,13 @@ pub fn render_to_png(
 ) -> Result<Vec<u8>, String> {
     let em = options.font_size;
     let pad = options.padding;
+    let dpr = options.device_pixel_ratio.clamp(0.01, 16.0);
+    let em_px = em * dpr;
+    let pad_px = pad * dpr;
 
     let total_h = display_list.height + display_list.depth;
-    let img_w = (display_list.width as f32 * em + 2.0 * pad).ceil() as u32;
-    let img_h = (total_h as f32 * em + 2.0 * pad).ceil() as u32;
+    let img_w = (display_list.width as f32 * em_px + 2.0 * pad_px).ceil() as u32;
+    let img_h = (total_h as f32 * em_px + 2.0 * pad_px).ceil() as u32;
 
     let img_w = img_w.max(1);
     let img_h = img_h.max(1);
@@ -56,11 +63,11 @@ pub fn render_to_png(
                 commands: _,
                 color,
             } => {
-                let glyph_em = em * *scale as f32;
+                let glyph_em = em_px * *scale as f32;
                 render_glyph(
                     &mut pixmap,
-                    *x as f32 * em + pad,
-                    *y as f32 * em + pad,
+                    *x as f32 * em_px + pad_px,
+                    *y as f32 * em_px + pad_px,
                     font,
                     *char_code,
                     color,
@@ -77,10 +84,10 @@ pub fn render_to_png(
             } => {
                 render_line(
                     &mut pixmap,
-                    *x as f32 * em + pad,
-                    *y as f32 * em + pad,
-                    *width as f32 * em,
-                    *thickness as f32 * em,
+                    *x as f32 * em_px + pad_px,
+                    *y as f32 * em_px + pad_px,
+                    *width as f32 * em_px,
+                    *thickness as f32 * em_px,
                     color,
                 );
             }
@@ -93,10 +100,10 @@ pub fn render_to_png(
             } => {
                 render_rect(
                     &mut pixmap,
-                    *x as f32 * em + pad,
-                    *y as f32 * em + pad,
-                    *width as f32 * em,
-                    *height as f32 * em,
+                    *x as f32 * em_px + pad_px,
+                    *y as f32 * em_px + pad_px,
+                    *width as f32 * em_px,
+                    *height as f32 * em_px,
                     color,
                 );
             }
@@ -109,12 +116,13 @@ pub fn render_to_png(
             } => {
                 render_path(
                     &mut pixmap,
-                    *x as f32 * em + pad,
-                    *y as f32 * em + pad,
+                    *x as f32 * em_px + pad_px,
+                    *y as f32 * em_px + pad_px,
                     commands,
                     *fill,
                     color,
-                    em,
+                    em_px,
+                    1.5 * dpr,
                 );
             }
         }
@@ -347,6 +355,7 @@ fn render_rect(pixmap: &mut Pixmap, x: f32, y: f32, width: f32, height: f32, col
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_path(
     pixmap: &mut Pixmap,
     x: f32,
@@ -355,6 +364,7 @@ fn render_path(
     fill: bool,
     color: &Color,
     em: f32,
+    stroke_width_px: f32,
 ) {
     // For filled paths, render each subpath (delimited by MoveTo) as a separate
     // fill_path call.  KaTeX stretchy arrows are assembled from multiple path
@@ -362,20 +372,21 @@ fn render_path(
     // be opposite.  Combining them into a single fill_path with FillRule::Winding
     // causes the shaft region to cancel out (net winding = 0 → unfilled).
     // Drawing each subpath independently avoids cross-component winding interactions.
-    if fill {
-        let mut start = 0;
-        for i in 1..commands.len() {
-            if matches!(commands[i], ratex_types::path_command::PathCommand::MoveTo { .. }) {
-                render_path_segment(pixmap, x, y, &commands[start..i], fill, color, em);
-                start = i;
+        if fill {
+            let mut start = 0;
+            for i in 1..commands.len() {
+                if matches!(commands[i], ratex_types::path_command::PathCommand::MoveTo { .. }) {
+                    render_path_segment(pixmap, x, y, &commands[start..i], fill, color, em, stroke_width_px);
+                    start = i;
+                }
             }
+            render_path_segment(pixmap, x, y, &commands[start..], fill, color, em, stroke_width_px);
+            return;
         }
-        render_path_segment(pixmap, x, y, &commands[start..], fill, color, em);
-        return;
-    }
-    render_path_segment(pixmap, x, y, commands, fill, color, em);
+        render_path_segment(pixmap, x, y, commands, fill, color, em, stroke_width_px);
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_path_segment(
     pixmap: &mut Pixmap,
     x: f32,
@@ -384,6 +395,7 @@ fn render_path_segment(
     fill: bool,
     color: &Color,
     em: f32,
+    stroke_width_px: f32,
 ) {
     let mut builder = PathBuilder::new();
     for cmd in commands {
@@ -444,7 +456,7 @@ fn render_path_segment(
             );
         } else {
             let stroke = Stroke {
-                width: 1.5,
+                width: stroke_width_px,
                 ..Default::default()
             };
             pixmap.stroke_path(&path, &paint, &stroke, Transform::identity(), None);

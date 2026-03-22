@@ -8,12 +8,12 @@ pub fn katex_accent_path(
 ) -> Option<(Vec<PathCommand>, f64, f64, bool)> {
     match label {
         "\\vec" => {
-            // KaTeX uses SVG for \vec (from PR #1018) to avoid combining character issues.
-            // Use a filled arrow shape for precise control over thickness.
-            let h_em = 0.12; // Small compact height
-            let w_em = base_width_em.max(0.35);
-            let cmds = build_vec_arrow_filled(w_em, h_em);
-            Some((cmds, w_em, h_em, true)) // true = fill
+            // KaTeX `svgGeometry.path.vec` (glyph U+20D7) + `svgData.vec` fixed size — not stretched to base width.
+            const W_EM: f64 = 0.471;
+            const H_EM: f64 = 0.714;
+            let raw = parse_svg_path(KATEX_VEC_PATH);
+            let cmds = scale_svg_path_thousandths(&raw);
+            Some((cmds, W_EM, H_EM, true))
         }
         "\\widehat" | "\\widecheck" => {
             let is_hat = label == "\\widehat";
@@ -242,37 +242,45 @@ fn clip_segment_to_rect(
     vec![(a, b)]
 }
 
-/// Build a filled vector arrow for \vec accent.
-/// The arrow is centered horizontally over the base and points to the right.
-fn build_vec_arrow_filled(width_em: f64, height_em: f64) -> Vec<PathCommand> {
-    // Filled rightward arrow with thin shaft and small arrowhead
-    let mid_y = height_em / 2.0;
-    let shaft_thickness = 0.02; // Thin shaft
-    let arrow_len = width_em * 0.85;
-    let head_len = height_em * 0.6; // Arrowhead length
-    let head_width = height_em * 0.45; // Arrowhead half-width
-    let start_x = (width_em - arrow_len) / 2.0;
-    let end_x = start_x + arrow_len;
-    let y = -mid_y; // Center y (negative because SVG y points down)
+/// KaTeX `svgGeometry.js` path `vec` (from Main U+20D7); viewBox `0 0 471 714` (= 1000×0.471 by 1000×0.714).
+const KATEX_VEC_PATH: &str = "M377 20c0-5.333 1.833-10 5.5-14S391 0 397 0c4.667 0 8.667 1.667 12 5 3.333 2.667 6.667 9 10 19 6.667 24.667 20.333 43.667 41 57 7.333 4.667 11 10.667 11 18 0 6-1 10-3 12s-6.667 5-14 9c-28.667 14.667-53.667 35.667-75 63 -1.333 1.333-3.167 3.5-5.5 6.5s-4 4.833-5 5.5c-1 .667-2.5 1.333-4.5 2s-4.333 1 -7 1c-4.667 0-9.167-1.833-13.5-5.5S337 184 337 178c0-12.667 15.667-32.333 47-59 H213l-171-1c-8.667-6-13-12.333-13-19 0-4.667 4.333-11.333 13-20h359 c-16-25.333-24-45-24-59z";
 
-    // Build a filled arrow shape: shaft rectangle + triangular head
-    vec![
-        // Start at shaft top-left
-        PathCommand::MoveTo { x: start_x, y: y - shaft_thickness },
-        // Shaft top edge to where head begins
-        PathCommand::LineTo { x: end_x - head_len, y: y - shaft_thickness },
-        // Arrowhead top edge
-        PathCommand::LineTo { x: end_x - head_len, y: y - head_width },
-        // Arrowhead tip
-        PathCommand::LineTo { x: end_x, y },
-        // Arrowhead bottom edge
-        PathCommand::LineTo { x: end_x - head_len, y: y + head_width },
-        // Back to shaft bottom
-        PathCommand::LineTo { x: end_x - head_len, y: y + shaft_thickness },
-        // Shaft bottom edge back to start
-        PathCommand::LineTo { x: start_x, y: y + shaft_thickness },
-        PathCommand::Close,
-    ]
+fn scale_svg_path_thousandths(cmds: &[PathCommand]) -> Vec<PathCommand> {
+    let s = 0.001;
+    cmds.iter()
+        .map(|c| match *c {
+            PathCommand::MoveTo { x, y } => PathCommand::MoveTo {
+                x: x * s,
+                y: y * s,
+            },
+            PathCommand::LineTo { x, y } => PathCommand::LineTo {
+                x: x * s,
+                y: y * s,
+            },
+            PathCommand::CubicTo {
+                x1,
+                y1,
+                x2,
+                y2,
+                x,
+                y,
+            } => PathCommand::CubicTo {
+                x1: x1 * s,
+                y1: y1 * s,
+                x2: x2 * s,
+                y2: y2 * s,
+                x: x * s,
+                y: y * s,
+            },
+            PathCommand::QuadTo { x1, y1, x, y } => PathCommand::QuadTo {
+                x1: x1 * s,
+                y1: y1 * s,
+                x: x * s,
+                y: y * s,
+            },
+            PathCommand::Close => PathCommand::Close,
+        })
+        .collect()
 }
 
 /// KaTeX selects widehat/widecheck variant by character count.
@@ -463,6 +471,11 @@ fn scale_cmd_xy(cmd: &PathCommand, sx: f64, sy: f64) -> PathCommand {
 // ---------------------------------------------------------------------------
 // Minimal SVG path data parser
 // ---------------------------------------------------------------------------
+
+/// Parse a KaTeX-style SVG path `d` string into [`PathCommand`]s (for delimiters, accents).
+pub(crate) fn parse_svg_path_data(d: &str) -> Vec<PathCommand> {
+    parse_svg_path(d)
+}
 
 fn parse_svg_path(d: &str) -> Vec<PathCommand> {
     let tokens = tokenize_svg(d);
@@ -737,6 +750,12 @@ const RIGHTHARPOONDOWN: &str = "M399747 511c0 7.3 6.7 11 20 11 8 0 13-.8 15-2.5s
 // rightharpoondownplus (viewBox 400000×716)
 const RIGHTHARPOONDOWNPLUS: &str = "M399747 705c0 7.3 6.7 11 20 11 8 0 13-.8 15-2.5s4.7-6.8 8-15.5c40-94 99.3-166.3 178-217 13.3-8 20.3-12.3 21-13 5.3-3.3 8.5-5.8 9.5-7.5 1-1.7 1.5-5.2 1.5-10.5s-2.3-10.3-7-15H0v40h399908c-34 25.3-64.7 57-92 95-27.3 38-48.7 77.7-64 119-3.3 8.7-5 14-5 16zM0 435v40h399900v-40z m0-194v40h400000v-40zm0 0v40h400000v-40z";
 
+// mhchem \\xrightequilibrium / \\xleftequilibrium (KaTeX katexImagesData, viewBox 400000×716)
+const BARABOVESHORTLEFTHARPOON: &str = "M507,435c-4,4,-6.3,8.7,-7,14c0,5.3,0.7,9,2,11c1.3,2,5.3,5.3,12,10c90.7,54,156,130,196,228c3.3,10.7,6.3,16.3,9,17c2,0.7,5,1,9,1c0,0,5,0,5,0c10.7,0,16.7,-2,18,-6c2,-2.7,1,-9.7,-3,-21c-32,-87.3,-82.7,-157.7,-152,-211c0,0,-3,-3,-3,-3l399351,0l0,-40c-398570,0,-399437,0,-399437,0z M593 435 v40 H399500 v-40zM0 281 v-40 H399908 v40z M0 281 v-40 H399908 v40z";
+const RIGHTHARPOONABOVESHORTBAR: &str = "M0,241 l0,40c399126,0,399993,0,399993,0c4.7,-4.7,7,-9.3,7,-14c0,-9.3,-3.7,-15.3,-11,-18c-92.7,-56.7,-159,-133.7,-199,-231c-3.3,-9.3,-6,-14.7,-8,-16c-2,-1.3,-7,-2,-15,-2c-10.7,0,-16.7,2,-18,6c-2,2.7,-1,9.7,3,21c15.3,42,36.7,81.8,64,119.5c27.3,37.7,58,69.2,92,94.5zM0 241 v40 H399908 v-40z M0 475 v-40 H399500 v40z M0 475 v-40 H399500 v40z";
+const SHORTBARABOVELEFTHARPOON: &str = "M7,435c-4,4,-6.3,8.7,-7,14c0,5.3,0.7,9,2,11c1.3,2,5.3,5.3,12,10c90.7,54,156,130,196,228c3.3,10.7,6.3,16.3,9,17c2,0.7,5,1,9,1c0,0,5,0,5,0c10.7,0,16.7,-2,18,-6c2,-2.7,1,-9.7,-3,-21c-32,-87.3,-82.7,-157.7,-152,-211c0,0,-3,-3,-3,-3l399907,0l0,-40c-399126,0,-399993,0,-399993,0zM93 435 v40 H400000 v-40z M500 241 v40 H400000 v-40z M500 241 v40 H400000 v-40z";
+const SHORTRIGHTHARPOONABOVEBAR: &str = "M53,241l0,40c398570,0,399437,0,399437,0c4.7,-4.7,7,-9.3,7,-14c0,-9.3,-3.7,-15.3,-11,-18c-92.7,-56.7,-159,-133.7,-199,-231c-3.3,-9.3,-6,-14.7,-8,-16c-2,-1.3,-7,-2,-15,-2c-10.7,0,-16.7,2,-18,6c-2,2.7,-1,9.7,3,21c15.3,42,36.7,81.8,64,119.5c27.3,37.7,58,69.2,92,94.5zM500 241 v40 H399408 v-40z M500 435 v40 H400000 v-40z";
+
 // lefthook from glyph U+21A9 in font KaTeX Main (viewBox 400000×522)
 const LEFTHOOK: &str = "M400000 281 H103s-33-11.2-61-33.5S0 197.3 0 164s14.2-61.2 42.5-83.5C70.8 58.2 104 47 142 47 c16.7 0 25 6.7 25 20 0 12-8.7 18.7-26 20-40 3.3-68.7 15.7-86 37-10 12-15 25.3-15 40 0 22.7 9.8 40.7 29.5 54 19.7 13.3 43.5 21 71.5 23h399859zM103 281v-40h399897v40z";
 
@@ -803,7 +822,8 @@ const _VEC_KATEX: &str = "M377 20c0-5.333 1.833-10 5.5-14S391 0 397 0c4.667 0 8.
 
 struct KatexImageData {
     paths: &'static [&'static str],
-    _min_width: f64,
+    /// KaTeX `katexImagesData` minimum arrow shaft width (em).
+    min_width: f64,
     vb_height: f64,
     align: Option<&'static str>,
 }
@@ -811,40 +831,50 @@ struct KatexImageData {
 fn katex_image_data(label: &str) -> Option<KatexImageData> {
     let key = label.trim_start_matches('\\');
     match key {
-        "overrightarrow"  => Some(KatexImageData { paths: &["rightarrow"],  _min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
-        "overleftarrow"   => Some(KatexImageData { paths: &["leftarrow"],   _min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
-        "underrightarrow" => Some(KatexImageData { paths: &["rightarrow"],  _min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
-        "underleftarrow"  => Some(KatexImageData { paths: &["leftarrow"],   _min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
-        "xrightarrow"     => Some(KatexImageData { paths: &["rightarrow"],  _min_width: 1.469, vb_height: 522.0, align: Some("xMaxYMin") }),
-        "xleftarrow"      => Some(KatexImageData { paths: &["leftarrow"],   _min_width: 1.469, vb_height: 522.0, align: Some("xMinYMin") }),
-        "Overrightarrow"  => Some(KatexImageData { paths: &["doublerightarrow"], _min_width: 0.888, vb_height: 560.0, align: Some("xMaxYMin") }),
-        "xRightarrow"     => Some(KatexImageData { paths: &["doublerightarrow"], _min_width: 1.526, vb_height: 560.0, align: Some("xMaxYMin") }),
-        "xLeftarrow"      => Some(KatexImageData { paths: &["doubleleftarrow"],  _min_width: 1.526, vb_height: 560.0, align: Some("xMinYMin") }),
-        "overleftharpoon" | "xleftharpoonup"    => Some(KatexImageData { paths: &["leftharpoon"],  _min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
-        "xleftharpoondown"                      => Some(KatexImageData { paths: &["leftharpoondown"], _min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
-        "overrightharpoon" | "xrightharpoonup"  => Some(KatexImageData { paths: &["rightharpoon"], _min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
-        "xrightharpoondown"                     => Some(KatexImageData { paths: &["rightharpoondown"], _min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
-        "xlongequal"         => Some(KatexImageData { paths: &["longequal"],   _min_width: 0.888, vb_height: 334.0, align: Some("xMinYMin") }),
-        "xtwoheadleftarrow"  => Some(KatexImageData { paths: &["twoheadleftarrow"],  _min_width: 0.888, vb_height: 334.0, align: Some("xMinYMin") }),
-        "xtwoheadrightarrow" => Some(KatexImageData { paths: &["twoheadrightarrow"], _min_width: 0.888, vb_height: 334.0, align: Some("xMaxYMin") }),
-        "overleftrightarrow"  => Some(KatexImageData { paths: &["leftarrow", "rightarrow"], _min_width: 0.888, vb_height: 522.0, align: None }),
-        "underleftrightarrow" => Some(KatexImageData { paths: &["leftarrow", "rightarrow"], _min_width: 0.888, vb_height: 522.0, align: None }),
-        "xleftrightarrow"    => Some(KatexImageData { paths: &["leftarrow", "rightarrow"], _min_width: 1.75, vb_height: 522.0, align: None }),
-        "xLeftrightarrow"    => Some(KatexImageData { paths: &["doubleleftarrow", "doublerightarrow"], _min_width: 1.75, vb_height: 560.0, align: None }),
-        "xrightleftharpoons" => Some(KatexImageData { paths: &["leftharpoondownplus", "rightharpoonplus"], _min_width: 1.75, vb_height: 716.0, align: None }),
-        "xleftrightharpoons" => Some(KatexImageData { paths: &["leftharpoonplus", "rightharpoondownplus"], _min_width: 1.75, vb_height: 716.0, align: None }),
-        "xhookleftarrow"     => Some(KatexImageData { paths: &["leftarrow", "righthook"],  _min_width: 1.08, vb_height: 522.0, align: None }),
-        "xhookrightarrow"    => Some(KatexImageData { paths: &["lefthook", "rightarrow"],  _min_width: 1.08, vb_height: 522.0, align: None }),
-        "overlinesegment"    => Some(KatexImageData { paths: &["leftlinesegment", "rightlinesegment"], _min_width: 0.888, vb_height: 522.0, align: None }),
-        "underlinesegment"   => Some(KatexImageData { paths: &["leftlinesegment", "rightlinesegment"], _min_width: 0.888, vb_height: 522.0, align: None }),
-        "overgroup"          => Some(KatexImageData { paths: &["leftgroup", "rightgroup"], _min_width: 0.888, vb_height: 342.0, align: None }),
-        "undergroup"         => Some(KatexImageData { paths: &["leftgroupunder", "rightgroupunder"], _min_width: 0.888, vb_height: 342.0, align: None }),
-        "xmapsto"            => Some(KatexImageData { paths: &["leftmapsto", "rightarrow"], _min_width: 1.5, vb_height: 522.0, align: None }),
-        "xtofrom"            => Some(KatexImageData { paths: &["leftToFrom", "rightToFrom"], _min_width: 1.75, vb_height: 528.0, align: None }),
-        "xrightleftarrows"   => Some(KatexImageData { paths: &["baraboveleftarrow", "rightarrowabovebar"], _min_width: 1.75, vb_height: 901.0, align: None }),
-        // overbrace/underbrace: not using KaTeX three-segment joining; drawn as a single path by the engine's horiz_brace_path
+        "overrightarrow"  => Some(KatexImageData { paths: &["rightarrow"],  min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
+        "overleftarrow"   => Some(KatexImageData { paths: &["leftarrow"],   min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
+        "underrightarrow" => Some(KatexImageData { paths: &["rightarrow"],  min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
+        "underleftarrow"  => Some(KatexImageData { paths: &["leftarrow"],   min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
+        "xrightarrow"     => Some(KatexImageData { paths: &["rightarrow"],  min_width: 1.469, vb_height: 522.0, align: Some("xMaxYMin") }),
+        "xleftarrow"      => Some(KatexImageData { paths: &["leftarrow"],   min_width: 1.469, vb_height: 522.0, align: Some("xMinYMin") }),
+        "Overrightarrow"  => Some(KatexImageData { paths: &["doublerightarrow"], min_width: 0.888, vb_height: 560.0, align: Some("xMaxYMin") }),
+        "xRightarrow"     => Some(KatexImageData { paths: &["doublerightarrow"], min_width: 1.526, vb_height: 560.0, align: Some("xMaxYMin") }),
+        "xLeftarrow"      => Some(KatexImageData { paths: &["doubleleftarrow"],  min_width: 1.526, vb_height: 560.0, align: Some("xMinYMin") }),
+        "overleftharpoon" | "xleftharpoonup"    => Some(KatexImageData { paths: &["leftharpoon"],  min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
+        "xleftharpoondown"                      => Some(KatexImageData { paths: &["leftharpoondown"], min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
+        "overrightharpoon" | "xrightharpoonup"  => Some(KatexImageData { paths: &["rightharpoon"], min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
+        "xrightharpoondown"                     => Some(KatexImageData { paths: &["rightharpoondown"], min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
+        "xlongequal"         => Some(KatexImageData { paths: &["longequal"],   min_width: 0.888, vb_height: 334.0, align: Some("xMinYMin") }),
+        "xtwoheadleftarrow"  => Some(KatexImageData { paths: &["twoheadleftarrow"],  min_width: 0.888, vb_height: 334.0, align: Some("xMinYMin") }),
+        "xtwoheadrightarrow" => Some(KatexImageData { paths: &["twoheadrightarrow"], min_width: 0.888, vb_height: 334.0, align: Some("xMaxYMin") }),
+        "overleftrightarrow"  => Some(KatexImageData { paths: &["leftarrow", "rightarrow"], min_width: 0.888, vb_height: 522.0, align: None }),
+        "underleftrightarrow" => Some(KatexImageData { paths: &["leftarrow", "rightarrow"], min_width: 0.888, vb_height: 522.0, align: None }),
+        "xleftrightarrow"    => Some(KatexImageData { paths: &["leftarrow", "rightarrow"], min_width: 1.75, vb_height: 522.0, align: None }),
+        "xLeftrightarrow"    => Some(KatexImageData { paths: &["doubleleftarrow", "doublerightarrow"], min_width: 1.75, vb_height: 560.0, align: None }),
+        "xrightleftharpoons" => Some(KatexImageData { paths: &["leftharpoondownplus", "rightharpoonplus"], min_width: 1.75, vb_height: 716.0, align: None }),
+        "xleftrightharpoons" => Some(KatexImageData { paths: &["leftharpoonplus", "rightharpoondownplus"], min_width: 1.75, vb_height: 716.0, align: None }),
+        "xrightequilibrium" => Some(KatexImageData { paths: &["baraboveshortleftharpoon", "rightharpoonaboveshortbar"], min_width: 1.75, vb_height: 716.0, align: None }),
+        "xleftequilibrium" => Some(KatexImageData { paths: &["shortbaraboveleftharpoon", "shortrightharpoonabovebar"], min_width: 1.75, vb_height: 716.0, align: None }),
+        "xhookleftarrow"     => Some(KatexImageData { paths: &["leftarrow", "righthook"],  min_width: 1.08, vb_height: 522.0, align: None }),
+        "xhookrightarrow"    => Some(KatexImageData { paths: &["lefthook", "rightarrow"],  min_width: 1.08, vb_height: 522.0, align: None }),
+        "overlinesegment"    => Some(KatexImageData { paths: &["leftlinesegment", "rightlinesegment"], min_width: 0.888, vb_height: 522.0, align: None }),
+        "underlinesegment"   => Some(KatexImageData { paths: &["leftlinesegment", "rightlinesegment"], min_width: 0.888, vb_height: 522.0, align: None }),
+        "overgroup"          => Some(KatexImageData { paths: &["leftgroup", "rightgroup"], min_width: 0.888, vb_height: 342.0, align: None }),
+        "undergroup"         => Some(KatexImageData { paths: &["leftgroupunder", "rightgroupunder"], min_width: 0.888, vb_height: 342.0, align: None }),
+        "xmapsto"            => Some(KatexImageData { paths: &["leftmapsto", "rightarrow"], min_width: 1.5, vb_height: 522.0, align: None }),
+        "xtofrom"            => Some(KatexImageData { paths: &["leftToFrom", "rightToFrom"], min_width: 1.75, vb_height: 528.0, align: None }),
+        "xrightleftarrows"   => Some(KatexImageData { paths: &["baraboveleftarrow", "rightarrowabovebar"], min_width: 1.75, vb_height: 901.0, align: None }),
+        // Overbrace/underbrace: KaTeX Size4 glyphs (viewBox 400000×548), same 3-piece horizontal joining as stretchy arrows.
+        "overbrace"  => Some(KatexImageData { paths: &["leftbrace", "midbrace", "rightbrace"], min_width: 0.888, vb_height: 548.0, align: None }),
+        "underbrace" => Some(KatexImageData { paths: &["leftbraceunder", "midbraceunder", "rightbraceunder"], min_width: 0.888, vb_height: 548.0, align: None }),
         _ => None,
     }
+}
+
+/// KaTeX [`katexImagesData`](https://github.com/KaTeX/KaTeX/blob/main/src/katexImagesData.js) `minWidth`
+/// for `\\xrightarrow`, `\\xleftrightarrow`, mhchem `\\xrightequilibrium`, etc.
+pub(crate) fn katex_stretchy_min_width_em(label: &str) -> Option<f64> {
+    katex_image_data(label).map(|d| d.min_width)
 }
 
 /// Look up the SVG path data for a named path key.
@@ -862,6 +892,10 @@ fn path_for_name(name: &str) -> Option<&'static str> {
         "rightharpoonplus"     => Some(RIGHTHARPOONPLUS),
         "rightharpoondown"     => Some(RIGHTHARPOONDOWN),
         "rightharpoondownplus" => Some(RIGHTHARPOONDOWNPLUS),
+        "baraboveshortleftharpoon" => Some(BARABOVESHORTLEFTHARPOON),
+        "rightharpoonaboveshortbar" => Some(RIGHTHARPOONABOVESHORTBAR),
+        "shortbaraboveleftharpoon" => Some(SHORTBARABOVELEFTHARPOON),
+        "shortrightharpoonabovebar" => Some(SHORTRIGHTHARPOONABOVEBAR),
         "lefthook"             => Some(LEFTHOOK),
         "righthook"            => Some(RIGHTHOOK),
         "leftbrace"            => Some(LEFTBRACE),
@@ -960,9 +994,28 @@ pub fn katex_stretchy_path(label: &str, width_em: f64) -> Option<(Vec<PathComman
             let lc = make_cmds(data.paths[0], 0.0)?;
             let mc = make_cmds(data.paths[1], x_m)?;
             let rc = make_cmds(data.paths[2], x_r)?;
-            let mut out = clip_path_to_rect(&lc, 0.0, width_em, y_min, y_max);
-            out.extend(clip_path_to_rect(&mc, 0.0, width_em, y_min, y_max));
-            out.extend(clip_path_to_rect(&rc, 0.0, width_em, y_min, y_max));
+            // KaTeX `stretchy.ts` + `katex.scss`: three stacked spans with overflow hidden —
+            // `.brace-left` 25.1%, `.brace-center` 50% at left 25%, `.brace-right` 25.1% from the
+            // right. Each child SVG is 400em wide with `preserveAspectRatio` slice so only the
+            // correct horizontal band shows. Clipping all three to `[0, width]` exposes the
+            // middle glyph’s full 400-unit shaft on the entire width → thick bar past the curls.
+            let key = label.trim_start_matches('\\');
+            let w = width_em;
+            let out = if key == "overbrace" || key == "underbrace" {
+                let left_max = w * 0.251;
+                let center_min = w * 0.25;
+                let center_max = w * 0.75;
+                let right_min = w * (1.0 - 0.251);
+                let mut o = clip_path_to_rect(&lc, 0.0, left_max, y_min, y_max);
+                o.extend(clip_path_to_rect(&mc, center_min, center_max, y_min, y_max));
+                o.extend(clip_path_to_rect(&rc, right_min, w, y_min, y_max));
+                o
+            } else {
+                let mut o = clip_path_to_rect(&lc, 0.0, w, y_min, y_max);
+                o.extend(clip_path_to_rect(&mc, 0.0, w, y_min, y_max));
+                o.extend(clip_path_to_rect(&rc, 0.0, w, y_min, y_max));
+                o
+            };
             Some((out, height_em))
         }
         _ => None,
@@ -977,6 +1030,19 @@ mod tests {
     fn test_parse_simple_path() {
         let cmds = parse_svg_path("M0 0 L10 20 Z");
         assert_eq!(cmds.len(), 3);
+    }
+
+    #[test]
+    fn test_parse_katex_vec_path() {
+        let cmds = scale_svg_path_thousandths(&parse_svg_path(KATEX_VEC_PATH));
+        assert!(cmds.len() >= 8, "vec path should parse to multiple segments");
+        match cmds[0] {
+            PathCommand::MoveTo { x, y } => {
+                assert!((x - 0.377).abs() < 0.001);
+                assert!((y - 0.02).abs() < 0.001);
+            }
+            _ => panic!("expected MoveTo"),
+        }
     }
 
     #[test]

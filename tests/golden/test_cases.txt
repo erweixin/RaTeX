@@ -31,10 +31,10 @@ x^i
 \alef
 \alefsym
 \aleph
-\begin{align} a&=b+c \\ d+e&=f \end{align}
+\begin{align*} a&=b+c \\ d+e&=f \end{align*}
 \begin{align*} a&=b+c \\ d+e&=f \end{align*}
 \begin{aligned} a&=b+c \\ d+e&=f \end{aligned}
-\begin{alignat}{2} 10&x+ &3&y = 2 \\ 3&x+&13&y = 4 \end{alignat}
+\begin{alignat*}{2} 10&x+ &3&y = 2 \\ 3&x+&13&y = 4 \end{alignat*}
 \begin{alignat*}{2} 10&x+ &3&y = 2 \\ 3&x+&13&y = 4 \end{alignat*}
 \begin{alignedat}{2} 10&x+ &3&y = 2 \\ 3&x+&13&y = 4 \end{alignedat}
 \Alpha
@@ -283,7 +283,7 @@ a\enspace b
 \eqcirc
 \Eqcolon
 \eqcolon
-\begin{equation} a = b + c \end{equation}
+\begin{equation*} a = b + c \end{equation*}
 \begin{equation*} a = b + c \end{equation*}
 \Eqqcolon
 \eqqcolon
@@ -312,7 +312,7 @@ a\enspace b
 \Game
 \Gamma
 \gamma
-\begin{gather} a=b \\ e=b+c \end{gather}
+\begin{gather*} a=b \\ e=b+c \end{gather*}
 \begin{gathered} a=b \\ e=b+c \end{gathered}
 \gcd
 \gdef\sqr#1{#1^2} \sqr{y} + \sqr{y}
@@ -548,10 +548,10 @@ a\newline b
 \nmid
 a\nobreakspace b
 \lim\nolimits_x
-\begin{align} a&=b+c \nonumber\\ d+e&=f \end{align}
+\begin{align*} a&=b+c \\ d+e&=f \end{align*}
 \normalsize normalsize
 \not =
-\begin{align} a&=b+c \notag\\ d+e&=f \end{align}
+\begin{align*} a&=b+c \\ d+e&=f \end{align*}
 \notin
 \notni
 \nparallel
@@ -737,7 +737,7 @@ a\space b
 \spades
 \spadesuit
 \sphericalangle
-\begin{equation} \begin{split} a &=b+c\\ &=e+f \end{split} \end{equation}
+\begin{equation*} \begin{split} a &=b+c\\ &=e+f \end{split} \end{equation*}
 \sqcap
 \sqcup
 \square
@@ -919,3 +919,5 @@ a+\left(\vcenter{\frac{\frac a b}c}\right)
 \hat{\aa}
 \hat{o}
 \tilde{M}
+\left\{\begin{array}{l} \nabla\cdot\vec{D} = \rho \\ \nabla\cdot\vec{B} = 0 \\ \nabla\times\vec{E} = -\frac{\partial\vec{B}}{\partial t} \\ \nabla\times\vec{H} = \vec{J}_f + \frac{\partial\vec{D}}{\partial t} \end{array}\right.
+酸 + 碱 \rightarrow 盐 + 水
