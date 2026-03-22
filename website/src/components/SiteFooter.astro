@@ -1,0 +1,40 @@
+---
+interface Props {
+  copyright?: string;
+}
+const { copyright = "\u00a9 2026 RaTeX \u00b7 MIT \u00b7 Built with Rust" } = Astro.props;
+---
+
+<footer class="w-full py-10 bg-zinc-50 border-t border-zinc-200">
+  <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+    <div class="font-serif font-bold text-zinc-900">RaTeX</div>
+    <div class="flex flex-wrap gap-x-6 gap-y-2">
+      <a
+        class="text-xs uppercase tracking-widest text-zinc-500 hover:text-orange-700 underline decoration-2 underline-offset-4"
+        href="https://github.com/erweixin/RaTeX"
+        target="_blank"
+        rel="noopener noreferrer">GitHub</a>
+      <a
+        class="text-xs uppercase tracking-widest text-zinc-500 hover:text-orange-700 underline decoration-2 underline-offset-4"
+        href="https://www.npmjs.com/package/ratex-wasm"
+        target="_blank"
+        rel="noopener noreferrer">npm</a>
+      <a
+        class="text-xs uppercase tracking-widest text-zinc-500 hover:text-orange-700 underline decoration-2 underline-offset-4"
+        href="https://crates.io/search?q=ratex"
+        target="_blank"
+        rel="noopener noreferrer">Crates.io</a>
+      <a
+        class="text-xs uppercase tracking-widest text-zinc-500 hover:text-orange-700 underline decoration-2 underline-offset-4"
+        href="https://github.com/erweixin/RaTeX/discussions"
+        target="_blank"
+        rel="noopener noreferrer">Discussions</a>
+      <a
+        class="text-xs uppercase tracking-widest text-zinc-500 hover:text-orange-700 underline decoration-2 underline-offset-4"
+        href="https://github.com/erweixin/RaTeX/blob/main/SECURITY.md"
+        target="_blank"
+        rel="noopener noreferrer">Security</a>
+    </div>
+    <p class="text-zinc-500 text-xs tracking-widest uppercase">{copyright}</p>
+  </div>
+</footer>

@@ -1,0 +1,190 @@
+---
+import type { Locale } from "../i18n/types";
+import { useTranslations, pageHref } from "../i18n/utils";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { repoBlob } from "../data/site";
+
+interface Props {
+  lang?: Locale;
+}
+const { lang = "en" } = Astro.props;
+const t = useTranslations(lang);
+const base = import.meta.env.BASE_URL;
+
+const platformsMeta: Array<{
+  id: string;
+  icon: string;
+  code: string;
+  doc: string;
+  anchor?: string;
+  extra?: { label: string; href: string };
+}> = [
+  {
+    id: "web",
+    icon: "language",
+    code: `<link rel="stylesheet" href="node_modules/ratex-wasm/fonts.css" />
+<script type="module" src="node_modules/ratex-wasm/dist/ratex-formula.js"></script>
+<ratex-formula latex="\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}" font-size="48"></ratex-formula>`,
+    doc: "platforms/web/README.md",
+    extra: { label: "npm", href: "https://www.npmjs.com/package/ratex-wasm" },
+  },
+  {
+    id: "ios",
+    icon: "phone_iphone",
+    code: `// SwiftUI
+RaTeXFormula(latex: #"\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}"#, fontSize: 24)`,
+    doc: "platforms/ios/README.md",
+  },
+  {
+    id: "android",
+    icon: "android",
+    code: `binding.mathView.latex = """\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}"""
+binding.mathView.fontSize = 24f`,
+    doc: "platforms/android/README.md",
+  },
+  {
+    id: "flutter",
+    icon: "widgets",
+    code: `RaTeXWidget(
+  latex: r'\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}',
+  fontSize: 28,
+  onError: (e) => debugPrint('RaTeX: ' + e.toString()),
+)`,
+    doc: "platforms/flutter/README.md",
+    extra: { label: "pub.dev", href: "https://pub.dev/packages/ratex_flutter" },
+  },
+  {
+    id: "react-native",
+    icon: "mobile_friendly",
+    code: `import { RaTeXView } from 'ratex-react-native';
+
+<RaTeXView
+  latex="\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}"
+  fontSize={24}
+/>`,
+    doc: "platforms/react-native/README.md",
+    extra: { label: "npm", href: "https://www.npmjs.com/package/ratex-react-native" },
+  },
+  {
+    id: "server",
+    icon: "cloud",
+    code: `echo '\\frac{1}{2} + \\sqrt{x}' | cargo run --release -p ratex-render`,
+    doc: "README.md",
+    anchor: "#render-to-png",
+  },
+];
+
+const platforms = platformsMeta.map((meta, i) => ({
+  ...meta,
+  title: t.getStarted.platforms[i].title,
+  blurb: t.getStarted.platforms[i].blurb,
+  steps: t.getStarted.platforms[i].steps,
+}));
+---
+
+<BaseLayout
+  title="RaTeX — Get started: Web, iOS, Android, Flutter, React Native"
+  description="Integrate RaTeX on Web (WASM), iOS, Android, Flutter, React Native, or server-side PNG—same Rust core everywhere."
+  active="get-started"
+  lang={lang}
+  copyright={t.footer.copyright}
+>
+  <main class="pt-28 lg:pt-24 max-w-7xl mx-auto px-6 py-12 md:py-16 border-x border-outline/30 min-h-[60vh]">
+    <header class="mb-12 md:mb-16 max-w-3xl">
+      <p class="text-xs font-label uppercase tracking-[0.28em] text-primary/90 mb-3">{t.getStarted.eyebrow}</p>
+      <h1 class="text-4xl md:text-5xl font-bold text-primary mb-6">{t.getStarted.heading}</h1>
+      <p class="text-lg text-on-surface-variant leading-relaxed">
+        {t.getStarted.intro}
+      </p>
+      <p class="mt-4 text-sm text-on-surface-variant/90">
+        {t.getStarted.tryBrowserFirst}
+        {" "}<a href={pageHref("demo.html", lang, base)} class="text-primary underline underline-offset-2 font-medium">{t.getStarted.liveDemoLink}</a>
+        {" "}·
+        {" "}<a href={pageHref("math.html", lang, base)} class="text-primary underline underline-offset-2 font-medium">{t.getStarted.mathGalleryLink}</a>
+      </p>
+    </header>
+
+    <nav
+      class="mb-12 p-4 bg-surface-container/70 border border-outline/40 rounded-lg"
+      aria-label="On this page"
+    >
+      <p class="text-xs font-label uppercase tracking-wider text-on-surface-variant mb-2">{t.getStarted.jumpTo}</p>
+      <ul class="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+        {
+          platforms.map((p) => (
+            <li>
+              <a href={`#${p.id}`} class="text-primary hover:underline">
+                {p.title}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+    </nav>
+
+    <div class="space-y-16 md:space-y-20">
+      {
+        platforms.map((p) => (
+          <section id={p.id} class="scroll-mt-28 border-t border-outline/30 pt-12 first:border-t-0 first:pt-0">
+            <div class="flex flex-col sm:flex-row sm:items-start gap-4 mb-4">
+              <span
+                class="material-symbols-outlined text-primary text-3xl shrink-0"
+                style="font-variation-settings: 'FILL' 1"
+                aria-hidden="true"
+              >
+                {p.icon}
+              </span>
+              <div class="min-w-0 flex-1">
+                <h2 class="text-2xl md:text-3xl font-bold font-serif text-zinc-900 mb-2">{p.title}</h2>
+                <p class="text-on-surface-variant leading-relaxed mb-4">{p.blurb}</p>
+                <ol class="list-decimal pl-5 space-y-2 text-[15px] text-on-surface-variant mb-6">
+                  {p.steps.map((s) => (
+                    <li set:html={s.replace(/`([^`]+)`/g, '<code class="font-mono text-sm bg-surface-container px-1 rounded">$1</code>')}></li>
+                  ))}
+                </ol>
+                <pre
+                  class="text-[13px] leading-relaxed font-mono bg-zinc-900 text-zinc-100 p-4 rounded-md overflow-x-auto border border-zinc-700/50 mb-4"
+                  tabindex="0"
+                ><code>{p.code}</code></pre>
+                <div class="flex flex-wrap gap-3 items-center text-sm">
+                  <a
+                    href={p.anchor ? `${repoBlob(p.doc)}${p.anchor}` : repoBlob(p.doc)}
+                    class="inline-flex items-center gap-1 text-primary font-medium underline underline-offset-2"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {t.getStarted.fullDoc}
+                    <span class="material-symbols-outlined text-base" aria-hidden="true">open_in_new</span>
+                  </a>
+                  {p.extra && (
+                    <a
+                      href={p.extra.href}
+                      class="text-on-surface-variant hover:text-primary underline underline-offset-2"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {p.extra.label}
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+        ))
+      }
+    </div>
+
+    <section class="mt-20 pt-12 border-t border-outline/30">
+      <h2 class="text-xl font-bold mb-3">{t.getStarted.architectureHeading}</h2>
+      <p class="text-on-surface-variant text-sm leading-relaxed max-w-3xl mb-4">
+        {t.getStarted.architectureDescPrefix} <code class="font-mono text-sm bg-surface-container px-1 rounded">Canvas</code>{t.getStarted.architectureDescSuffix}
+      </p>
+      <a
+        href={repoBlob("README.md")}
+        class="text-primary underline underline-offset-2 text-sm font-medium"
+        target="_blank"
+        rel="noopener noreferrer">{t.getStarted.architectureLink}</a
+      >
+    </section>
+  </main>
+</BaseLayout>

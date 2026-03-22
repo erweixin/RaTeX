@@ -1,0 +1,148 @@
+---
+import type { Locale } from "../../i18n/types";
+import { useTranslations } from "../../i18n/utils";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+
+interface Props {
+  lang?: Locale;
+}
+const { lang = "en" } = Astro.props;
+const t = useTranslations(lang);
+const base = import.meta.env.BASE_URL;
+const defaultFormula = String.raw`\frac{-b \pm \sqrt{b^2-4ac}}{2a}`;
+---
+
+<BaseLayout
+  title="RaTeX — Live comparison (WASM vs KaTeX)"
+  description="Compare RaTeX WASM canvas output with KaTeX 0.16.9 side by side: edit LaTeX, status, and example snippets."
+  active="demo"
+  lang={lang}
+  copyright={t.footer.copyright}
+>
+  <link
+    slot="head"
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+    crossorigin="anonymous"
+  />
+  <script
+    slot="head"
+    defer
+    src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
+    crossorigin="anonymous"
+    id="katex-script"></script>
+  <script slot="head" src={`${base}katex-fonts-link.js`}></script>
+
+  <main class="bg-background pt-28 lg:pt-24">
+    <div class="max-w-7xl mx-auto px-6 border-x border-outline/30">
+      <header class="py-10 md:py-14 border-b border-outline/30">
+        <p class="text-xs font-label uppercase tracking-[0.28em] text-primary mb-4">{t.demoLive.eyebrow}</p>
+        <h1 class="text-4xl sm:text-5xl md:text-6xl font-bold text-zinc-900 leading-tight mb-4 max-w-3xl">
+          {t.demoLive.heading}
+        </h1>
+        <p class="text-lg md:text-xl text-on-surface-variant font-body leading-relaxed max-w-3xl">
+          {t.demoLive.desc}
+        </p>
+      </header>
+
+      <section class="py-10 md:py-12 border-b border-outline/30" aria-labelledby="live-input-heading">
+        <h2 id="live-input-heading" class="sr-only">Formula input</h2>
+        <div class="flex flex-col sm:flex-row gap-3 max-w-3xl">
+          <input
+            class="flex-1 min-w-0 px-4 py-3 border border-outline/60 bg-white font-mono text-sm text-zinc-900 placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary rounded-[12px] ring-1 ring-black/[0.04]"
+            id="formula"
+            type="text"
+            value={defaultFormula}
+            placeholder={t.demoLive.inputPlaceholder}
+            autocomplete="off"
+            autocorrect="off"
+            spellcheck="false"
+          />
+          <button
+            class="shrink-0 px-8 py-3 bg-primary text-on-primary text-xs font-label tracking-[0.18em] uppercase font-bold rounded-[12px] hover:opacity-90 transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+            id="render-btn"
+            type="button"
+            disabled
+          >
+            {t.demoLive.renderBtn}
+          </button>
+        </div>
+        <div class="mt-4 flex items-center gap-2 text-sm text-on-surface-variant" role="status" aria-live="polite">
+          <span
+            class="inline-block h-2 w-2 shrink-0 rounded-full bg-amber-500"
+            id="status-dot"
+            aria-hidden="true"></span>
+          <span id="status-text">{t.demoLive.statusLoading}</span>
+        </div>
+      </section>
+
+      <section class="py-10 md:py-12" aria-labelledby="live-output-heading">
+        <h2 id="live-output-heading" class="sr-only">Render output</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-5xl mx-auto">
+          <div
+            class="flex flex-col border border-outline/50 bg-white rounded-[12px] overflow-hidden ring-1 ring-black/[0.04] shadow-sm"
+          >
+            <div
+              class="flex items-center justify-between gap-3 px-4 py-3 border-b border-outline/40 bg-surface-container-lowest"
+            >
+              <span class="text-xs font-label uppercase tracking-wider text-on-surface-variant">KaTeX</span>
+              <span
+                class="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200/80"
+                >Reference</span
+              >
+            </div>
+            <div
+              class="min-h-[5rem] flex items-start justify-center p-5 overflow-x-auto overflow-y-visible"
+              id="katex-output"
+            >
+              <span class="text-sm text-on-surface-variant/80 italic">{t.demoLive.waitingForInput}</span>
+            </div>
+          </div>
+          <div
+            class="flex flex-col border border-outline/50 bg-white rounded-[12px] overflow-hidden ring-1 ring-black/[0.04] shadow-sm"
+          >
+            <div
+              class="flex items-center justify-between gap-3 px-4 py-3 border-b border-outline/40 bg-surface-container-lowest"
+            >
+              <span class="text-xs font-label uppercase tracking-wider text-on-surface-variant">RaTeX</span>
+              <span
+                class="text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-full bg-sky-50 text-sky-900 border border-sky-200/80"
+                >WASM</span
+              >
+            </div>
+            <div
+              class="min-h-[5rem] flex items-start justify-center p-5 overflow-x-auto overflow-y-visible"
+              id="ratex-output"
+            >
+              <span class="text-sm text-on-surface-variant/80 italic">{t.demoLive.waitingForInput}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="py-12 md:py-16 border-t border-outline/30 bg-surface" aria-labelledby="live-examples-heading">
+        <h2 id="live-examples-heading" class="text-xs font-label uppercase tracking-[0.25em] text-primary/90 mb-3">
+          {t.demoLive.quickTryLabel}
+        </h2>
+        <p class="text-[15px] md:text-base text-on-surface-variant max-w-3xl mb-6 leading-relaxed">
+          {t.demoLive.activeDevText}
+          {" "}<a
+            href="https://github.com/erweixin/RaTeX/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-primary font-medium underline underline-offset-2">{t.demoLive.openIssueLink}</a
+          >.
+        </p>
+        <p class="text-sm font-medium text-zinc-900 mb-4">{t.demoLive.examplesLabel}</p>
+        <div
+          class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4"
+          id="examples-grid"
+          role="list"
+        >
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src={`${base}demo-live.js`}></script>
+</BaseLayout>

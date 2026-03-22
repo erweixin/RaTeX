@@ -1,0 +1,139 @@
+---
+interface Props {
+  defaultLatex?: string;
+  msgLoading?: string;
+  msgEnterLatexAbove?: string;
+}
+
+const {
+  defaultLatex = String.raw`\ce{Zn^2+  <=>[+ 2OH-][+ 2H+]  $\underset{\text{amphoteres Hydroxid}}{\ce{Zn(OH)2 v}}$  <=>[+ 2OH-][+ 2H+]  $\underset{\text{Hydroxozikat}}{\ce{[Zn(OH)4]^2-}}$}`,
+  msgLoading = "Loading\u2026",
+  msgEnterLatexAbove = "Enter LaTeX above.",
+} = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+
+<div
+  class="hero-playground rounded-[12px] shadow-2xl overflow-hidden border border-zinc-200/90 bg-white ring-1 ring-black/5"
+  aria-label="Live LaTeX playground"
+  data-msg-loading={msgLoading}
+  data-msg-enter={msgEnterLatexAbove}
+>
+  <div class="bg-zinc-900 px-4 pt-3 pb-2">
+    <div class="flex items-center justify-between gap-3 mb-3">
+      <div class="flex gap-1.5" aria-hidden="true">
+        <span class="w-2.5 h-2.5 rounded-full bg-zinc-600"></span>
+        <span class="w-2.5 h-2.5 rounded-full bg-zinc-600"></span>
+        <span class="w-2.5 h-2.5 rounded-full bg-zinc-600"></span>
+      </div>
+      <span class="text-[10px] font-mono tracking-widest text-zinc-500 uppercase">INPUT.TEX</span>
+    </div>
+    <div class="relative min-h-[5.5rem] rounded-[8px] border border-zinc-700/80 bg-zinc-950/50">
+      <pre
+        id="hero-playground-highlight"
+        class="pointer-events-none absolute inset-0 z-0 m-0 overflow-auto whitespace-pre-wrap break-all p-3 font-mono text-[13px] leading-relaxed text-zinc-100"
+        aria-hidden="true"></pre>
+      <textarea
+        id="hero-playground-input"
+        class="relative z-10 block min-h-[5.5rem] w-full resize-y bg-transparent p-3 font-mono text-[13px] leading-relaxed text-transparent caret-orange-400 outline-none selection:bg-orange-500/25"
+        rows="3"
+        spellcheck="false"
+        autocomplete="off"
+        aria-label="LaTeX input">{defaultLatex}</textarea>
+    </div>
+  </div>
+  <div class="border-t border-zinc-200 bg-white px-4 py-5">
+    <p class="text-[10px] font-mono tracking-widest text-zinc-400 uppercase mb-3">OUTPUT</p>
+    <div class="overflow-x-auto rounded-[8px] border border-zinc-200 bg-white shadow-inner">
+      <div
+        id="hero-playground-out"
+        class="flex min-h-[6rem] w-fit min-w-full items-center justify-center p-4"
+      >
+        <span id="hero-playground-placeholder" class="text-xs text-zinc-400 italic">{msgLoading}</span>
+        <canvas id="hero-playground-canvas" class="hidden"></canvas>
+      </div>
+    </div>
+    <p id="hero-playground-error" class="mt-2 text-xs text-red-700 font-mono break-words min-h-[1rem]" role="status"></p>
+  </div>
+</div>
+
+<script src={`${base}gallery.js`}></script>
+<script is:inline>
+  (function () {
+    function escapeHtml(s) {
+      return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+    function highlightLatex(s) {
+      return escapeHtml(s).replace(/(\\[a-zA-Z]+)/g, '<span class="text-orange-400">$1</span>');
+    }
+    function boot() {
+      var input = document.getElementById("hero-playground-input");
+      var pre = document.getElementById("hero-playground-highlight");
+      var canvas = document.getElementById("hero-playground-canvas");
+      var placeholder = document.getElementById("hero-playground-placeholder");
+      var errEl = document.getElementById("hero-playground-error");
+      if (!input || !pre || !canvas || !errEl) return;
+
+      var container = input.closest("[data-msg-loading]");
+      var msgEnter = (container && container.dataset.msgEnter) || "Enter LaTeX above.";
+
+      function syncHighlight() {
+        pre.innerHTML = highlightLatex(input.value);
+      }
+      syncHighlight();
+      input.addEventListener("input", syncHighlight);
+
+      var t = null;
+      function scheduleRender() {
+        if (t) clearTimeout(t);
+        t = setTimeout(render, 120);
+      }
+      input.addEventListener("input", scheduleRender);
+
+      async function render() {
+        errEl.textContent = "";
+        var latex = input.value.trim();
+        if (!latex) {
+          if (placeholder) {
+            placeholder.classList.remove("hidden");
+            placeholder.textContent = msgEnter;
+          }
+          canvas.classList.add("hidden");
+          return;
+        }
+
+        if (typeof window.RaTeXGallery === "undefined" || !window.RaTeXGallery.ensurePlaygroundEngine) {
+          errEl.textContent = "RaTeXGallery not loaded.";
+          return;
+        }
+
+        try {
+          var engine = await window.RaTeXGallery.ensurePlaygroundEngine();
+          if (!engine.renderLatex) {
+            if (placeholder) placeholder.classList.add("hidden");
+            canvas.classList.add("hidden");
+            errEl.textContent =
+              "WASM not available in this environment. GitHub Pages includes it; locally run: cd platforms/web && bash build.sh";
+            return;
+          }
+          var dl = JSON.parse(engine.renderLatex(latex));
+          if (placeholder) placeholder.classList.add("hidden");
+          canvas.classList.remove("hidden");
+          engine.drawDisplayList(dl, canvas, engine.EM, engine.PAD);
+        } catch (e) {
+          if (placeholder) placeholder.classList.add("hidden");
+          canvas.classList.add("hidden");
+          errEl.textContent = String(e).replace(/^.*?:\s*/, "").slice(0, 280);
+        }
+      }
+
+      render();
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", boot);
+    } else {
+      boot();
+    }
+  })();
+</script>

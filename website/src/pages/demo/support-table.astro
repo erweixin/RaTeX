@@ -1,0 +1,365 @@
+---
+import type { Locale } from "../../i18n/types";
+import { useTranslations, pageHref } from "../../i18n/utils";
+import BaseLayout from "../../layouts/BaseLayout.astro";
+
+interface Props {
+  lang?: Locale;
+}
+const { lang = "en" } = Astro.props;
+const t = useTranslations(lang);
+const base = import.meta.env.BASE_URL;
+
+const filterActive =
+  "filter-btn rounded-full border border-primary bg-primary px-3 py-1.5 text-xs font-medium text-on-primary shadow-sm transition-colors";
+const filterIdle =
+  "filter-btn rounded-full border border-outline/60 bg-white px-3 py-1.5 text-xs text-on-surface-variant hover:border-primary/30 transition-colors";
+---
+
+<BaseLayout
+  title="RaTeX — Formula support table"
+  description="916 golden formulas: RaTeX WASM vs KaTeX 0.16.9, IoU vs reference PNGs. Batch offline scores plus a live RaTeX column in your browser."
+  active="demo"
+  lang={lang}
+  copyright={t.footer.copyright}
+>
+  <link
+    slot="head"
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+    crossorigin="anonymous"
+  />
+  <script
+    slot="head"
+    defer
+    src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
+    crossorigin="anonymous"
+    id="katex-script"></script>
+  <script
+    slot="head"
+    defer
+    src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/mhchem.min.js"
+    crossorigin="anonymous"></script>
+  <script slot="head" src={`${base}katex-fonts-link.js`}></script>
+  <style is:global>
+    /* Sticky thead: viewport offset = fixed nav (5.5rem) + measured filter toolbar (--support-toolbar-h). */
+    .support-table-scroll thead th {
+      position: sticky;
+      z-index: 20;
+      background-color: #fff;
+      box-shadow: 0 1px 0 0 rgba(229, 229, 223, 0.95);
+    }
+
+    /* Mobile card layout */
+    @media (max-width: 767px) {
+      .support-table-scroll { overflow-x: visible !important; }
+      .support-table-scroll table { display: block; min-width: 0 !important; }
+      .support-table-scroll thead { display: none; }
+      .support-table-scroll tbody { display: flex; flex-direction: column; gap: 8px; padding-bottom: 4px; }
+
+      /* Filtered-out rows must stay hidden — our display:grid would otherwise beat .hidden */
+      .support-table-scroll tbody tr.hidden { display: none !important; }
+
+      /* Each row → rounded card, 2-col grid: [idx] [content] */
+      .support-table-scroll tbody tr {
+        display: grid;
+        grid-template-columns: 1.75rem minmax(0, 1fr);
+        grid-template-areas:
+          "idx source"
+          ".   katex"
+          ".   ratex";
+        column-gap: 8px;
+        row-gap: 0;
+        border: 1px solid rgba(229, 229, 223, 0.9);
+        border-radius: 10px;
+        padding: 10px 12px;
+        background: #fff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+      }
+
+      /* Row 1 — index number */
+      .support-table-scroll .td-idx {
+        grid-area: idx;
+        display: block;
+        padding: 0;
+        align-self: center;
+        font-size: 10px;
+        color: #a1a1aa;
+        text-align: right;
+        white-space: nowrap;
+        width: 1.75rem;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* Row 1 — LaTeX source.
+         td-source has Tailwind class "hidden" (display:none !important).
+         Target it by class name to win the specificity battle. */
+      .support-table-scroll .td-source.hidden,
+      .support-table-scroll .td-source {
+        grid-area: source;
+        display: block !important;
+        padding: 0;
+        align-self: center;
+        font-family: ui-monospace, monospace;
+        font-size: 11px;
+        color: #52525b;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      /* Score: hidden on mobile */
+      .support-table-scroll .td-score { display: none !important; }
+
+      /* Row 2 — KaTeX (show on mobile, label via ::before, centered) */
+      .support-table-scroll .td-katex {
+        grid-area: katex;
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        overflow-x: auto;
+        padding: 8px 0 4px;
+        margin-top: 8px;
+        border-top: 1px solid rgba(229, 229, 223, 0.6);
+      }
+      .support-table-scroll .td-katex::before {
+        content: "KaTeX";
+        font-size: 9px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #a1a1aa;
+        margin-bottom: 4px;
+        align-self: center;
+      }
+
+      /* Row 3 — RaTeX canvas, centered */
+      .support-table-scroll .td-ratex {
+        grid-area: ratex;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        overflow-x: auto;
+        padding: 8px 0 4px;
+        border-top: 1px solid rgba(229, 229, 223, 0.6);
+      }
+      .support-table-scroll .td-ratex::before {
+        content: "RaTeX";
+        font-size: 9px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #a1a1aa;
+        margin-bottom: 4px;
+        align-self: center;
+      }
+      /* ratex-cell inner flex also needs centering */
+      .support-table-scroll .td-ratex .ratex-cell {
+        justify-content: center;
+      }
+    }
+  </style>
+
+  <main class="bg-background pt-28 lg:pt-24">
+    <div class="max-w-7xl mx-auto px-6 border-x border-outline/30">
+      <header class="py-10 md:py-14 border-b border-outline/30">
+        <p class="text-xs font-label uppercase tracking-[0.28em] text-primary mb-4">{t.supportTable.eyebrow}</p>
+        <h1 class="text-4xl sm:text-5xl md:text-6xl font-bold text-zinc-900 leading-tight mb-4 max-w-3xl">
+          {t.supportTable.heading}
+        </h1>
+        <p class="text-lg md:text-xl text-on-surface-variant font-body leading-relaxed max-w-3xl mb-6">
+          {t.supportTable.desc}
+        </p>
+        <div
+          class="mb-8 max-w-3xl p-4 md:p-5 bg-surface-container/90 border border-outline/40 rounded-[12px] ring-1 ring-black/[0.04]"
+          role="note"
+        >
+          <p class="text-xs font-label uppercase tracking-wider text-primary/90 mb-2">{t.supportTable.dataSourceLabel}</p>
+          <p class="text-sm text-zinc-800 leading-relaxed">
+            {t.supportTable.dataSourceDescPrefix}
+            {" "}<code class="font-mono text-xs bg-surface px-1 rounded border border-outline/50">main</code>
+            {" "}{t.supportTable.dataSourceDescMid}
+            {" "}<a href={pageHref("demo/live.html", lang, base)} class="text-primary font-medium underline underline-offset-2">{t.supportTable.dataSourceLiveLink}</a>.
+          </p>
+        </div>
+
+        <div
+          class="mt-10 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4"
+          role="group"
+          aria-label="Score distribution summary"
+        >
+          <div class="p-8 md:p-10 flex flex-col bg-white border border-outline/50 shadow-sm rounded-[12px] overflow-hidden ring-1 ring-black/[0.04] text-center">
+            <div class="text-3xl md:text-4xl font-bold text-emerald-600 tabular-nums leading-none mb-2" id="cnt-great">—</div>
+            <div class="text-xs font-label uppercase tracking-wide text-on-surface-variant">{t.supportTable.scoreGreat}</div>
+          </div>
+          <div class="p-8 md:p-10 flex flex-col bg-white border border-outline/50 shadow-sm rounded-[12px] overflow-hidden ring-1 ring-black/[0.04] text-center">
+            <div class="text-3xl md:text-4xl font-bold text-sky-700 tabular-nums leading-none mb-2" id="cnt-mid-hi">—</div>
+            <div class="text-xs font-label uppercase tracking-wide text-on-surface-variant">{t.supportTable.scoreMidHi}</div>
+          </div>
+          <div class="p-8 md:p-10 flex flex-col bg-white border border-outline/50 shadow-sm rounded-[12px] overflow-hidden ring-1 ring-black/[0.04] text-center">
+            <div class="text-3xl md:text-4xl font-bold text-sky-700 tabular-nums leading-none mb-2" id="cnt-mid-lo">—</div>
+            <div class="text-xs font-label uppercase tracking-wide text-on-surface-variant">{t.supportTable.scoreMidLo}</div>
+          </div>
+          <div class="p-8 md:p-10 flex flex-col bg-white border border-outline/50 shadow-sm rounded-[12px] overflow-hidden ring-1 ring-black/[0.04] text-center">
+            <div class="text-3xl md:text-4xl font-bold text-red-600 tabular-nums leading-none mb-2" id="cnt-low">—</div>
+            <div class="text-xs font-label uppercase tracking-wide text-on-surface-variant">{t.supportTable.scoreLow}</div>
+          </div>
+          <div class="p-8 md:p-10 flex flex-col bg-white border border-outline/50 shadow-sm rounded-[12px] overflow-hidden ring-1 ring-black/[0.04] text-center col-span-2 sm:col-span-1 lg:col-span-1">
+            <div class="text-3xl md:text-4xl font-bold text-zinc-900 tabular-nums leading-none mb-2" id="cnt-avg">—</div>
+            <div class="text-xs font-label uppercase tracking-wide text-on-surface-variant">{t.supportTable.scoreAvg}</div>
+          </div>
+        </div>
+
+        <div class="mt-8 max-w-xl">
+          <div class="h-2 rounded-full bg-surface-container overflow-hidden border border-outline/40">
+            <div class="h-full w-0 rounded-full bg-gradient-to-r from-primary/90 to-primary transition-[width] duration-300" id="pfill"
+            ></div>
+          </div>
+          <div class="mt-2 flex justify-between text-xs text-on-surface-variant font-mono">
+            <span id="plabel">{t.supportTable.initializing}</span>
+            <span id="pcount"></span>
+          </div>
+        </div>
+      </header>
+
+      <div
+        class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 py-4 border-b border-outline/30 bg-surface text-xs text-on-surface-variant"
+        role="group"
+        aria-label="Score legend"
+      >
+        <span class="inline-flex items-center gap-1.5"
+          ><span class="h-2.5 w-2.5 rounded-full bg-emerald-500" aria-hidden="true"></span> ≥ 0.8</span
+        >
+        <span class="inline-flex items-center gap-1.5"
+          ><span class="h-2.5 w-2.5 rounded-full bg-lime-500" aria-hidden="true"></span> 0.6–0.8</span
+        >
+        <span class="inline-flex items-center gap-1.5"
+          ><span class="h-2.5 w-2.5 rounded-full bg-amber-500" aria-hidden="true"></span> 0.4–0.6</span
+        >
+        <span class="inline-flex items-center gap-1.5"
+          ><span class="h-2.5 w-2.5 rounded-full bg-orange-500" aria-hidden="true"></span> 0.3–0.4</span
+        >
+        <span class="inline-flex items-center gap-1.5"
+          ><span class="h-2.5 w-2.5 rounded-full bg-red-500" aria-hidden="true"></span> &lt; 0.3 / error</span
+        >
+        <span class="italic text-on-surface-variant/80 hidden sm:inline">{t.supportTable.offlineIouNote}</span>
+      </div>
+
+      <div
+        id="support-toolbar"
+        class="sticky top-[5.5rem] z-30 flex flex-wrap items-center gap-3 py-3 px-1 md:px-0 border-b border-outline/40 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/80"
+      >
+        <div class="flex flex-wrap gap-2 items-center" role="toolbar" aria-label="Filter formulas">
+          <button type="button" class={filterActive} data-filter="all">
+            {t.supportTable.filterAll} <span id="b-all">916</span>
+          </button>
+          <button type="button" class={filterIdle} data-filter="great">
+            {t.supportTable.filterGreat} <span id="b-great">—</span>
+          </button>
+          <button type="button" class={filterIdle} data-filter="mid-hi">
+            {t.supportTable.filterMidHi} <span id="b-mid-hi">—</span>
+          </button>
+          <button type="button" class={filterIdle} data-filter="mid-lo">
+            {t.supportTable.filterMidLo} <span id="b-mid-lo">—</span>
+          </button>
+          <button type="button" class={filterIdle} data-filter="low">
+            {t.supportTable.filterLow} <span id="b-low">—</span>
+          </button>
+        </div>
+        <div class="flex flex-1 min-w-[160px] max-w-sm">
+          <input
+            type="search"
+            id="search"
+            placeholder={t.supportTable.searchPlaceholder}
+            autocomplete="off"
+            class="w-full px-3 py-2 text-sm border border-outline/60 bg-white rounded-[12px] ring-1 ring-black/[0.04] focus:outline-none focus:ring-2 focus:ring-primary/25 focus:border-primary placeholder:text-on-surface-variant/50"
+          />
+        </div>
+        <div class="text-xs text-on-surface-variant whitespace-nowrap ml-auto" id="tstatus">{t.supportTable.initializing}</div>
+      </div>
+
+      <p class="py-4 text-sm text-on-surface-variant leading-relaxed max-w-3xl">
+        {t.supportTable.scoresDesc}
+      </p>
+
+      <!-- overflow-y: visible so thead sticky uses the viewport (horizontal scroll only). -->
+      <div
+        class="support-table-scroll pb-16 -mx-6 px-6 md:mx-0 md:px-0 overflow-x-auto overflow-y-visible"
+      >
+        <table class="w-full border-collapse text-sm min-w-[720px]">
+          <thead>
+            <tr>
+              <th
+                class="py-3 px-2 text-left text-[10px] font-label uppercase tracking-wider text-on-surface-variant border-b-2 border-outline/50 w-10 align-bottom"
+              >
+                {t.supportTable.colNum}
+              </th>
+              <th
+                class="py-3 px-3 text-left text-[10px] font-label uppercase tracking-wider text-on-surface-variant border-b-2 border-outline/50 hidden md:table-cell min-w-[12rem] align-bottom"
+              >
+                {t.supportTable.colLatex}
+              </th>
+              <th
+                class="py-3 px-3 text-left text-[10px] font-label uppercase tracking-wider text-on-surface-variant border-b-2 border-outline/50 min-w-[200px] align-bottom"
+              >
+                {t.supportTable.colKatex}
+              </th>
+              <th
+                class="py-3 px-3 text-left text-[10px] font-label uppercase tracking-wider text-on-surface-variant border-b-2 border-outline/50 min-w-[200px] align-bottom"
+              >
+                {t.supportTable.colRatex}
+              </th>
+              <th
+                class="py-3 px-2 text-center text-[10px] font-label uppercase tracking-wider text-on-surface-variant border-b-2 border-outline/50 w-[100px] sm:w-[110px] align-bottom"
+              >
+                {t.supportTable.colScore}
+              </th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+
+      <script is:inline>
+        (function () {
+          var el = document.getElementById("support-toolbar");
+          if (!el) return;
+          function sync() {
+            document.documentElement.style.setProperty("--support-toolbar-h", el.offsetHeight + "px");
+          }
+          function boot() {
+            sync();
+            requestAnimationFrame(sync);
+          }
+          if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", boot);
+          } else {
+            boot();
+          }
+          window.addEventListener("load", sync);
+          if (typeof ResizeObserver !== "undefined") {
+            new ResizeObserver(sync).observe(el);
+          }
+          window.addEventListener("resize", sync);
+        })();
+      </script>
+
+      <footer class="py-10 border-t border-outline/30 text-center text-sm text-on-surface-variant">
+        <p class="text-xs font-label uppercase tracking-wider text-on-surface-variant/70 mb-2">{t.supportTable.referencesLabel}</p>
+        <p>
+          <a href="https://github.com/erweixin/RaTeX" target="_blank" rel="noopener noreferrer" class="text-primary underline underline-offset-2"
+            >GitHub</a
+          >
+          ·
+          <a href="https://katex.org/" target="_blank" rel="noopener noreferrer" class="text-primary underline underline-offset-2"
+            >KaTeX</a
+          >
+          (MIT) · {t.supportTable.inkIou} ·
+          <a href={pageHref("demo/live.html", lang, base)} class="text-primary underline underline-offset-2">{t.supportTable.liveCompLink}</a>
+        </p>
+      </footer>
+    </div>
+  </main>
+
+  <script src={`${base}demo-support-table.js`}></script>
+</BaseLayout>

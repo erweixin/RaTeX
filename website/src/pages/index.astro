@@ -1,0 +1,369 @@
+---
+import type { Locale } from "../i18n/types";
+import { useTranslations, pageHref } from "../i18n/utils";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import HeroPlayground from "../components/HeroPlayground.astro";
+
+interface Props {
+  lang?: Locale;
+}
+const { lang = "en" } = Astro.props;
+const t = useTranslations(lang);
+const base = import.meta.env.BASE_URL;
+
+const platformLinks = [
+  { label: t.getStarted.platforms[0].title, hash: "web" },
+  { label: t.getStarted.platforms[1].title, hash: "ios" },
+  { label: t.getStarted.platforms[2].title, hash: "android" },
+  { label: t.getStarted.platforms[3].title, hash: "flutter" },
+  { label: t.getStarted.platforms[4].title, hash: "react-native" },
+  { label: t.getStarted.platforms[5].title, hash: "server" },
+] as const;
+---
+
+<BaseLayout
+  title="RaTeX — Rust math layout aligned with KaTeX golden tests"
+  description="Rust TeX-style math layout with KaTeX-aligned golden tests. Ready-to-use packages for Web (WASM), iOS, Android, Flutter, and React Native—same display list everywhere."
+  active="home"
+  lang={lang}
+  copyright={t.footer.copyright}
+>
+  <script slot="head" src={`${base}katex-fonts-link.js`}></script>
+  <main class="pt-28 lg:pt-24">
+    <header class="max-w-7xl mx-auto px-6 py-14 md:py-20 lg:py-24 border-x border-outline/30">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-14 xl:gap-16 items-start">
+        <div class="max-w-xl lg:max-w-none">
+          <p class="text-primary font-label tracking-[0.3em] uppercase mb-5 text-sm">{t.home.eyebrow}</p>
+          <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-[1.08] mb-8">{t.home.heading}</h1>
+          <p class="text-lg sm:text-xl md:text-2xl text-on-surface-variant font-body leading-relaxed max-w-2xl">
+            {t.home.descMain}
+          </p>
+          <p class="mt-6 text-sm text-on-surface-variant/90 max-w-2xl leading-relaxed">
+            <strong class="text-on-surface/95">{t.home.alignmentLabel}</strong> {t.home.alignmentBody}
+            <a href={pageHref("demo/support-table.html", lang, base)} class="text-primary underline underline-offset-2">{t.home.alignmentLink}</a>
+            {" "}{t.home.alignmentSuffix}
+            {" "}<strong class="text-on-surface/95">{t.home.whereFitsLabel}</strong>
+            {" "}{t.home.whereFitsPrefix}
+            {" "}<a href="https://katex.org/" class="text-primary underline underline-offset-2">KaTeX</a>
+            {" "}{t.home.whereFitsMid}
+          </p>
+        </div>
+        <div class="w-full lg:sticky lg:top-28 shrink-0">
+          <p class="text-xs font-label uppercase tracking-[0.25em] text-primary/90 mb-3">{t.home.tryIt}</p>
+          <HeroPlayground
+            msgLoading={t.heroPlayground.loading}
+            msgEnterLatexAbove={t.heroPlayground.enterLatexAbove}
+          />
+        </div>
+      </div>
+    </header>
+
+    <section
+      id="platforms"
+      class="max-w-7xl mx-auto px-6 py-10 md:py-12 border-x border-outline/30 bg-surface-container-lowest/60"
+      aria-labelledby="platforms-heading"
+    >
+      <p class="text-xs font-label uppercase tracking-[0.25em] text-primary/90 mb-3">{t.home.packagesEyebrow}</p>
+      <h2 id="platforms-heading" class="text-2xl md:text-3xl font-bold text-zinc-900 mb-3">{t.home.packagesHeading}</h2>
+      <p class="text-sm md:text-base text-on-surface-variant max-w-3xl font-body leading-relaxed mb-6">
+        {t.home.packagesDescPrefix}
+        {" "}<a href={pageHref("get-started.html", lang, base)} class="text-primary font-medium underline underline-offset-2">{t.home.packagesGetStarted}</a>{t.home.packagesDescSuffix}
+      </p>
+      <ul class="flex flex-wrap gap-2.5 md:gap-3" role="list">
+        {
+          platformLinks.map((p) => (
+            <li>
+              <a
+                href={`${pageHref("get-started.html", lang, base)}#${p.hash}`}
+                class="inline-flex items-center rounded-full border border-outline/50 bg-white px-4 py-2 text-sm font-medium text-zinc-800 shadow-sm ring-1 ring-black/[0.03] transition-colors hover:border-primary/35 hover:bg-surface-container-lowest hover:text-primary"
+              >
+                {p.label}
+              </a>
+            </li>
+          ))
+        }
+      </ul>
+      <p class="mt-5 text-xs text-on-surface-variant/90 font-mono leading-relaxed max-w-3xl">
+        npm <span class="text-on-surface-variant">ratex-wasm</span> /
+        <span class="text-on-surface-variant">ratex-react-native</span> · Maven <span class="text-on-surface-variant">io.github.erweixin:ratex-android</span> · pub.dev
+        <span class="text-on-surface-variant">ratex_flutter</span> · iOS via SPM
+      </p>
+    </section>
+
+    <section
+      id="when-to-use"
+      class="max-w-7xl mx-auto px-6 py-12 md:py-14 border-x border-outline/30 bg-surface-container-lowest/80"
+      aria-labelledby="when-to-use-heading"
+    >
+      <h2 id="when-to-use-heading" class="text-2xl md:text-3xl font-bold mb-6">{t.home.whenToUseHeading}</h2>
+      <ul class="grid grid-cols-1 md:grid-cols-3 gap-8 font-body text-on-surface-variant leading-relaxed">
+        <li>
+          <span class="font-semibold text-on-surface">{t.home.whenToUseNative}</span>
+          — {t.home.whenToUseNativeDesc}
+        </li>
+        <li>
+          <span class="font-semibold text-on-surface">{t.home.whenToUseWasm}</span>
+          — {t.home.whenToUseWasmDescPrefix}
+          {" "}<a href={pageHref("demo.html", lang, base)} class="text-primary underline underline-offset-2">{t.home.whenToUseWasmLink}</a>{t.home.whenToUseWasmDescSuffix}
+        </li>
+        <li>
+          <span class="font-semibold text-on-surface">{t.home.whenToUseChem}</span>
+          — <code class="bg-surface-container px-1 font-mono text-sm">\ce</code>
+          {" "}/<code class="bg-surface-container px-1 font-mono text-sm">\pu</code>
+          {" "}{t.home.whenToUseChemDescSuffix}
+        </li>
+      </ul>
+    </section>
+
+    <section id="features" class="max-w-7xl mx-auto px-6 py-16 grid grid-cols-1 md:grid-cols-3 gap-0 border-x border-y border-outline/30">
+      <div class="p-10 border-r border-outline/30 flex flex-col justify-between group hover:bg-surface-container-low transition-colors duration-300">
+        <div>
+          <span class="material-symbols-outlined text-primary text-4xl mb-8" style="font-variation-settings: 'FILL' 1">memory</span>
+          <h3 class="text-3xl font-bold mb-4">{t.home.rustCoreHeading}</h3>
+          <p class="text-on-surface-variant font-body leading-relaxed">
+            {t.home.rustCoreDesc}
+          </p>
+        </div>
+        <div class="mt-12 flex flex-wrap gap-2">
+          <span class="text-xs font-mono bg-surface-container px-2 py-1">MEMORY_SAFE</span>
+          <span class="text-xs font-mono bg-surface-container px-2 py-1">DISPLAY_LIST</span>
+        </div>
+      </div>
+      <div class="p-10 border-r border-outline/30 flex flex-col justify-between group hover:bg-surface-container-low transition-colors duration-300">
+        <div>
+          <span class="material-symbols-outlined text-primary text-4xl mb-8" style="font-variation-settings: 'FILL' 1">devices</span>
+          <h3 class="text-3xl font-bold mb-4">{t.home.shipEverywhereHeading}</h3>
+          <p class="text-on-surface-variant font-body leading-relaxed">
+            {t.home.shipEverywhereDesc}
+          </p>
+        </div>
+        <div class="mt-12 flex flex-wrap gap-2">
+          <span class="text-xs font-mono bg-surface-container px-2 py-1">WASM</span>
+          <span class="text-xs font-mono bg-surface-container px-2 py-1">FFI</span>
+        </div>
+      </div>
+      <div class="p-10 flex flex-col justify-between group hover:bg-surface-container-low transition-colors duration-300">
+        <div>
+          <span class="material-symbols-outlined text-primary text-4xl mb-8" style="font-variation-settings: 'FILL' 1">science</span>
+          <h3 class="text-3xl font-bold mb-4">{t.home.mhchemHeading}</h3>
+          <p class="text-on-surface-variant font-body leading-relaxed">
+            {t.home.mhchemDescPrefix} <code class="bg-surface-container px-1">\ce</code>
+            {" "}{t.home.mhchemDescMid} <code class="bg-surface-container px-1">\pu</code>
+            {" "}{t.home.mhchemDescSuffix}
+          </p>
+        </div>
+        <div class="mt-12 flex flex-wrap gap-2">
+          <span class="text-xs font-mono bg-surface-container px-2 py-1">MHCHEM</span>
+          <span class="text-xs font-mono bg-surface-container px-2 py-1">LATEX_MATH</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="max-w-7xl mx-auto px-6 py-16 md:py-20 bg-surface border-x border-outline/30" aria-labelledby="galleries-heading">
+      <p class="text-xs font-label uppercase tracking-[0.25em] text-primary/90 mb-3">{t.home.galleriesEyebrow}</p>
+      <h2 id="galleries-heading" class="text-4xl md:text-5xl font-bold mb-6">{t.home.galleriesHeading}</h2>
+      <p class="text-lg text-on-surface-variant max-w-3xl font-body leading-relaxed">
+        {t.home.galleriesDescPrefix}
+        {" "}<a class="text-primary underline font-medium" href={pageHref("math.html", lang, base)}>{t.nav.math}</a>,
+        {" "}<a class="text-primary underline font-medium" href={pageHref("chemistry.html", lang, base)}>{t.nav.chemistry}</a>,
+        {" "}<a class="text-primary underline font-medium" href={pageHref("physics.html", lang, base)}>{t.nav.physics}</a>.
+        {" "}{t.home.galleriesDemoPrefix}
+        {" "}<a class="text-primary underline font-medium" href={pageHref("demo.html", lang, base)}>{t.home.galleriesDemoLink}</a>{t.home.galleriesDemoMid}
+        {" "}<a class="text-primary underline font-medium" href={`${pageHref("demo.html", lang, base)}#support-table`}>{t.home.galleriesSupportLink}</a>
+        {" "}{t.home.galleriesDemoSuffix}
+      </p>
+    </section>
+
+    <section id="comparison" class="max-w-7xl mx-auto px-6 py-20 border-x border-y border-outline/30 bg-surface-container-lowest">
+      <div class="text-center mb-12">
+        <h2 class="text-4xl md:text-5xl font-bold mb-4">{t.home.comparisonHeading}</h2>
+        <p class="text-on-surface-variant font-body max-w-2xl mx-auto">
+          {t.home.comparisonDesc}
+        </p>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse min-w-[640px]">
+          <caption class="sr-only">Web stack comparison: RaTeX versus KaTeX and MathJax</caption>
+          <thead>
+            <tr class="border-b-2 border-on-surface">
+              <th scope="col" class="py-4 px-3 font-label tracking-widest uppercase text-xs"></th>
+              <th scope="col" class="py-4 px-3 font-serif text-xl text-primary italic">RaTeX</th>
+              <th scope="col" class="py-4 px-3 font-label tracking-widest uppercase text-xs opacity-60">KaTeX (web)</th>
+              <th scope="col" class="py-4 px-3 font-label tracking-widest uppercase text-xs opacity-60">MathJax</th>
+            </tr>
+          </thead>
+          <tbody class="font-body text-sm md:text-base">
+            <tr class="border-b border-outline/30 hover:bg-surface-container/50">
+              <td scope="row" class="py-5 px-3 font-semibold">{t.home.comparisonRuntime}</td>
+              <td class="py-5 px-3 text-primary">Pure Rust</td>
+              <td class="py-5 px-3 opacity-70">JavaScript + DOM</td>
+              <td class="py-5 px-3 opacity-70">JavaScript + DOM</td>
+            </tr>
+            <tr class="border-b border-outline/30 hover:bg-surface-container/50">
+              <td scope="row" class="py-5 px-3 font-semibold">{t.home.comparisonMobile}</td>
+              <td class="py-5 px-3 text-primary">Native / WASM</td>
+              <td class="py-5 px-3 opacity-70">WebView</td>
+              <td class="py-5 px-3 opacity-70">WebView</td>
+            </tr>
+            <tr class="border-b border-outline/30 hover:bg-surface-container/50">
+              <td scope="row" class="py-5 px-3 font-semibold">{t.home.comparisonOffline}</td>
+              <td class="py-5 px-3 text-primary">Yes</td>
+              <td class="py-5 px-3 opacity-70">Depends</td>
+              <td class="py-5 px-3 opacity-70">Depends</td>
+            </tr>
+            <tr class="border-b border-outline/30 hover:bg-surface-container/50">
+              <td scope="row" class="py-5 px-3 font-semibold">{t.home.comparisonJsBundle}</td>
+              <td class="py-5 px-3 text-primary font-mono text-xs md:text-sm">0 kB JS (core is WASM)</td>
+              <td class="py-5 px-3 opacity-70">~280 kB</td>
+              <td class="py-5 px-3 opacity-70">~500 kB</td>
+            </tr>
+            <tr class="border-b border-outline/30 hover:bg-surface-container/50">
+              <td scope="row" class="py-5 px-3 font-semibold">{t.home.comparisonMemory}</td>
+              <td class="py-5 px-3 text-primary font-mono text-xs md:text-sm">Predictable</td>
+              <td class="py-5 px-3 opacity-70">GC / heap</td>
+              <td class="py-5 px-3 opacity-70">GC / heap</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-16 text-center mb-8">
+        <h3 class="text-2xl font-bold mb-2">{t.home.nativeSdkHeading}</h3>
+        <p class="text-on-surface-variant text-sm max-w-3xl mx-auto leading-relaxed">
+          {t.home.nativeSdkDesc}
+        </p>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse min-w-[880px]">
+          <caption class="sr-only"
+            >RaTeX compared to swiftMath, flutter_math, and iosMath: mhchem support, cross-platform engine, and layout core performance characteristics</caption
+          >
+          <thead>
+            <tr class="border-b-2 border-on-surface">
+              <th scope="col" class="py-4 px-2 sm:px-3 font-label tracking-widest uppercase text-xs">{t.home.capabilityLabel}</th>
+              <th scope="col" class="py-4 px-2 sm:px-3 font-serif text-lg sm:text-xl text-primary italic">RaTeX</th>
+              <th scope="col" class="py-4 px-2 sm:px-3 font-label tracking-widest uppercase text-[10px] sm:text-xs opacity-60">swiftMath</th>
+              <th scope="col" class="py-4 px-2 sm:px-3 font-label tracking-widest uppercase text-[10px] sm:text-xs opacity-60">flutter_math</th>
+              <th scope="col" class="py-4 px-2 sm:px-3 font-label tracking-widest uppercase text-[10px] sm:text-xs opacity-60">iosMath</th>
+            </tr>
+          </thead>
+          <tbody class="font-body text-sm md:text-base">
+            <tr class="border-b border-outline/30 hover:bg-surface-container/50">
+              <td scope="row" class="py-4 px-2 sm:px-3 font-semibold"
+                >mhchem <span class="font-mono font-normal">\ce</span> (chemistry)</td
+              >
+              <td class="py-4 px-2 sm:px-3 text-primary"
+                ><span class="material-symbols-outlined text-[22px] align-middle text-green-700" style="font-variation-settings: 'FILL' 1" aria-label="Yes"
+                  >check_circle</span
+                ></td
+              >
+              <td class="py-4 px-2 sm:px-3 text-zinc-400"
+                ><span class="material-symbols-outlined text-[22px] align-middle" aria-label="No">cancel</span></td
+              >
+              <td class="py-4 px-2 sm:px-3 text-zinc-400"
+                ><span class="material-symbols-outlined text-[22px] align-middle" aria-label="No">cancel</span></td
+              >
+              <td class="py-4 px-2 sm:px-3 text-zinc-400"
+                ><span class="material-symbols-outlined text-[22px] align-middle" aria-label="No">cancel</span></td
+              >
+            </tr>
+            <tr class="border-b border-outline/30 hover:bg-surface-container/50">
+              <td scope="row" class="py-4 px-2 sm:px-3 font-semibold"
+                ><span class="font-mono font-normal">\pu</span> / siunitx-style units</td
+              >
+              <td class="py-4 px-2 sm:px-3 text-primary"
+                ><span class="material-symbols-outlined text-[22px] align-middle text-green-700" style="font-variation-settings: 'FILL' 1" aria-label="Yes"
+                  >check_circle</span
+                ></td
+              >
+              <td class="py-4 px-2 sm:px-3 text-zinc-400"
+                ><span class="material-symbols-outlined text-[22px] align-middle" aria-label="No">cancel</span></td
+              >
+              <td class="py-4 px-2 sm:px-3 text-zinc-400"
+                ><span class="material-symbols-outlined text-[22px] align-middle" aria-label="No">cancel</span></td
+              >
+              <td class="py-4 px-2 sm:px-3 text-zinc-400"
+                ><span class="material-symbols-outlined text-[22px] align-middle" aria-label="No">cancel</span></td
+              >
+            </tr>
+            <tr class="border-b border-outline/30 hover:bg-surface-container/50">
+              <td scope="row" class="py-4 px-2 sm:px-3 font-semibold">{t.home.sameEngineFfi}</td>
+              <td class="py-4 px-2 sm:px-3 text-primary"
+                ><span class="material-symbols-outlined text-[22px] align-middle text-green-700" style="font-variation-settings: 'FILL' 1" aria-label="Yes"
+                  >check_circle</span
+                ></td
+              >
+              <td class="py-4 px-2 sm:px-3 text-zinc-400"
+                ><span class="material-symbols-outlined text-[22px] align-middle" aria-label="No">cancel</span></td
+              >
+              <td class="py-4 px-2 sm:px-3 text-zinc-400"
+                ><span class="material-symbols-outlined text-[22px] align-middle" aria-label="No">cancel</span></td
+              >
+              <td class="py-4 px-2 sm:px-3 text-zinc-400"
+                ><span class="material-symbols-outlined text-[22px] align-middle" aria-label="No">cancel</span></td
+              >
+            </tr>
+            <tr class="border-b border-outline/30 hover:bg-surface-container/50">
+              <td scope="row" class="py-4 px-2 sm:px-3 font-semibold">{t.home.sameEngineRust}</td>
+              <td class="py-4 px-2 sm:px-3 text-primary"
+                ><span class="material-symbols-outlined text-[22px] align-middle text-green-700" style="font-variation-settings: 'FILL' 1" aria-label="Yes"
+                  >check_circle</span
+                ></td
+              >
+              <td class="py-4 px-2 sm:px-3 text-zinc-400"
+                ><span class="material-symbols-outlined text-[22px] align-middle" aria-label="No">cancel</span></td
+              >
+              <td class="py-4 px-2 sm:px-3 text-zinc-400"
+                ><span class="material-symbols-outlined text-[22px] align-middle" aria-label="No">cancel</span></td
+              >
+              <td class="py-4 px-2 sm:px-3 text-zinc-400"
+                ><span class="material-symbols-outlined text-[22px] align-middle" aria-label="No">cancel</span></td
+              >
+            </tr>
+            <tr class="border-b border-outline/30 hover:bg-surface-container/50">
+              <td scope="row" class="py-4 px-2 sm:px-3 font-semibold">{t.home.rustLayoutCore}</td>
+              <td class="py-4 px-2 sm:px-3 text-primary"
+                ><span class="material-symbols-outlined text-[22px] align-middle text-green-700" style="font-variation-settings: 'FILL' 1" aria-label="Yes"
+                  >check_circle</span
+                ></td
+              >
+              <td class="py-4 px-2 sm:px-3 text-zinc-400"
+                ><span class="material-symbols-outlined text-[22px] align-middle" aria-label="No">cancel</span></td
+              >
+              <td class="py-4 px-2 sm:px-3 text-zinc-400"
+                ><span class="material-symbols-outlined text-[22px] align-middle" aria-label="No">cancel</span></td
+              >
+              <td class="py-4 px-2 sm:px-3 text-zinc-400"
+                ><span class="material-symbols-outlined text-[22px] align-middle" aria-label="No">cancel</span></td
+              >
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="mt-4 text-xs text-on-surface-variant/90 max-w-3xl mx-auto text-center leading-relaxed">
+        {t.home.nativeSdkFootnote}
+      </p>
+    </section>
+
+    <section id="cta" class="max-w-7xl mx-auto px-6 py-24 border-x border-outline/30">
+      <div class="bg-primary p-12 md:p-20 text-center relative overflow-hidden">
+        <div class="absolute top-0 right-0 p-6 opacity-10 pointer-events-none">
+          <span class="material-symbols-outlined text-[160px] md:text-[200px]" style="font-variation-settings: 'wght' 100">function</span>
+        </div>
+        <h2 class="text-3xl md:text-5xl font-bold text-on-primary mb-8 relative z-10 max-w-3xl mx-auto leading-tight">
+          {t.home.ctaHeading}
+        </h2>
+        <div class="flex flex-col sm:flex-row gap-4 justify-center relative z-10">
+          <a
+            href={pageHref("demo.html", lang, base)}
+            class="inline-block bg-on-primary text-primary px-8 py-4 font-label tracking-[0.2em] uppercase text-xs font-bold hover:opacity-90 transition-opacity"
+            >{t.home.ctaLiveDemo}</a>
+          <a
+            href="https://github.com/erweixin/RaTeX#readme"
+            class="inline-block bg-transparent text-on-primary px-8 py-4 font-label tracking-[0.2em] uppercase text-xs font-bold border-2 border-on-primary hover:bg-white/10 transition-colors"
+            >{t.home.ctaGithubReadme}</a>
+        </div>
+      </div>
+    </section>
+  </main>
+</BaseLayout>

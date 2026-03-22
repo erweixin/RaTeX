@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>RaTeX - Engineering Excellence</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&amp;family=Plus+Jakarta+Sans:wght@200..800&amp;family=Space+Grotesk:wght@300..700&amp;family=JetBrains+Mono:wght@400;700&amp;family=Crimson+Pro:wght@200..900&amp;family=DM+Sans:wght@200..1000&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "inverse-surface": "#1A1A19",
+                        "on-secondary": "#FFFFFF",
+                        "on-primary": "#FFFFFF",
+                        "on-secondary-container": "#121211",
+                        "on-error": "#FFFFFF",
+                        "tertiary-fixed-dim": "#A7C8FF",
+                        "on-background": "#121211",
+                        "surface-container-lowest": "#FFFFFF",
+                        "surface-container-low": "#F3F3EF",
+                        "on-error-container": "#410002",
+                        "surface-dim": "#E5E5DF",
+                        "on-primary-container": "#F9F9F6",
+                        "tertiary": "#005CAE",
+                        "on-secondary-fixed-variant": "#1A1A19",
+                        "on-surface": "#121211",
+                        "secondary": "#1A1A19",
+                        "surface-bright": "#FFFFFF",
+                        "primary-fixed-dim": "#FFB4A4",
+                        "secondary-fixed": "#E5E5DF",
+                        "on-primary-fixed": "#3E0500",
+                        "primary-fixed": "#FFDAD3",
+                        "surface-tint": "#CE4125",
+                        "outline": "#E5E5DF",
+                        "surface-container-high": "#E7E7E2",
+                        "surface": "#F9F9F6",
+                        "on-tertiary-fixed-variant": "#004788",
+                        "on-tertiary-fixed": "#001B3C",
+                        "secondary-container": "#E5E5DF",
+                        "tertiary-fixed": "#D5E3FF",
+                        "secondary-fixed-dim": "#8C8C85",
+                        "primary-container": "#1A1A19",
+                        "outline-variant": "#8C8C85",
+                        "inverse-primary": "#FFB4A4",
+                        "tertiary-container": "#D5E3FF",
+                        "surface-container": "#EDEDE9",
+                        "error-container": "#FFDAD6",
+                        "on-primary-fixed-variant": "#8D1600",
+                        "inverse-on-surface": "#F9F9F6",
+                        "surface-variant": "#E5E5DF",
+                        "on-tertiary-container": "#001B3C",
+                        "surface-container-highest": "#E1E1DC",
+                        "on-tertiary": "#FFFFFF",
+                        "on-surface-variant": "#5C5C58",
+                        "primary": "#CE4125",
+                        "background": "#F9F9F6",
+                        "error": "#BA1A1A",
+                        "on-secondary-fixed": "#121211"
+                    },
+                    fontFamily: {
+                        "headline": ["Crimson Pro", "serif"],
+                        "body": ["DM Sans", "sans-serif"],
+                        "label": ["Space Grotesk", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"]
+                    },
+                    borderRadius: {"DEFAULT": "0px", "lg": "0px", "xl": "0px", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        body { font-family: 'DM Sans', sans-serif; }
+        h1, h2, h3 { font-family: 'Crimson Pro', serif; }
+        code, pre { font-family: 'JetBrains Mono', monospace; }
+    </style>
+</head>
+<body class="bg-background text-on-background selection:bg-primary/20 selection:text-primary">
+<!-- TopNavBar -->
+<nav class="fixed top-0 w-full z-50 bg-white/80 dark:bg-zinc-950/80 backdrop-blur-md border-b border-zinc-200 dark:border-zinc-800 shadow-sm transition-all duration-200 ease-in-out">
+<div class="flex justify-between items-center px-6 py-3 max-w-7xl mx-auto">
+<div class="text-2xl font-black font-serif text-orange-800 dark:text-orange-400">RaTeX</div>
+<div class="hidden md:flex gap-8 items-center">
+<a class="font-serif text-lg tracking-tight text-orange-700 dark:text-orange-500 border-b-2 border-orange-700 dark:border-orange-500 pb-1" href="#">Features</a>
+<a class="font-serif text-lg tracking-tight text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors" href="#">Comparison</a>
+<a class="font-serif text-lg tracking-tight text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors" href="#">Documentation</a>
+<a class="font-serif text-lg tracking-tight text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors" href="#">Benchmarks</a>
+</div>
+<div class="flex items-center gap-4">
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer hover:bg-zinc-50 dark:hover:bg-zinc-900 p-2 transition-colors">terminal</span>
+<button class="bg-primary text-on-primary px-5 py-2 text-sm font-label tracking-widest uppercase hover:opacity-90 transition-opacity">
+                    Get Started
+                </button>
+</div>
+</div>
+</nav>
+<main class="pt-24">
+<!-- Hero Section -->
+<header class="max-w-7xl mx-auto px-6 py-20 md:py-32 border-x border-outline/30">
+<div class="max-w-3xl">
+<p class="text-primary font-label tracking-[0.3em] uppercase mb-6 text-sm">System Architecture</p>
+<h1 class="text-6xl md:text-8xl font-bold leading-tight mb-8">Engineering Excellence at the Core</h1>
+<p class="text-xl md:text-2xl text-on-surface-variant font-body leading-relaxed max-w-2xl">
+                    RaTeX is built on a high-performance Rust-powered engine, delivering deterministic typesetting with zero-cost abstractions and memory safety by design.
+                </p>
+</div>
+</header>
+<!-- Feature Bento Grid -->
+<section class="max-w-7xl mx-auto px-6 py-20 grid grid-cols-1 md:grid-cols-3 gap-0 border-x border-y border-outline/30">
+<!-- Card 1 -->
+<div class="p-10 border-r border-outline/30 flex flex-col justify-between group hover:bg-surface-container-low transition-colors duration-300">
+<div>
+<span class="material-symbols-outlined text-primary text-4xl mb-8" data-weight="fill" style="font-variation-settings: 'FILL' 1;">memory</span>
+<h3 class="text-3xl font-bold mb-4">Rust-Powered Performance</h3>
+<p class="text-on-surface-variant font-body leading-relaxed">
+                        Harnessing the power of Rust's ownership model to ensure complete memory safety and blazing-fast execution speeds that outperform traditional C++ implementations.
+                    </p>
+</div>
+<div class="mt-12 flex gap-4">
+<span class="text-xs font-mono bg-surface-container px-2 py-1">MEMORY_SAFE</span>
+<span class="text-xs font-mono bg-surface-container px-2 py-1">LLVM_OPTIMIZED</span>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="p-10 border-r border-outline/30 flex flex-col justify-between group hover:bg-surface-container-low transition-colors duration-300">
+<div>
+<span class="material-symbols-outlined text-primary text-4xl mb-8" data-weight="fill" style="font-variation-settings: 'FILL' 1;">devices</span>
+<h3 class="text-3xl font-bold mb-4">True Cross-Platform</h3>
+<p class="text-on-surface-variant font-body leading-relaxed">
+                        A single codebase that compiles natively for iOS, Android, and WebAssembly. Consistent pixel-perfect rendering across every device and environment.
+                    </p>
+</div>
+<div class="mt-12 flex gap-4">
+<span class="text-xs font-mono bg-surface-container px-2 py-1">WASM</span>
+<span class="text-xs font-mono bg-surface-container px-2 py-1">NATIVE_AARCH64</span>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="p-10 flex flex-col justify-between group hover:bg-surface-container-low transition-colors duration-300">
+<div>
+<span class="material-symbols-outlined text-primary text-4xl mb-8" data-weight="fill" style="font-variation-settings: 'FILL' 1;">science</span>
+<h3 class="text-3xl font-bold mb-4">Advanced Scientific Support</h3>
+<p class="text-on-surface-variant font-body leading-relaxed">
+                        Native integration for <code class="bg-surface-container px-1">\ce</code> and <code class="bg-surface-container px-1">\pu</code> macros. Complex chemical equations and physical units rendered with academic precision.
+                    </p>
+</div>
+<div class="mt-12 flex gap-4">
+<span class="text-xs font-mono bg-surface-container px-2 py-1">MHCHEM</span>
+<span class="text-xs font-mono bg-surface-container px-2 py-1">UNICODE_MATH</span>
+</div>
+</div>
+</section>
+<!-- Interactive Demo Block -->
+<section class="max-w-7xl mx-auto px-6 py-24 bg-surface border-x border-outline/30">
+<div class="flex flex-col md:flex-row gap-12 items-center">
+<div class="flex-1">
+<h2 class="text-5xl font-bold mb-6">Complex rendering made simple</h2>
+<p class="text-lg text-on-surface-variant mb-8 font-body">
+                        Direct support for chemical notation without external dependencies. Our engine parses mhchem syntax natively for maximum efficiency.
+                    </p>
+<div class="bg-inverse-surface text-surface p-8 border border-outline/10 shadow-xl">
+<div class="flex justify-between items-center mb-4 border-b border-surface/10 pb-4">
+<span class="text-xs font-mono tracking-widest opacity-60">SOURCE_TEX</span>
+<span class="material-symbols-outlined text-xs">content_copy</span>
+</div>
+<pre class="text-lg font-mono text-primary-fixed-dim overflow-x-auto"><code>\ce{SO4^2- + Ba^2+ -&gt; BaSO4 v}</code></pre>
+</div>
+</div>
+<div class="flex-1 w-full bg-white p-12 border border-outline shadow-sm min-h-[300px] flex flex-col justify-center items-center text-center">
+<span class="text-xs font-label tracking-widest text-on-surface-variant/40 mb-8 uppercase">Live Preview Output</span>
+<div class="relative">
+<!-- Simulated Math Render -->
+<div class="text-4xl font-serif text-on-background tracking-tighter italic">
+                            SO<sub class="text-xl not-italic -ml-1">4</sub><sup class="text-xl not-italic -ml-1">2−</sup> + Ba<sup class="text-xl not-italic -ml-1">2+</sup> → BaSO<sub class="text-xl not-italic -ml-1">4</sub>↓
+                        </div>
+<div class="absolute -bottom-12 left-1/2 -translate-x-1/2 w-32 h-[1px] bg-primary"></div>
+</div>
+<div class="mt-16 flex gap-2">
+<span class="w-2 h-2 rounded-full bg-primary/20"></span>
+<span class="w-2 h-2 rounded-full bg-primary/40"></span>
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+</div>
+</div>
+</div>
+</section>
+<!-- Comparison Section -->
+<section class="max-w-7xl mx-auto px-6 py-24 border-x border-y border-outline/30 bg-surface-container-lowest">
+<div class="text-center mb-16">
+<h2 class="text-5xl font-bold mb-4">The Competition Gap</h2>
+<p class="text-on-surface-variant font-body">Technical comparison with leading mobile math libraries.</p>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="border-b-2 border-on-surface">
+<th class="py-6 px-4 font-label tracking-widest uppercase text-xs">Metric / Capability</th>
+<th class="py-6 px-4 font-serif text-2xl text-primary italic">RaTeX</th>
+<th class="py-6 px-4 font-label tracking-widest uppercase text-xs opacity-50">iosMath</th>
+<th class="py-6 px-4 font-label tracking-widest uppercase text-xs opacity-50">swiftMath</th>
+</tr>
+</thead>
+<tbody class="font-body">
+<tr class="border-b border-outline/30 group hover:bg-surface-container">
+<td class="py-8 px-4 font-bold">Rust Engine (Safety)</td>
+<td class="py-8 px-4 text-primary"><span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span></td>
+<td class="py-8 px-4 opacity-30"><span class="material-symbols-outlined">cancel</span></td>
+<td class="py-8 px-4 opacity-30"><span class="material-symbols-outlined">cancel</span></td>
+</tr>
+<tr class="border-b border-outline/30 group hover:bg-surface-container">
+<td class="py-8 px-4 font-bold">mhchem (\ce) Support</td>
+<td class="py-8 px-4 text-primary"><span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span></td>
+<td class="py-8 px-4 opacity-30"><span class="material-symbols-outlined">cancel</span></td>
+<td class="py-8 px-4 opacity-30"><span class="material-symbols-outlined">cancel</span></td>
+</tr>
+<tr class="border-b border-outline/30 group hover:bg-surface-container">
+<td class="py-8 px-4 font-bold">Multi-platform Binary</td>
+<td class="py-8 px-4 text-primary"><span class="material-symbols-outlined" data-weight="fill" style="font-variation-settings: 'FILL' 1;">check_circle</span></td>
+<td class="py-8 px-4 opacity-30"><span class="material-symbols-outlined">cancel</span></td>
+<td class="py-8 px-4 opacity-30"><span class="material-symbols-outlined">cancel</span></td>
+</tr>
+<tr class="border-b border-outline/30 group hover:bg-surface-container">
+<td class="py-8 px-4 font-bold">Memory Management</td>
+<td class="py-8 px-4 text-primary font-mono text-sm uppercase">Automatic / Zero-Cost</td>
+<td class="py-8 px-4 opacity-50 text-sm">Reference Counting</td>
+<td class="py-8 px-4 opacity-50 text-sm">ARC</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<!-- CTA Section -->
+<section class="max-w-7xl mx-auto px-6 py-32 border-x border-outline/30">
+<div class="bg-primary p-16 md:p-24 text-center relative overflow-hidden">
+<!-- Decorative element -->
+<div class="absolute top-0 right-0 p-8 opacity-10">
+<span class="material-symbols-outlined text-[200px]" style="font-variation-settings: 'wght' 100;">function</span>
+</div>
+<h2 class="text-5xl md:text-7xl font-bold text-on-primary mb-8 relative z-10">Ready to build the future of scientific apps?</h2>
+<div class="flex flex-col md:flex-row gap-6 justify-center relative z-10">
+<button class="bg-on-primary text-primary px-10 py-5 font-label tracking-[0.2em] uppercase text-sm font-bold border-2 border-transparent hover:bg-primary-container hover:text-on-primary-container transition-all">
+                        Download SDK
+                    </button>
+<button class="bg-transparent text-on-primary px-10 py-5 font-label tracking-[0.2em] uppercase text-sm font-bold border-2 border-on-primary hover:bg-on-primary/10 transition-all">
+                        Read the Docs
+                    </button>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="w-full py-12 bg-zinc-50 dark:bg-zinc-900 border-t border-zinc-200 dark:border-zinc-800 transition-opacity opacity-80 hover:opacity-100">
+<div class="flex flex-col md:flex-row justify-between items-center px-8 max-w-7xl mx-auto gap-4">
+<div class="font-serif font-bold text-zinc-900 dark:text-zinc-100">RaTeX</div>
+<div class="flex gap-8">
+<a class="font-sans text-sm uppercase tracking-widest text-zinc-500 dark:text-zinc-500 hover:text-orange-700 dark:hover:text-orange-400 underline decoration-2 underline-offset-4 transition-colors" href="#">GitHub</a>
+<a class="font-sans text-sm uppercase tracking-widest text-zinc-500 dark:text-zinc-500 hover:text-orange-700 dark:hover:text-orange-400 underline decoration-2 underline-offset-4 transition-colors" href="#">Crates.io</a>
+<a class="font-sans text-sm uppercase tracking-widest text-zinc-500 dark:text-zinc-500 hover:text-orange-700 dark:hover:text-orange-400 underline decoration-2 underline-offset-4 transition-colors" href="#">Discord</a>
+<a class="font-sans text-sm uppercase tracking-widest text-zinc-500 dark:text-zinc-500 hover:text-orange-700 dark:hover:text-orange-400 underline decoration-2 underline-offset-4 transition-colors" href="#">Privacy Policy</a>
+</div>
+<div class="text-zinc-500 font-sans text-xs tracking-widest uppercase">
+                © 2024 RaTeX Project. Built with Rust.
+            </div>
+</div>
+</footer>
+</body></html>

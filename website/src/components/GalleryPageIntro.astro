@@ -1,0 +1,29 @@
+---
+interface Props {
+  eyebrow: string;
+  title: string;
+  initializingText?: string;
+  renderedText?: string;
+}
+
+const {
+  eyebrow,
+  title,
+  initializingText = "Initializing\u2026",
+  renderedText = "Rendered:",
+} = Astro.props;
+---
+
+<header class="mb-10">
+  <p class="text-xs font-label uppercase tracking-[0.28em] text-primary/90 mb-2">{eyebrow}</p>
+  <h1 class="text-4xl md:text-5xl font-bold text-primary mb-5">{title}</h1>
+  <div class="space-y-3 text-[15px] md:text-base leading-relaxed text-on-surface-variant max-w-3xl">
+    <slot />
+  </div>
+  <div class="mt-6 flex flex-wrap gap-4 text-sm text-zinc-500 font-label tracking-wide">
+    <p id="gallery-status" aria-live="polite">{initializingText}</p>
+    <p class="font-mono text-primary">
+      <span class="text-on-surface-variant/70">{renderedText}</span> <span id="gallery-count">0 / 0</span>
+    </p>
+  </div>
+</header>

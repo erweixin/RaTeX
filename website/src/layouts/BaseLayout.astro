@@ -1,0 +1,81 @@
+---
+import type { Locale } from "../i18n/types";
+import SiteHeader from "../components/SiteHeader.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+
+interface Props {
+  title: string;
+  description?: string;
+  ogTitle?: string;
+  ogDescription?: string;
+  ogImage?: string;
+  active?: "home" | "math" | "chemistry" | "physics" | "get-started" | "demo";
+  lang?: Locale;
+  copyright?: string;
+}
+
+const {
+  title,
+  description = "RaTeX — KaTeX-compatible math rendering in Rust",
+  ogTitle: ogTitleProp,
+  ogDescription: ogDescriptionProp,
+  ogImage = "https://erweixin.github.io/RaTeX/screen.png",
+  active,
+  lang = "en",
+  copyright,
+} = Astro.props;
+
+const ogTitle = ogTitleProp ?? title;
+const ogDescription = ogDescriptionProp ?? description;
+/** Astro `base` (e.g. `/RaTeX/`) — used client-side for WASM/fonts under `platforms/web/`, not page path. */
+const siteBase = import.meta.env.BASE_URL;
+---
+
+<!doctype html>
+<html class="light" lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={ogTitle} />
+    <meta property="og:description" content={ogDescription} />
+    <meta property="og:image" content={ogImage} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@200..900&family=DM+Sans:wght@200..1000&family=JetBrains+Mono:wght@400;700&family=Space+Grotesk:wght@300..700&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+      rel="stylesheet"
+    />
+    <script is:inline define:vars={{ siteBase }}>
+      window.__RATEX_SITE_BASE__ = siteBase;
+    </script>
+    <slot name="head" />
+    <style is:global>
+      .material-symbols-outlined {
+        font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+      }
+      body {
+        font-family: "DM Sans", sans-serif;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: "Crimson Pro", serif;
+      }
+      code,
+      pre {
+        font-family: "JetBrains Mono", monospace;
+      }
+    </style>
+  </head>
+  <body class="bg-background text-on-background selection:bg-primary/20 selection:text-primary">
+    <SiteHeader active={active} lang={lang} />
+    <slot />
+    <SiteFooter copyright={copyright} />
+  </body>
+</html>

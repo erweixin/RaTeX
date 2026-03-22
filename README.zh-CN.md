@@ -2,6 +2,8 @@
 
 **简体中文** | [English](README.md)
 
+**项目站点：** [erweixin.github.io/RaTeX](https://erweixin.github.io/RaTeX/)（首页与 Math / Chemistry / Physics 公式画廊）
+
 **纯 Rust 实现的 KaTeX 兼容数学渲染引擎 — 无 JavaScript、无 WebView、无 DOM。**
 
 解析 LaTeX，按 TeX 规则排版，在任意平台原生渲染。**胶水层已就绪，各平台开箱即用。**
@@ -43,8 +45,8 @@ RaTeX 完全去掉 Web 栈：一个 Rust 核心、一套显示列表，各平台
 - **WASM**（`ratex-wasm`）通过 `<ratex-formula>` Web 组件在浏览器中即插即用
 - **服务端 PNG** 通过 tiny-skia — 无需浏览器
 
-**[→ 在线演示](https://erweixin.github.io/RaTeX/demo/index.html)** — 输入 LaTeX，对比 RaTeX (Rust/WASM) 与 KaTeX 
-**[→ 支持表](https://erweixin.github.io/RaTeX/demo/support_table.html)** — 916 条测试公式的 RaTeX vs KaTeX 对比
+**[→ 在线演示](https://erweixin.github.io/RaTeX/demo/live.html)** — 输入 LaTeX，对比 RaTeX (Rust/WASM) 与 KaTeX
+**[→ 支持表](https://erweixin.github.io/RaTeX/demo/support-table.html)** — 916 条测试公式的 RaTeX vs KaTeX 对比
 
 ---
 

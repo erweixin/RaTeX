@@ -26,6 +26,12 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: website/package-lock.json
+
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
@@ -34,7 +40,10 @@ jobs:
 
       - name: Prepare site
         run: |
+          node tools/generate_website_formulas.mjs
+          cd website && npm ci && npm run build
           mkdir -p _site/platforms/web
+          cp -r website/dist/* _site/
           cp -r demo _site/
           cp platforms/web/fonts.css _site/platforms/web/
           cp -r platforms/web/fonts _site/platforms/web/

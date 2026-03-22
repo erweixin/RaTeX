@@ -1,0 +1,69 @@
+---
+import type { Locale } from "../i18n/types";
+import { useTranslations, pageHref } from "../i18n/utils";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import GalleryPageIntro from "../components/GalleryPageIntro.astro";
+import { repoBlob } from "../data/site";
+
+interface Props {
+  lang?: Locale;
+}
+const { lang = "en" } = Astro.props;
+const t = useTranslations(lang);
+const base = import.meta.env.BASE_URL;
+const galleryDataUrl = `${base}data/physics.json`;
+const ceFileUrl = repoBlob("tests/golden/test_case_ce.txt");
+---
+
+<BaseLayout
+  title="RaTeX — Physics gallery (mhchem \\pu)"
+  description="Golden-suite \\pu lines plus curated equations, rendered with RaTeX WASM."
+  active="physics"
+  lang={lang}
+  copyright={t.footer.copyright}
+>
+  <script slot="head" src={`${base}katex-fonts-link.js`}></script>
+  <main class="pt-28 lg:pt-24 max-w-7xl mx-auto px-6 py-12 md:py-14 border-x border-outline/30 min-h-[60vh]">
+    <GalleryPageIntro
+      eyebrow={t.physicsGallery.eyebrow}
+      title={t.physicsGallery.title}
+      initializingText={t.gallery.initializing}
+      renderedText={t.gallery.rendered}
+    >
+      <p>
+        {t.physicsGallery.desc1prefix} <code class="font-mono text-sm bg-surface-container px-1 rounded">\pu</code>
+        {" "}{t.physicsGallery.desc1mid}
+        {" "}<a href={ceFileUrl} class="text-primary underline underline-offset-2 font-mono text-sm">tests/golden/test_case_ce.txt</a>{t.physicsGallery.desc1suffix}
+      </p>
+      <p>
+        {t.physicsGallery.desc2prefix} <code class="font-mono text-sm bg-surface-container px-1 rounded">\ce</code>
+        {" "}{t.physicsGallery.desc2mid}
+        {" "}<a href={pageHref("chemistry.html", lang, base)} class="text-primary underline underline-offset-2">{t.physicsGallery.desc2link}</a>
+        {" "}{t.physicsGallery.desc2suffix}
+      </p>
+    </GalleryPageIntro>
+    <div id="gallery-list" class="border-t border-outline/30" role="region" aria-label={t.physicsGallery.ariaLabel}></div>
+  </main>
+  <script src={`${base}gallery.js`}></script>
+  <script is:inline define:vars={{ galleryDataUrl }}>
+    (function () {
+      function boot() {
+        if (typeof window.RaTeXGallery === "undefined") {
+          console.error("RaTeXGallery: gallery.js did not load");
+          return;
+        }
+        window.RaTeXGallery.init({
+          dataUrl: galleryDataUrl,
+          statusEl: "gallery-status",
+          countEl: "gallery-count",
+          listEl: "gallery-list",
+        });
+      }
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot);
+      } else {
+        boot();
+      }
+    })();
+  </script>
+</BaseLayout>

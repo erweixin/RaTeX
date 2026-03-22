@@ -2,6 +2,8 @@
 
 [简体中文](README.zh-CN.md) | **English**
 
+**Project site:** [erweixin.github.io/RaTeX](https://erweixin.github.io/RaTeX/) (landing page + Math / Chemistry / Physics galleries)
+
 **KaTeX-compatible math rendering engine in pure Rust — no JavaScript, no WebView, no DOM.**
 
 Parse LaTeX, lay it out with TeX rules, and render it natively on any platform. Glue layers are ready — use out of the box on every platform.
@@ -43,8 +45,8 @@ RaTeX cuts the web stack out entirely. One Rust core, one display list, every pl
 - **WASM** (`ratex-wasm`) for drop-in browser use via `<ratex-formula>` Web Component
 - **Server-side PNG** via tiny-skia — no browser needed
 
-**[→ Live Demo](https://erweixin.github.io/RaTeX/demo/index.html)** — type LaTeX and compare RaTeX (Rust/WASM) vs KaTeX side-by-side · 
-**[→ Support table](https://erweixin.github.io/RaTeX/demo/support_table.html)** — RaTeX vs KaTeX across all 916 test formulas
+**[→ Live Demo](https://erweixin.github.io/RaTeX/demo/live.html)** — type LaTeX and compare RaTeX (Rust/WASM) vs KaTeX side-by-side ·
+**[→ Support table](https://erweixin.github.io/RaTeX/demo/support-table.html)** — RaTeX vs KaTeX across all 916 test formulas
 
 ---
 

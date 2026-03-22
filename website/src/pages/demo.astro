@@ -1,0 +1,156 @@
+---
+import type { Locale } from "../i18n/types";
+import { useTranslations, pageHref } from "../i18n/utils";
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+interface Props {
+  lang?: Locale;
+}
+const { lang = "en" } = Astro.props;
+const t = useTranslations(lang);
+const base = import.meta.env.BASE_URL;
+
+const demoLinks = [
+  {
+    id: "live",
+    title: t.demo.liveComparisonTitle,
+    subtitle: t.demo.liveComparisonSubtitle,
+    body: t.demo.liveComparisonBody,
+    href: pageHref("demo/live.html", lang, base),
+    cta: t.demo.liveComparisonCta,
+    icon: "compare_arrows",
+  },
+  {
+    id: "table",
+    title: t.demo.supportTableTitle,
+    subtitle: t.demo.supportTableSubtitle,
+    body: t.demo.supportTableBody,
+    href: pageHref("demo/support-table.html", lang, base),
+    cta: t.demo.supportTableCta,
+    icon: "table_rows",
+  },
+] as const;
+
+const galleryLinks = [
+  { label: t.demo.galleryLabels.math, href: pageHref("math.html", lang, base), hint: t.demo.galleryHints.math },
+  { label: t.demo.galleryLabels.chemistry, href: pageHref("chemistry.html", lang, base), hint: t.demo.galleryHints.chemistry },
+  { label: t.demo.galleryLabels.physics, href: pageHref("physics.html", lang, base), hint: t.demo.galleryHints.physics },
+] as const;
+---
+
+<BaseLayout
+  title="RaTeX — Demos & benchmarks"
+  description="RaTeX WASM vs KaTeX 0.16.9: live comparison, 916-formula support table, and golden galleries (Math, Chemistry, Physics)."
+  active="demo"
+  lang={lang}
+  copyright={t.footer.copyright}
+>
+  <main class="pt-28 lg:pt-24 bg-background">
+    <div class="max-w-7xl mx-auto px-6 border-x border-outline/30">
+      <header class="py-12 md:py-16 lg:py-20 border-b border-outline/30">
+        <p class="text-xs font-label uppercase tracking-[0.28em] text-primary mb-4">{t.demo.eyebrow}</p>
+        <h1 class="text-4xl sm:text-5xl md:text-6xl font-bold text-zinc-900 leading-tight mb-6 max-w-3xl">
+          {t.demo.heading}
+        </h1>
+        <p class="text-lg md:text-xl text-on-surface-variant font-body leading-relaxed max-w-3xl mb-4">
+          {t.demo.intro}
+        </p>
+        <p class="text-sm text-on-surface-variant max-w-3xl leading-relaxed border-l-2 border-primary/40 pl-4 mb-8">
+          <span class="font-label uppercase tracking-wider text-primary/90">{t.demo.suggestedOrderLabel}</span>
+          — {t.demo.suggestedOrderDescPrefix}
+          {" "}<strong class="text-on-surface">{t.demo.suggestedOrderLiveLink}</strong>
+          {" "}{t.demo.suggestedOrderDescMid}
+          {" "}<strong class="text-on-surface">{t.demo.suggestedOrderTableLink}</strong>
+          {" "}{t.demo.suggestedOrderDescSuffix}
+        </p>
+        <div
+          class="p-4 bg-surface-container/80 border border-outline/40 max-w-3xl text-sm text-on-surface-variant leading-relaxed"
+          role="note"
+        >
+          <p>
+            <span class="font-semibold text-on-surface">{t.demo.howItLoadsLabel}</span>
+            {" "}{t.demo.howItLoadsDesc}
+            {" "}<a href={pageHref("get-started.html", lang, base)} class="text-primary font-medium underline underline-offset-2">{t.demo.howItLoadsGetStartedLink}</a>.
+          </p>
+        </div>
+      </header>
+
+      <section class="py-12 md:py-16" aria-labelledby="demo-tools-heading">
+        <h2 id="demo-tools-heading" class="sr-only">Demo tools</h2>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
+          {
+            demoLinks.map((item) => (
+              <article
+                id={item.id === "table" ? "support-table" : "live-comparison"}
+                class="flex flex-col bg-white border border-outline/50 shadow-sm rounded-[12px] overflow-hidden ring-1 ring-black/[0.04] scroll-mt-28"
+              >
+                <div class="p-8 md:p-10 flex flex-col flex-1">
+                  <span
+                    class="material-symbols-outlined text-primary text-4xl mb-6"
+                    style="font-variation-settings: 'FILL' 1"
+                    aria-hidden="true"
+                  >
+                    {item.icon}
+                  </span>
+                  <h3 class="text-2xl md:text-3xl font-bold font-serif text-zinc-900 mb-1">{item.title}</h3>
+                  <p class="text-xs font-label uppercase tracking-wider text-primary/90 mb-4">{item.subtitle}</p>
+                  <p class="text-[15px] md:text-base text-on-surface-variant font-body leading-relaxed flex-1 mb-8">
+                    {item.body}
+                  </p>
+                  <a
+                    href={item.href}
+                    class="inline-flex w-fit items-center justify-center gap-2 bg-primary text-on-primary px-6 py-3 text-xs font-label tracking-[0.18em] uppercase font-bold hover:opacity-90 transition-opacity"
+                  >
+                    {item.cta}
+                    <span class="material-symbols-outlined text-base" aria-hidden="true">arrow_forward</span>
+                  </a>
+                </div>
+              </article>
+            ))
+          }
+        </div>
+      </section>
+
+      <section
+        class="py-12 md:py-16 border-t border-outline/30 bg-surface"
+        aria-labelledby="galleries-heading-demo"
+      >
+        <div class="max-w-3xl mb-8">
+          <p class="text-xs font-label uppercase tracking-[0.25em] text-primary/90 mb-3">{t.demo.galleriesEyebrow}</p>
+          <h2 id="galleries-heading-demo" class="text-3xl md:text-4xl font-bold text-zinc-900 mb-4">
+            {t.demo.galleriesHeading}
+          </h2>
+          <p class="text-on-surface-variant font-body leading-relaxed">
+            {t.demo.galleriesDesc}
+          </p>
+        </div>
+        <ul class="grid grid-cols-1 sm:grid-cols-3 gap-4" role="list">
+          {
+            galleryLinks.map((g) => (
+              <li>
+                <a
+                  href={g.href}
+                  class="flex flex-col h-full p-6 bg-white border border-outline/40 hover:border-primary/40 hover:bg-surface-container-lowest transition-colors rounded-[12px] ring-1 ring-black/[0.03]"
+                >
+                  <span class="text-lg font-bold font-serif text-zinc-900 mb-1">{g.label}</span>
+                  <span class="text-xs font-mono text-on-surface-variant/90">{g.hint}</span>
+                  <span class="mt-4 text-sm text-primary font-medium inline-flex items-center gap-1">
+                    {t.demo.galleriesOpen}
+                    <span class="material-symbols-outlined text-sm" aria-hidden="true">chevron_right</span>
+                  </span>
+                </a>
+              </li>
+            ))
+          }
+        </ul>
+      </section>
+
+      <footer class="py-10 border-t border-outline/30 text-center text-sm text-on-surface-variant">
+        <p>
+          {t.demo.footerText}
+          {" "}<a href={pageHref("get-started.html", lang, base)} class="text-primary font-medium underline underline-offset-2">{t.demo.footerLink}</a>
+        </p>
+      </footer>
+    </div>
+  </main>
+</BaseLayout>

@@ -1,0 +1,68 @@
+---
+import type { Locale } from "../i18n/types";
+import { useTranslations } from "../i18n/utils";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import GalleryPageIntro from "../components/GalleryPageIntro.astro";
+import { repoBlob } from "../data/site";
+
+interface Props {
+  lang?: Locale;
+}
+const { lang = "en" } = Astro.props;
+const t = useTranslations(lang);
+const base = import.meta.env.BASE_URL;
+const galleryDataUrl = `${base}data/math.json`;
+const testCasesUrl = repoBlob("tests/golden/test_cases.txt");
+---
+
+<BaseLayout
+  title="RaTeX — Math formula gallery"
+  description="Golden-suite LaTeX lines rendered with RaTeX WASM on Canvas: KaTeX-style grouping, lazy-loaded."
+  active="math"
+  lang={lang}
+  copyright={t.footer.copyright}
+>
+  <script slot="head" src={`${base}katex-fonts-link.js`}></script>
+  <main class="pt-28 lg:pt-24 max-w-7xl mx-auto px-6 py-12 md:py-14 border-x border-outline/30 min-h-[60vh]">
+    <GalleryPageIntro
+      eyebrow={t.mathGallery.eyebrow}
+      title={t.mathGallery.title}
+      initializingText={t.gallery.initializing}
+      renderedText={t.gallery.rendered}
+    >
+      <p>
+        {t.mathGallery.desc1prefix} <a href={testCasesUrl} class="text-primary underline underline-offset-2 font-mono text-sm">tests/golden/test_cases.txt</a> {t.mathGallery.desc1suffix}
+      </p>
+      <p>
+        {t.mathGallery.desc2prefix}
+        {" "}<a href="https://katex.org/docs/supported.html" class="text-primary underline underline-offset-2" target="_blank" rel="noopener noreferrer"
+          >{t.mathGallery.desc2link}</a
+        >
+        {" "}{t.mathGallery.desc2suffix}
+      </p>
+    </GalleryPageIntro>
+    <div id="gallery-list" class="border-t border-outline/30" role="region" aria-label={t.mathGallery.ariaLabel}></div>
+  </main>
+  <script src={`${base}gallery.js`}></script>
+  <script is:inline define:vars={{ galleryDataUrl }}>
+    (function () {
+      function boot() {
+        if (typeof window.RaTeXGallery === "undefined") {
+          console.error("RaTeXGallery: gallery.js did not load");
+          return;
+        }
+        window.RaTeXGallery.init({
+          dataUrl: galleryDataUrl,
+          statusEl: "gallery-status",
+          countEl: "gallery-count",
+          listEl: "gallery-list",
+        });
+      }
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", boot);
+      } else {
+        boot();
+      }
+    })();
+  </script>
+</BaseLayout>
