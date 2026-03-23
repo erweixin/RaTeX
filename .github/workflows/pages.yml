@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat-website]
   workflow_dispatch:
 
 permissions:
@@ -29,8 +29,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
-          cache-dependency-path: website/package-lock.json
 
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
@@ -41,7 +39,9 @@ jobs:
       - name: Prepare site
         run: |
           node tools/generate_website_formulas.mjs
-          cd website && npm ci && npm run build
+          rm -f website/package-lock.json
+          npm --prefix website install
+          npm --prefix website run build
           mkdir -p _site/platforms/web
           cp -r website/dist/* _site/
           cp -r demo _site/
