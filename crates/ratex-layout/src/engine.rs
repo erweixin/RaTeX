@@ -930,8 +930,8 @@ fn layout_radical(
     let metrics = options.metrics();
     let theta = metrics.default_rule_thickness; // 0.04 for textstyle
 
-    // Rule 11: phi depends on style
-    // Display/DisplayCramped: phi = xHeight; Text and smaller: phi = theta
+    // KaTeX sqrt.js: `let phi = theta; if (options.style.id < Style.TEXT.id) phi = xHeight`.
+    // Style ids 0–1 are DISPLAY / DISPLAY_CRAMPED; TEXT is id 2. So only display styles use xHeight.
     let phi = if options.style.is_display() {
         metrics.x_height
     } else {
@@ -947,7 +947,10 @@ fn layout_radical(
     // KaTeX surd sizes: small=1.0, size1=1.2, size2=1.8, size3=2.4, size4=3.0
     let tex_height = select_surd_height(min_delim_height);
     let rule_width = theta;
-    let advance_width = 0.833;
+    let surd_font = crate::surd::surd_font_for_inner_height(tex_height);
+    let advance_width = ratex_font::get_char_metrics(surd_font, 0x221A)
+        .map(|m| m.width)
+        .unwrap_or(0.833);
 
     // Check if delimiter is taller than needed → center the extra space
     let delim_depth = tex_height - rule_width;
@@ -967,16 +970,17 @@ fn layout_radical(
         body_box.depth
     };
 
-    // Root index (e.g. \sqrt[3]{x}): layout in script style and place to the left of the surd.
+    // Root index (e.g. \sqrt[3]{x}): KaTeX uses SCRIPTSCRIPT (TeX: superscript of superscript).
     const INDEX_KERN: f64 = 0.05;
-    let (index_box, index_offset) = if let Some(index_node) = index {
-        let script_opts = options.with_style(options.style.superscript());
-        let idx = layout_node(index_node, &script_opts);
-        let script_em = options.style.superscript().size_multiplier();
-        let offset = idx.width * script_em + INDEX_KERN;
-        (Some(Box::new(idx)), offset)
+    let (index_box, index_offset, index_scale) = if let Some(index_node) = index {
+        let root_style = options.style.superscript().superscript();
+        let root_opts = options.with_style(root_style);
+        let idx = layout_node(index_node, &root_opts);
+        let index_ratio = root_style.size_multiplier() / options.style.size_multiplier();
+        let offset = idx.width * index_ratio + INDEX_KERN;
+        (Some(Box::new(idx)), offset, index_ratio)
     } else {
-        (None, 0.0)
+        (None, 0.0, 1.0)
     };
 
     let width = index_offset + advance_width + body_box.width;
@@ -989,6 +993,7 @@ fn layout_radical(
             body: Box::new(body_box),
             index: index_box,
             index_offset,
+            index_scale,
             rule_thickness: rule_width,
             inner_height: tex_height,
         },

@@ -2,6 +2,10 @@ use ratex_types::display_item::{DisplayItem, DisplayList};
 use ratex_types::path_command::PathCommand;
 
 use crate::layout_box::{BoxContent, LayoutBox, VBoxChildKind};
+use crate::surd::surd_font_for_inner_height;
+
+/// Unicode √ (U+221A), same glyph KaTeX uses for `\sqrt` surd.
+const SURD_CHAR: u32 = 0x221A;
 
 /// Convert a LayoutBox tree into a flat DisplayList with absolute coordinates.
 ///
@@ -205,32 +209,60 @@ fn emit_box(lbox: &LayoutBox, x: f64, y: f64, scale: f64, items: &mut Vec<Displa
             body,
             index,
             index_offset,
+            index_scale,
             rule_thickness,
-            ..
+            inner_height,
         } => {
             let radical_width = lbox.width - index_offset - body.width;
 
             if let Some(index_box) = index {
-                // Root index: slightly smaller than script (0.62), shifted right into the notch.
-                const INDEX_SCALE: f64 = 0.62;
-                const INDEX_PADDING_LEFT: f64 = 0.5; // move "3" to the right
-                let index_baseline_y = y - lbox.height * scale + index_box.height * INDEX_SCALE * scale;
-                emit_box(index_box, x + INDEX_PADDING_LEFT * scale, index_baseline_y, scale * INDEX_SCALE, items);
+                // Root index (scriptscript): KaTeX `htmlBuilder` builds a vlist with
+                // `positionType: "shift", positionData: -toShift` where
+                // `toShift = 0.6 * (body.height - body.depth)` and `body` is the sqrt
+                // inner+vlist (same height/depth as this radical box, excluding the index).
+                // That aligns the root span with the sqrt body on the math baseline, then
+                // shifts the glyph upward by `toShift` — not pinned to the top of the surd.
+                //
+                // Horizontal: KaTeX uses `margin-left: 5/18 em` on `.sqrt > .root` (`\mkern 5mu`).
+                // Outline-font U+221A vs KaTeX SVG shifts the crook; ~0.55em parent-em inset matches
+                // `tests/golden/fixtures/0744.png` better than 5/18 (~0.278) for our glyph pipeline.
+                const INDEX_PADDING_LEFT_EM: f64 = 0.62;
+                let to_shift = 0.6 * (lbox.height - lbox.depth);
+                let index_baseline_y = y - to_shift * scale;
+                let child_scale = scale * index_scale;
+                emit_box(
+                    index_box,
+                    x + INDEX_PADDING_LEFT_EM * scale,
+                    index_baseline_y,
+                    child_scale,
+                    items,
+                );
             }
 
             let surd_x = x + index_offset * scale;
-            let surd_height = lbox.height + lbox.depth;
-            items.push(DisplayItem::Path {
+            let surd_font = surd_font_for_inner_height(*inner_height);
+            let (gw, gh, gd) = ratex_font::get_char_metrics(surd_font, SURD_CHAR)
+                .map(|m| (m.width, m.height, m.depth))
+                .unwrap_or((radical_width, lbox.height, lbox.depth));
+            let commands = glyph_placeholder_commands(gw, gh, gd);
+            items.push(DisplayItem::GlyphPath {
                 x: surd_x,
-                y: y - lbox.height * scale,
-                commands: radical_surd_path(radical_width * scale, surd_height * scale),
-                fill: false,
+                y,
+                scale,
+                font: surd_font.as_str().to_string(),
+                char_code: SURD_CHAR,
+                commands,
                 color: lbox.color,
             });
 
+            // Horizontal vinculum: align with the surd glyph's top bar (KaTeX uses SVG paths
+            // that join the stem; we extend a separate rule). Center the rule on the bar:
+            // ~one rule-thickness below the glyph bbox top (y - gh), not on `lbox.height`
+            // (layout box can differ slightly from font outline ascent).
+            let line_center_y = y - gh * scale + (rule_thickness * scale) / 2.0;
             items.push(DisplayItem::Line {
                 x: surd_x + radical_width * scale,
-                y: y - lbox.height * scale,
+                y: line_center_y,
                 width: body.width * scale,
                 thickness: rule_thickness * scale,
                 color: lbox.color,
@@ -515,18 +547,6 @@ fn glyph_placeholder_commands(width: f64, height: f64, depth: f64) -> Vec<PathCo
     ]
 }
 
-/// Simplified radical surd path.
-fn radical_surd_path(width: f64, height: f64) -> Vec<PathCommand> {
-    vec![
-        PathCommand::MoveTo { x: 0.0, y: height * 0.6 },
-        PathCommand::LineTo {
-            x: width * 0.4,
-            y: height,
-        },
-        PathCommand::LineTo { x: width, y: 0.0 },
-    ]
-}
-
 /// Compute the visual bounding box from glyph, line, and rect items.
 /// Excludes Path items which may have extreme coordinates (e.g. KaTeX SVG viewBox artifacts).
 /// Returns (min_x, max_x, min_y, max_y) in em coordinates.
@@ -590,3 +610,4 @@ fn shift_item_x(item: &mut DisplayItem, dx: f64) {
         DisplayItem::Path { x, .. } => *x += dx,
     }
 }
+

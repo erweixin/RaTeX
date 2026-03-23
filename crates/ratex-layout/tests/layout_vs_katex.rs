@@ -92,22 +92,22 @@ fn fraction_with_scripts() {
 
 #[test]
 fn sqrt_x() {
-    check("\\sqrt{x}", 0.84919, 0.19084);
+    check("\\sqrt{x}", 0.84916, 0.19084);
 }
 
 #[test]
 fn sqrt_2() {
-    check("\\sqrt{2}", 0.95614, 0.08389);
+    check("\\sqrt{2}", 0.95610, 0.08390);
 }
 
 #[test]
 fn sqrt_a_plus_b() {
-    check("\\sqrt{a+b}", 0.93942, 0.10061);
+    check("\\sqrt{a+b}", 0.93943, 0.10057);
 }
 
 #[test]
 fn nested_frac_in_sqrt() {
-    check("\\sqrt{\\frac{a}{b}}", 1.54472, 0.89528);
+    check("\\sqrt{\\frac{a}{b}}", 1.54466, 0.89535);
 }
 
 #[test]

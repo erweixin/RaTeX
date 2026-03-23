@@ -5,6 +5,7 @@ pub mod layout_box;
 pub mod layout_options;
 pub mod spacing;
 pub mod stacked_delim;
+pub mod surd;
 pub mod to_display;
 pub mod vbox;
 

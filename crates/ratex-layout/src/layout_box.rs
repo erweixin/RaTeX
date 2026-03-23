@@ -74,6 +74,8 @@ pub enum BoxContent {
         index: Option<Box<LayoutBox>>,
         /// Horizontal offset (in em) of the surd/body from the left edge when index is present.
         index_offset: f64,
+        /// `scriptscript` size relative to the surrounding math style (for drawing the index).
+        index_scale: f64,
         rule_thickness: f64,
         inner_height: f64,
     },
