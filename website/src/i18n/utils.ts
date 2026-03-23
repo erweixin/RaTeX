@@ -12,7 +12,7 @@ export function useTranslations(locale: Locale): TranslationDict {
  */
 export function pageHref(slug: string, locale: Locale, base: string): string {
   if (locale === "zh") {
-    return slug ? `${base}zh/${slug}` : `${base}zh/index.html`;
+    return slug ? `${base}zh/${slug}` : `${base}zh.html`;
   }
   return slug ? `${base}${slug}` : base;
 }
