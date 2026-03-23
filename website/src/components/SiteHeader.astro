@@ -14,9 +14,9 @@ const base = import.meta.env.BASE_URL;
 // Derive current slug from the request URL so the language switcher points correctly.
 const currentPath = Astro.url.pathname;
 const relPath = currentPath.startsWith(base) ? currentPath.slice(base.length) : "";
-// If already on zh, strip the zh/ prefix to get the bare slug.
-const isZh = relPath.startsWith("zh/");
-const slug = isZh ? relPath.slice(3) : relPath;
+// If already on zh, strip the zh/ prefix (or zh.html for the home page) to get the bare slug.
+const isZh = relPath.startsWith("zh/") || relPath === "zh.html";
+const slug = isZh ? (relPath === "zh.html" ? "" : relPath.slice(3)) : relPath;
 
 const enHref = pageHref(slug, "en", base);
 const zhHref = pageHref(slug, "zh", base);
@@ -36,7 +36,7 @@ function langBtnClass(isActive: boolean) {
 
 <nav class="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-zinc-200 shadow-sm" aria-label="Primary">
   <div class="flex flex-wrap justify-between items-center gap-4 px-6 py-3 max-w-7xl mx-auto">
-    <a href={lang === "zh" ? `${base}zh/index.html` : base} class="text-2xl font-black font-serif text-orange-800">RaTeX</a>
+    <a href={lang === "zh" ? `${base}zh.html` : base} class="text-2xl font-black font-serif text-orange-800">RaTeX</a>
     <div class="hidden lg:flex flex-wrap gap-6 items-center text-sm md:text-base" role="navigation" aria-label="Site sections">
       <a class={navClass(active === "home")} href={active === "home" ? `#features` : pageHref("", lang, base) + "#features"}>{t.nav.features}</a>
       <a class={navClass(active === "demo")} href={pageHref("demo.html", lang, base)}>{t.nav.demo}</a>

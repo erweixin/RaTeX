@@ -267,10 +267,10 @@ function buildTable() {
 
     // KaTeX
     const tdK = document.createElement('td');
-    tdK.className = 'td-katex min-w-0 align-top';
+    tdK.className = 'td-katex min-w-0 align-middle';
     const kc = document.createElement('div');
     kc.className =
-      'katex-cell block overflow-x-auto overflow-y-visible min-h-[28px] text-[16.53px] text-zinc-900';
+      'katex-cell flex items-center overflow-x-auto overflow-y-visible min-h-[28px] text-[16.53px] text-zinc-900';
     try {
       // displayMode: true — required for AMS environments (align, equation, gather, …)
       // and matches tools/golden_compare/generate_reference.mjs (golden PNG reference).
@@ -284,7 +284,7 @@ function buildTable() {
 
     // RaTeX
     const tdR = document.createElement('td');
-    tdR.className = 'td-ratex min-w-0 align-top';
+    tdR.className = 'td-ratex min-w-0 align-middle';
     const rc = document.createElement('div');
     rc.className = 'ratex-cell flex items-center min-h-[28px] max-w-full';
     rc.innerHTML = '<span class="text-xs text-on-surface-variant italic">loading…</span>';
