@@ -145,7 +145,10 @@ fn layout_multiline(
             vchildren.push(VBoxChild { kind: VBoxChildKind::Kern(gap), shift: 0.0 });
             h += gap + row.height + prev_depth;
         }
-        vchildren.push(VBoxChild { kind: VBoxChildKind::Box(row.clone()), shift: 0.0 });
+        vchildren.push(VBoxChild {
+            kind: VBoxChildKind::Box(Box::new(row.clone())),
+            shift: 0.0,
+        });
     }
 
     LayoutBox {
@@ -329,7 +332,7 @@ fn layout_node(node: &ParseNode, options: &LayoutOptions) -> LayoutBox {
             row_gaps,
             hlines_before_row,
             col_separation_type.as_deref(),
-            hskip_before_and_after.unwrap_or(true),
+            hskip_before_and_after.unwrap_or(false),
             options,
         ),
 
@@ -2032,9 +2035,9 @@ fn layout_array(
     arraystretch: f64,
     add_jot: bool,
     row_gaps: &[Option<ratex_parser::parse_node::Measurement>],
-    _hlines: &[Vec<bool>],
+    hlines: &[Vec<bool>],
     col_sep_type: Option<&str>,
-    _hskip: bool,
+    hskip: bool,
     options: &LayoutOptions,
 ) -> LayoutBox {
     let metrics = options.metrics();
@@ -2066,9 +2069,9 @@ fn layout_array(
 
     let num_cols = body.iter().map(|r| r.len()).max().unwrap_or(0);
 
-    // Extract per-column alignment from cols spec (default to 'c').
+    // Extract per-column alignment and column separators from cols spec.
+    use ratex_parser::parse_node::AlignType;
     let col_aligns: Vec<u8> = {
-        use ratex_parser::parse_node::AlignType;
         let align_specs: Vec<&ratex_parser::parse_node::AlignSpec> = cols
             .map(|cs| {
                 cs.iter()
@@ -2086,6 +2089,29 @@ fn layout_array(
             })
             .collect()
     };
+
+    // Detect vertical separator ('|') positions in the column spec.
+    // col_separators[i] = true means there is a '|' at boundary i (0 = before col 0, num_cols = after last col).
+    let col_separators: Vec<bool> = {
+        let mut seps = vec![false; num_cols + 1];
+        let mut align_count = 0usize;
+        if let Some(cs) = cols {
+            for spec in cs {
+                match spec.align_type {
+                    AlignType::Align => align_count += 1,
+                    AlignType::Separator if spec.align.as_deref() == Some("|") => {
+                        if align_count <= num_cols {
+                            seps[align_count] = true;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        seps
+    };
+
+    let rule_thickness = 0.4 * pt;
 
     // Layout all cells
     let mut cell_boxes: Vec<Vec<LayoutBox>> = Vec::with_capacity(num_rows);
@@ -2149,12 +2175,22 @@ fn layout_array(
 
     let offset = total_height / 2.0 + metrics.axis_height;
 
-    // Total width
+    // Extra x padding before col 0 and after last col (hskip_before_and_after).
+    let content_x_offset = if hskip { col_gap / 2.0 } else { 0.0 };
+
+    // Total width including outer padding.
     let total_width: f64 = col_widths.iter().sum::<f64>()
-        + col_gap * (num_cols.saturating_sub(1)) as f64;
+        + col_gap * (num_cols.saturating_sub(1)) as f64
+        + 2.0 * content_x_offset;
 
     let height = offset;
     let depth = total_height - offset;
+
+    // Ensure hlines_before_row has num_rows + 1 entries.
+    let mut hlines_before_row: Vec<Vec<bool>> = hlines.to_vec();
+    while hlines_before_row.len() < num_rows + 1 {
+        hlines_before_row.push(vec![]);
+    }
 
     LayoutBox {
         width: total_width,
@@ -2168,6 +2204,10 @@ fn layout_array(
             row_depths: row_depths.clone(),
             col_gap,
             offset,
+            content_x_offset,
+            col_separators,
+            hlines_before_row,
+            rule_thickness,
         },
         color: options.color,
     }

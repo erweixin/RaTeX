@@ -300,7 +300,7 @@ fn make_glyph_stack_delim(kind: StackDelimKind, height_total: f64, options: &Lay
         shift: 0.0,
     };
     let bx = |lb: LayoutBox| VBoxChild {
-        kind: VBoxChildKind::Box(lb),
+        kind: VBoxChildKind::Box(Box::new(lb)),
         shift: 0.0,
     };
 

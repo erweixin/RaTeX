@@ -122,6 +122,16 @@ pub enum BoxContent {
         row_depths: Vec<f64>,
         col_gap: f64,
         offset: f64,
+        /// Extra x padding before the first column (= arraycolsep when hskip_before_and_after is true).
+        content_x_offset: f64,
+        /// For each column boundary (0 = before col 0, ..., num_cols = after last col),
+        /// whether there is a vertical rule separator ('|').
+        col_separators: Vec<bool>,
+        /// For each row boundary (0 = before row 0, ..., num_rows = after last row),
+        /// the list of hlines: false = solid, true = dashed.
+        hlines_before_row: Vec<Vec<bool>>,
+        /// Thickness of array rules in em.
+        rule_thickness: f64,
     },
 
     /// An SVG-style path (arrows, braces, etc.).
@@ -188,7 +198,7 @@ pub struct VBoxChild {
 
 #[derive(Debug, Clone)]
 pub enum VBoxChildKind {
-    Box(LayoutBox),
+    Box(Box<LayoutBox>),
     Kern(f64),
 }
 

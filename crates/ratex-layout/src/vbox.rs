@@ -78,7 +78,7 @@ mod tests {
     #[test]
     fn test_single_element_vbox() {
         let child = VBoxChild {
-            kind: VBoxChildKind::Box(make_test_box(1.0, 0.5, 0.2)),
+            kind: VBoxChildKind::Box(Box::new(make_test_box(1.0, 0.5, 0.2))),
             shift: 0.0,
         };
         let vbox = make_vbox(vec![child]);
@@ -89,7 +89,7 @@ mod tests {
     #[test]
     fn test_vbox_with_kern() {
         let child1 = VBoxChild {
-            kind: VBoxChildKind::Box(make_test_box(1.0, 0.5, 0.2)),
+            kind: VBoxChildKind::Box(Box::new(make_test_box(1.0, 0.5, 0.2))),
             shift: 0.0,
         };
         let kern = VBoxChild {
@@ -97,7 +97,7 @@ mod tests {
             shift: 0.0,
         };
         let child2 = VBoxChild {
-            kind: VBoxChildKind::Box(make_test_box(0.8, 0.3, 0.1)),
+            kind: VBoxChildKind::Box(Box::new(make_test_box(0.8, 0.3, 0.1))),
             shift: 0.0,
         };
         let vbox = make_vbox(vec![child1, kern, child2]);
@@ -109,7 +109,7 @@ mod tests {
     #[test]
     fn test_vbox_with_depth() {
         let child = VBoxChild {
-            kind: VBoxChildKind::Box(make_test_box(1.0, 0.8, 0.4)),
+            kind: VBoxChildKind::Box(Box::new(make_test_box(1.0, 0.8, 0.4))),
             shift: 0.0,
         };
         let vbox = make_vbox_with_depth(vec![child], 0.5);

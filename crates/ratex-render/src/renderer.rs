@@ -342,6 +342,11 @@ fn render_line(pixmap: &mut Pixmap, x: f32, y: f32, width: f32, thickness: f32, 
 }
 
 fn render_rect(pixmap: &mut Pixmap, x: f32, y: f32, width: f32, height: f32, color: &Color) {
+    // Clamp to at least 2px: with width=1px at a fractional pixel position, fill_dot8's
+    // dot-8 fixed-point arithmetic can produce inner_width=0 and trigger a debug_assert.
+    // 2px guarantees at least 1 full interior pixel regardless of sub-pixel alignment.
+    let width = width.max(2.0);
+    let height = height.max(2.0);
     let rect = tiny_skia::Rect::from_xywh(x, y, width, height);
     if let Some(rect) = rect {
         let mut paint = Paint::default();

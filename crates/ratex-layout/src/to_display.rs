@@ -349,12 +349,61 @@ fn emit_box(lbox: &LayoutBox, x: f64, y: f64, scale: f64, items: &mut Vec<Displa
             row_depths,
             col_gap,
             offset,
+            content_x_offset,
+            col_separators,
+            hlines_before_row,
+            rule_thickness,
         } => {
-            let mut cur_y = y - offset * scale;
+            let y_top = y - offset * scale;
+            let array_total_height = (lbox.height + lbox.depth) * scale;
+            let line_thickness = rule_thickness * scale;
+
+            // Compute y positions of row boundaries (0 = top of array, num_rows = bottom).
+            let mut boundary_ys: Vec<f64> = Vec::with_capacity(cells.len() + 1);
+            let mut cur_boundary = y_top;
+            boundary_ys.push(cur_boundary);
+            for r in 0..cells.len() {
+                cur_boundary += (row_heights[r] + row_depths[r]) * scale;
+                boundary_ys.push(cur_boundary);
+            }
+
+            // Draw horizontal lines (hlines) before/after each row.
+            for (r, hlines) in hlines_before_row.iter().enumerate() {
+                if r < boundary_ys.len() && !hlines.is_empty() {
+                    items.push(DisplayItem::Line {
+                        x,
+                        y: boundary_ys[r],
+                        width: lbox.width * scale,
+                        thickness: line_thickness,
+                        color: lbox.color,
+                    });
+                }
+            }
+
+            // Draw vertical column separator lines ('|').
+            // Separator at position i has local x = content_x_offset - col_gap/2 + sum(col_widths[..i]) + col_gap * i.
+            let col_gap_half = col_gap / 2.0;
+            for (i, &has_sep) in col_separators.iter().enumerate() {
+                if has_sep {
+                    let prefix_w: f64 = col_widths[..i].iter().sum();
+                    let local_x = content_x_offset - col_gap_half + prefix_w + col_gap * i as f64;
+                    let abs_x = x + local_x * scale - line_thickness / 2.0;
+                    items.push(DisplayItem::Rect {
+                        x: abs_x,
+                        y: y_top,
+                        width: line_thickness,
+                        height: array_total_height,
+                        color: lbox.color,
+                    });
+                }
+            }
+
+            // Render cells.
+            let mut cur_y = y_top;
             for (r, row) in cells.iter().enumerate() {
                 let rh = row_heights[r];
                 cur_y += rh * scale;
-                let mut cur_x = x;
+                let mut cur_x = x + content_x_offset * scale;
                 for (c, cell) in row.iter().enumerate() {
                     let cw = col_widths[c];
                     let align = col_aligns.get(c).copied().unwrap_or(b'c');
