@@ -9,7 +9,7 @@
 Parse LaTeX, lay it out with TeX rules, and render it natively on any platform. Glue layers are ready — use out of the box on every platform.
 
 ```
-\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}   →   iOS · Android · Flutter · React Native · Web · PNG
+\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}   →   iOS · Android · Flutter · React Native · Web · PNG · SVG
 ```
 
 ---
@@ -44,6 +44,7 @@ RaTeX cuts the web stack out entirely. One Rust core, one display list, every pl
 - **Platform glue layers**: iOS / Android / Flutter / React Native bindings ready — **out of the box**
 - **WASM** (`ratex-wasm`) for drop-in browser use via `<ratex-formula>` Web Component
 - **Server-side PNG** via tiny-skia — no browser needed
+- **SVG export** (`ratex-svg`) — vector output, self-contained or KaTeX-webfont-based
 
 **[→ Live Demo](https://erweixin.github.io/RaTeX/demo/live.html)** — type LaTeX and compare RaTeX (Rust/WASM) vs KaTeX side-by-side ·
 **[→ Support table](https://erweixin.github.io/RaTeX/demo/support-table.html)** — RaTeX vs KaTeX across all 916 test formulas
@@ -99,10 +100,12 @@ flowchart LR
     subgraph output[" "]
         F[Native render<br/>iOS / Android / Flutter / RN]
         G[ratex-render<br/>PNG]
+        H[ratex-svg<br/>SVG]
     end
     A --> B --> C --> D --> E
     E --> F
     E --> G
+    E --> H
 ```
 
 ### Data flow (detailed)
@@ -126,6 +129,7 @@ flowchart TB
     DL --> FFI[ratex-ffi<br/>C ABI]
     DL --> RENDER[ratex-render<br/>tiny-skia → PNG]
     DL --> WASM[ratex-wasm<br/>JSON for web]
+    DL --> SVG[ratex-svg<br/>SVG]
 ```
 
 - **ratex-lexer**: Turns the LaTeX source string into a stream of tokens (commands, braces, symbols, etc.).
@@ -135,6 +139,7 @@ flowchart TB
   - **ratex-ffi**: Exposes the pipeline via C ABI for iOS/Android/RN/Flutter to render natively.
   - **ratex-render**: Rasterizes the display list to PNG using tiny-skia (server-side).
   - **ratex-wasm**: Exposes the same pipeline to the browser; returns DisplayList as JSON for Canvas 2D (or other) rendering.
+  - **ratex-svg**: Converts the display list to SVG — either referencing KaTeX webfonts (`<text>` elements) or embedding glyph outlines as `<path>` for a fully self-contained file.
 
 ### Crate roles
 
@@ -148,6 +153,7 @@ flowchart TB
 | `ratex-render` | Server-side only: rasterize DisplayList to PNG (tiny-skia + ab_glyph). |
 | `ratex-ffi`    | C ABI: full pipeline → DisplayList for iOS, Android, RN, Flutter to render natively. |
 | `ratex-wasm`   | WebAssembly: parse + layout → DisplayList as JSON for browser rendering. |
+| `ratex-svg`    | SVG export: DisplayList → SVG string (webfont `<text>` or embedded `<path>` outlines). |
 
 ### Text pipeline (summary)
 
@@ -165,6 +171,8 @@ ratex-ffi     → display list (iOS / Android / RN / Flutter → native render)
 ratex-render  → server-side rasterize to PNG (tiny-skia)
         or
 ratex-wasm    → DisplayList JSON (web)
+        or
+ratex-svg     → SVG string (vector output)
 ```
 
 ## Quick start
@@ -187,6 +195,20 @@ echo '\sum_{i=1}^n i = \frac{n(n+1)}{2}' | cargo run --release -p ratex-render -
   --font-dir /path/to/katex/fonts \
   --output-dir ./out
 ```
+
+### Render to SVG
+
+```bash
+# Default: glyphs as <text> elements (requires KaTeX webfonts to display correctly)
+echo '\frac{1}{2} + \sqrt{x}' | cargo run --release -p ratex-svg --features cli
+
+# Self-contained SVG: embed glyph outlines as <path> (no external fonts needed)
+echo '\sum_{i=1}^n i = \frac{n(n+1)}{2}' | cargo run --release -p ratex-svg --features cli -- \
+  --font-dir /path/to/katex/fonts \
+  --output-dir ./out
+```
+
+The `standalone` feature (enabled by `cli`) embeds glyph outlines from KaTeX TTF files, producing SVG files that render correctly without any CSS or web fonts.
 
 ### Use in the browser (WASM)
 
@@ -237,6 +259,7 @@ cargo test --all
 | `ratex-ffi` | C ABI: exposes the full pipeline for native platforms |
 | `ratex-wasm` | WASM: pipeline → DisplayList JSON for the browser |
 | `ratex-render` | Server-side: DisplayList → PNG (tiny-skia) |
+| `ratex-svg` | SVG export: DisplayList → SVG string (vector output) |
 
 ---
 

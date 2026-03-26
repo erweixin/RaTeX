@@ -28,7 +28,8 @@ RaTeX/
 │   ├── ratex-layout/             # AST → LayoutBox → DisplayList
 │   ├── ratex-ffi/                # C ABI: LaTeX → DisplayList JSON (+ Android JNI)
 │   ├── ratex-render/             # DisplayList → PNG (tiny-skia, server-side)
-│   └── ratex-wasm/               # WASM: LaTeX → DisplayList JSON (browser)
+│   ├── ratex-wasm/               # WASM: LaTeX → DisplayList JSON (browser)
+│   └── ratex-svg/                # SVG export: DisplayList → SVG string (vector output)
 │
 ├── platforms/
 │   ├── ios/                      # Swift + XCFramework + CoreGraphics
@@ -80,6 +81,7 @@ members = [
     "crates/ratex-ffi",
     "crates/ratex-render",
     "crates/ratex-wasm",
+    "crates/ratex-svg",
 ]
 
 [workspace.package]
@@ -115,6 +117,7 @@ serde_json = "1.0"
 | **ratex-ffi** | C ABI: `ratex_parse_and_layout` → DisplayList JSON; Android `jni` module when targeting Android |
 | **ratex-render** | DisplayList → PNG via tiny-skia + ab_glyph (server/CI) |
 | **ratex-wasm** | WASM: parse + layout → DisplayList JSON for browser |
+| **ratex-svg** | SVG export: DisplayList → SVG string; `standalone` feature embeds glyph `<path>` outlines from KaTeX TTF files; `cli` feature adds `render-svg` binary |
 
 ---
 
@@ -190,6 +193,31 @@ WASM crate; exports `renderLatex(latex: string) => string` (DisplayList JSON). C
 
 ---
 
+## ratex-svg
+
+SVG export crate. Converts a `DisplayList` into an SVG string via `render_to_svg(list, opts)`.
+
+```
+crates/ratex-svg/
+├── Cargo.toml
+└── src/
+    ├── lib.rs           # render_to_svg + SvgOptions; GlyphPath→<text>, Line/Rect→<rect>, Path→<path>
+    ├── standalone.rs    # (feature=standalone) load KaTeX TTF, convert glyph outlines to <path> data
+    └── bin/
+        └── render_svg.rs  # CLI binary (feature=cli): stdin LaTeX → SVG files
+```
+
+**Features:**
+
+| Feature | Description |
+|---------|-------------|
+| `standalone` | Embed glyph outlines as `<path>` using `ab_glyph` (requires KaTeX TTF files). Produces self-contained SVGs with no external font dependency. |
+| `cli` | Enables the `render-svg` binary (implies `standalone` + pulls in `ratex-layout` / `ratex-parser`). |
+
+**`SvgOptions` fields:** `font_size` (em units, default 40.0), `padding` (default 10.0), `stroke_width` (default 1.5), `embed_glyphs` (use `<path>` outlines), `font_dir` (KaTeX TTF directory for standalone mode).
+
+---
+
 ## Dependency graph
 
 ```
@@ -205,7 +233,8 @@ ratex-layout
     ↑
     ├── ratex-ffi    (C ABI for native)
     ├── ratex-render (PNG)
-    └── ratex-wasm   (browser JSON)
+    ├── ratex-wasm   (browser JSON)
+    └── ratex-svg    (SVG vector output)
     ↑
 platforms/ (ios, android, flutter, react-native, web)
 ```
