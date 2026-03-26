@@ -258,7 +258,7 @@ fn layout_node(node: &ParseNode, options: &LayoutOptions) -> LayoutBox {
         }
 
         ParseNode::Color { color, body, .. } => {
-            let new_color = Color::from_name(color).unwrap_or(options.color);
+            let new_color = Color::parse(color).unwrap_or(options.color);
             let new_opts = options.with_color(new_color);
             let mut lbox = layout_expression(body, &new_opts, true);
             lbox.color = new_color;

@@ -1,5 +1,13 @@
 use serde::{Deserialize, Serialize};
 
+fn parse_csv_f32(s: &str, expected: usize) -> Option<Vec<f32>> {
+    let parts: Vec<&str> = s.split(',').collect();
+    if parts.len() != expected {
+        return None;
+    }
+    parts.iter().map(|p| p.trim().parse::<f32>().ok()).collect()
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Color {
     pub r: f32,
@@ -57,6 +65,49 @@ impl Color {
             }
             _ => None,
         }
+    }
+
+    /// Parse a color from a MathJax color model + value string.
+    /// Model is case-sensitive per MathJax spec:
+    ///   RGB  → integers 0-255  e.g. "178,34,34"
+    ///   rgb  → floats 0-1      e.g. "0.7,0.13,0.13"
+    ///   HTML → hex RRGGBB      e.g. "B22222"
+    ///   gray → float 0-1       e.g. "0.5"
+    ///   cmyk → floats 0-1      e.g. "0,0.8,0.8,0"
+    pub fn from_model(model: &str, value: &str) -> Option<Self> {
+        match model {
+            "RGB" => {
+                let p = parse_csv_f32(value, 3)?;
+                Some(Self::rgb(p[0] / 255.0, p[1] / 255.0, p[2] / 255.0))
+            }
+            "rgb" => {
+                let p = parse_csv_f32(value, 3)?;
+                Some(Self::rgb(p[0], p[1], p[2]))
+            }
+            "HTML" => Self::from_hex(value),
+            "gray" => {
+                let g: f32 = value.trim().parse().ok()?;
+                Some(Self::rgb(g, g, g))
+            }
+            "cmyk" => {
+                let p = parse_csv_f32(value, 4)?;
+                let (c, m, y, k) = (p[0], p[1], p[2], p[3]);
+                Some(Self::rgb((1.0 - c) * (1.0 - k), (1.0 - m) * (1.0 - k), (1.0 - y) * (1.0 - k)))
+            }
+            _ => None,
+        }
+    }
+
+    /// Parse any supported color string: hex, named, or `[MODEL]value` (MathJax model syntax).
+    pub fn parse(s: &str) -> Option<Self> {
+        if let Some(rest) = s.strip_prefix('[') {
+            if let Some(bracket_end) = rest.find(']') {
+                let model = &rest[..bracket_end];
+                let value = &rest[bracket_end + 1..];
+                return Self::from_model(model, value);
+            }
+        }
+        Self::from_hex(s).or_else(|| Self::from_name(s))
     }
 
     /// Parse a named CSS color (subset used by KaTeX).
@@ -172,5 +223,63 @@ mod tests {
         assert!((c.r - c2.r).abs() < f32::EPSILON);
         assert!((c.g - c2.g).abs() < f32::EPSILON);
         assert!((c.b - c2.b).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_parse_hex() {
+        let c = Color::parse("#0000ff").unwrap();
+        assert!(c.r.abs() < 0.01);
+        assert!(c.g.abs() < 0.01);
+        assert!((c.b - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_parse_name() {
+        let c = Color::parse("red").unwrap();
+        assert!((c.r - 1.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_from_model_rgb() {
+        let c = Color::from_model("RGB", "178,34,34").unwrap();
+        assert!((c.r - 178.0 / 255.0).abs() < 0.01);
+        assert!((c.g - 34.0 / 255.0).abs() < 0.01);
+        assert!((c.b - 34.0 / 255.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_from_model_rgb_lower() {
+        let c = Color::from_model("rgb", "0.7,0.13,0.13").unwrap();
+        assert!((c.r - 0.7).abs() < 0.01);
+        assert!((c.g - 0.13).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_from_model_html() {
+        let c = Color::from_model("HTML", "B22222").unwrap();
+        assert!((c.r - 178.0 / 255.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_from_model_gray() {
+        let c = Color::from_model("gray", "0.5").unwrap();
+        assert!((c.r - 0.5).abs() < 0.01);
+        assert!((c.g - 0.5).abs() < 0.01);
+        assert!((c.b - 0.5).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_from_model_cmyk() {
+        // cmyk 0,0.8,0.8,0 → r=1, g=0.2, b=0.2
+        let c = Color::from_model("cmyk", "0,0.8,0.8,0").unwrap();
+        assert!((c.r - 1.0).abs() < 0.01);
+        assert!((c.g - 0.2).abs() < 0.01);
+        assert!((c.b - 0.2).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_parse_model_encoded() {
+        let c = Color::parse("[RGB]178,34,34").unwrap();
+        assert!((c.r - 178.0 / 255.0).abs() < 0.01);
     }
 }

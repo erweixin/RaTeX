@@ -5,13 +5,13 @@ use crate::functions::{define_function_full, ArgType, FunctionContext, FunctionS
 use crate::parse_node::ParseNode;
 
 pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
-    // \textcolor{color}{body}
+    // \textcolor[model]{color}{body}  (model is optional, MathJax extension)
     define_function_full(
         map,
         &["\\textcolor"],
         "color",
-        2, 0,
-        Some(vec![ArgType::Color, ArgType::Original]),
+        2, 1,
+        Some(vec![ArgType::Raw, ArgType::Color, ArgType::Original]),
         false,
         true,  // allowed_in_text
         true,
@@ -19,13 +19,13 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         handle_textcolor,
     );
 
-    // \color{color} (applies to rest of group)
+    // \color[model]{color}  (model is optional, MathJax extension)
     define_function_full(
         map,
         &["\\color"],
         "color",
-        1, 0,
-        Some(vec![ArgType::Color]),
+        1, 1,
+        Some(vec![ArgType::Raw, ArgType::Color]),
         false,
         true,
         true,
@@ -65,9 +65,9 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
 fn handle_textcolor(
     ctx: &mut FunctionContext,
     args: Vec<ParseNode>,
-    _opt_args: Vec<Option<ParseNode>>,
+    opt_args: Vec<Option<ParseNode>>,
 ) -> ParseResult<ParseNode> {
-    let color = extract_color(&args[0])?;
+    let color = encode_color(extract_color(&args[0])?, &opt_args);
     let body = ParseNode::ord_argument(args[1].clone());
 
     Ok(ParseNode::Color {
@@ -81,9 +81,9 @@ fn handle_textcolor(
 fn handle_color(
     ctx: &mut FunctionContext,
     args: Vec<ParseNode>,
-    _opt_args: Vec<Option<ParseNode>>,
+    opt_args: Vec<Option<ParseNode>>,
 ) -> ParseResult<ParseNode> {
-    let color = extract_color(&args[0])?;
+    let color = encode_color(extract_color(&args[0])?, &opt_args);
     let break_on = ctx.break_on_token_text.clone();
     let body = ctx
         .parser
@@ -140,4 +140,15 @@ fn extract_color(node: &ParseNode) -> ParseResult<String> {
     } else {
         Err(ParseError::msg("Expected color token"))
     }
+}
+
+/// When a MathJax color model opt-arg is present, encode as `[MODEL]value`.
+fn encode_color(value: String, opt_args: &[Option<ParseNode>]) -> String {
+    if let Some(Some(ParseNode::Raw { string: model, .. })) = opt_args.first() {
+        let model = model.trim();
+        if !model.is_empty() {
+            return format!("[{}]{}", model, value);
+        }
+    }
+    value
 }

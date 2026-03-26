@@ -661,7 +661,7 @@ impl<'a> Parser<'a> {
             Some(token) => {
                 let text = token.text.trim().to_string();
                 let re = regex_lite::Regex::new(
-                    r"^(#[a-fA-F0-9]{3,4}|#[a-fA-F0-9]{6}|#[a-fA-F0-9]{8}|[a-fA-F0-9]{6}|[a-zA-Z]+)$",
+                    r"^(#[a-fA-F0-9]{3,4}|#[a-fA-F0-9]{6}|#[a-fA-F0-9]{8}|[a-fA-F0-9]{6}|[a-zA-Z]+|\d+(\.\d+)?(,\d+(\.\d+)?)*)$",
                 )
                 .unwrap();
 
