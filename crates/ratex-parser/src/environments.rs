@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::error::{ParseError, ParseResult};
+use crate::macro_expander::MacroDefinition;
 use crate::parse_node::{AlignSpec, AlignType, Measurement, Mode, ParseNode, StyleStr};
 use crate::parser::Parser;
 
@@ -97,7 +98,22 @@ pub fn parse_array(
             .set_text_macro("\\cr", "\\\\\\relax");
     }
 
-    let arraystretch = config.arraystretch.unwrap_or(1.0);
+    let arraystretch = config.arraystretch.unwrap_or_else(|| {
+        // Check if \arraystretch is defined as a macro (e.g., via \def\arraystretch{1.5})
+        if let Some(def) = parser.gullet.get_macro("\\arraystretch") {
+            let s = match def {
+                MacroDefinition::Text(s) => s.clone(),
+                MacroDefinition::Tokens { tokens, .. } => {
+                    // Tokens are stored in reverse order (stack convention for expansion)
+                    tokens.iter().rev().map(|t| t.text.as_str()).collect::<String>()
+                }
+                MacroDefinition::Function(_) => String::new(),
+            };
+            s.parse::<f64>().unwrap_or(1.0)
+        } else {
+            1.0
+        }
+    });
 
     parser.gullet.begin_group();
 

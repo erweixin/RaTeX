@@ -24,3 +24,7 @@ jobs:
         run: cargo clippy --workspace -- -D warnings
       - name: Test
         run: cargo test --workspace
+      - name: Test ratex-svg (standalone + resvg golden)
+        run: cargo test -p ratex-svg --features standalone
+      - name: Clippy ratex-svg standalone
+        run: cargo clippy -p ratex-svg --features standalone -- -D warnings

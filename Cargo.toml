@@ -8,6 +8,7 @@ members = [
     "crates/ratex-layout",
     "crates/ratex-ffi",
     "crates/ratex-render",
+    "crates/ratex-svg",
     "crates/ratex-wasm",
 ]
 
@@ -26,6 +27,7 @@ ratex-font   = { path = "crates/ratex-font", version = "0.0.11" }
 ratex-lexer  = { path = "crates/ratex-lexer", version = "0.0.11" }
 ratex-parser = { path = "crates/ratex-parser", version = "0.0.11" }
 ratex-layout = { path = "crates/ratex-layout", version = "0.0.11" }
+ratex-svg    = { path = "crates/ratex-svg", version = "0.0.11" }
 
 phf        = { version = "0.11", features = ["macros"] }
 thiserror  = "1.0"

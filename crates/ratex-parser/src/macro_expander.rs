@@ -294,7 +294,7 @@ impl<'a> MacroExpander<'a> {
             ("\\llbracket", "\\mathopen{[\\mkern-3.2mu[}"),
             ("\\rrbracket", "\\mathclose{]\\mkern-3.2mu]}"),
             ("\\copyright", "\\textcircled{c}"),
-            ("\\textregistered", "\u{00AE}"),
+            ("\\textregistered", "\\textcircled{\\scriptsize R}"),
 
             // ── dddot / ddddot ──
             ("\\dddot", "{\\overset{\\raisebox{-0.1ex}{\\normalsize ...}}{#1}}"),

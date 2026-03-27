@@ -13,6 +13,7 @@ import SwiftUI
 /// view.fontSize = 28
 /// ```
 @MainActor
+@objcMembers
 public class RaTeXView: UIView {
 
     // MARK: Public properties
@@ -33,6 +34,12 @@ public class RaTeXView: UIView {
     /// Called after each successful render with the formula's ascent and total
     /// height in points.
     public var onLayout: ((CGFloat, CGFloat) -> Void)?
+
+    /// Distance from top to baseline (points).
+    public private(set) var mathAscent: CGFloat = 0
+
+    /// Distance from baseline to bottom (points).
+    public private(set) var mathDescent: CGFloat = 0
 
     // MARK: Private state
 
@@ -93,6 +100,8 @@ public class RaTeXView: UIView {
         do {
             let dl = try RaTeXEngine.shared.parse(latex)
             renderer = RaTeXRenderer(displayList: dl, fontSize: fontSize)
+            mathAscent  = renderer?.height ?? 0
+            mathDescent = renderer?.depth  ?? 0
             let ascent      = renderer?.height      ?? 0
             let totalHeight = renderer?.totalHeight ?? 0
             baselineMarker.frame = CGRect(x: 0, y: ascent, width: 1, height: 0)
@@ -100,6 +109,8 @@ public class RaTeXView: UIView {
             setNeedsDisplay()
             onLayout?(ascent, totalHeight)
         } catch {
+            mathAscent  = 0
+            mathDescent = 0
             onError?(error)
         }
     }

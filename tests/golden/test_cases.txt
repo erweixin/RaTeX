@@ -952,3 +952,4 @@ f^{(n)}(x) = \dfrac{\mathrm{d}^n f}{\mathrm{d}x^n}
 \tilde{\mathrm{e}}^{\mathrm{i}\pi}+1=0
 \utilde{EF} + \widehat{GH}
 \begin{array}{|c|c|} \hline 1 & 2 \\ \hline 3 & 4 \\ \hline \end{array}
+\frac{-b \pm \sqrt{b^2-4ac}}{2a}

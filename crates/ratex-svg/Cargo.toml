@@ -1,0 +1,39 @@
+[package]
+name = "ratex-svg"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+description = "SVG export for RaTeX DisplayList (vector output, optional KaTeX webfonts)"
+
+[features]
+default = []
+## Embed glyphs as `<path>` outlines (`ab_glyph`); requires [`SvgOptions::font_dir`] with KaTeX `.ttf` files.
+standalone = ["dep:ab_glyph", "dep:ratex-font"]
+## `render-svg` binary: parse + layout from stdin (needs `standalone` for outlined glyphs).
+cli = ["dep:ratex-layout", "dep:ratex-parser"]
+
+[dependencies]
+ratex-types = { workspace = true }
+ab_glyph = { version = "0.2", optional = true }
+ratex-font = { workspace = true, optional = true }
+ratex-layout = { workspace = true, optional = true }
+ratex-parser = { workspace = true, optional = true }
+
+[[bin]]
+name = "render-svg"
+path = "src/bin/render_svg.rs"
+required-features = ["cli", "standalone"]
+
+[dev-dependencies]
+ratex-layout = { workspace = true }
+ratex-parser = { workspace = true }
+png = "0.17"
+resvg = { version = "0.47", default-features = false }
+
+[[test]]
+name = "golden_svg"
+path = "tests/golden_svg.rs"
+required-features = ["standalone"]

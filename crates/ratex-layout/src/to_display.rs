@@ -248,9 +248,17 @@ fn emit_box(lbox: &LayoutBox, x: f64, y: f64, scale: f64, items: &mut Vec<Displa
                 .map(|m| (m.width, m.height, m.depth))
                 .unwrap_or((radical_width, lbox.height, lbox.depth));
             let commands = glyph_placeholder_commands(gw, gh, gd);
+
+            // Shift the surd glyph up so its top bar aligns with the vinculum.
+            // The layout places the vinculum at `lbox.height` above the baseline, but the
+            // font glyph height `gh` can be less than `lbox.height - rule_thickness`, causing
+            // the glyph's bar to sit too close to the body content. We shift the glyph up by
+            // the difference so the bar top is exactly at `lbox.height - rule_thickness`.
+            let surd_shift = lbox.height - rule_thickness - gh;
+            let surd_y = y - surd_shift * scale;
             items.push(DisplayItem::GlyphPath {
                 x: surd_x,
-                y,
+                y: surd_y,
                 scale,
                 font: surd_font.as_str().to_string(),
                 char_code: SURD_CHAR,
@@ -258,11 +266,9 @@ fn emit_box(lbox: &LayoutBox, x: f64, y: f64, scale: f64, items: &mut Vec<Displa
                 color: lbox.color,
             });
 
-            // Horizontal vinculum: align with the surd glyph's top bar (KaTeX uses SVG paths
-            // that join the stem; we extend a separate rule). Center the rule on the bar:
-            // ~one rule-thickness below the glyph bbox top (y - gh), not on `lbox.height`
-            // (layout box can differ slightly from font outline ascent).
-            let line_center_y = y - gh * scale + (rule_thickness * scale) / 2.0;
+            // Vinculum: a horizontal rule extending the glyph's top bar over the body.
+            // Center it on the glyph's top bar position.
+            let line_center_y = surd_y - gh * scale + (rule_thickness * scale) / 2.0;
             items.push(DisplayItem::Line {
                 x: surd_x + radical_width * scale,
                 y: line_center_y,
