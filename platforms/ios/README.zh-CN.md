@@ -65,9 +65,9 @@ bash platforms/ios/build-ios.sh
 
 ### 方式 A — Swift Package Manager（推荐）
 
-**已发布版本** — 在 Xcode 中：**File → Add Package Dependencies**，输入 GitHub 仓库 URL，选择 `RaTeX` 产品。字体会在首次渲染时自动加载；可选在启动时调用 `RaTeXFontLoader.loadFromPackageBundle()` 提前加载。
+在 Xcode 中：**File → Add Package Dependencies**，输入 `https://github.com/erweixin/RaTeX`，选择 `RaTeX` 产品。
 
-**本地开发** — 构建好 XCFramework 后，在 Xcode 中指向仓库根目录（**File → Add Package Dependencies → Add Local…**）。
+**本地开发** — 先执行 `bash platforms/ios/build-ios.sh`，然后在 Xcode 中通过 **File → Add Package Dependencies → Add Local…** 指向仓库根目录。
 
 ### 方式 B — 手动集成
 
@@ -99,7 +99,7 @@ NSLayoutConstraint.activate([
 ])
 ```
 
-### SwiftUI
+### SwiftUI — 块级公式
 
 ```swift
 import RaTeX
@@ -114,6 +114,37 @@ struct ContentView: View {
     }
 }
 ```
+
+### SwiftUI — 行内公式（文字 + LaTeX 混排）
+
+使用自定义 `FlowLayout`（SwiftUI `Layout`）将 `Text` 与 `RaTeXFormula` 并排排列，自动换行。基线对齐通过库内置的 `RaTeXFormulaAscentKey` 布局值实现，无需两次测量。
+
+```swift
+import RaTeX
+
+struct InlineExample: View {
+    private let fs: CGFloat = 17
+
+    var body: some View {
+        FlowLayout(horizontalSpacing: 3, lineSpacing: 6) {
+            Text("由勾股定理")
+            RaTeXFormula(latex: #"a^2 + b^2 = c^2"#, fontSize: fs, onError: { _ in })
+            Text("可直接求得斜边长度。")
+        }
+    }
+}
+
+// FlowLayout：水平排列子视图，自动换行，基线对齐。
+// 读取 RaTeXFormulaAscentKey 获取公式基线；Text 视图回退到 firstTextBaseline。
+struct FlowLayout: Layout {
+    var horizontalSpacing: CGFloat = 4
+    var lineSpacing: CGFloat = 6
+
+    // ... 完整实现见 demo/ios
+}
+```
+
+`RaTeXFormulaAscentKey` 是库内置的 `LayoutValueKey<CGFloat>`，携带公式的 ascent（基线到顶部的距离），供 `FlowLayout` 在混排时对齐，无需手动计算偏移量。
 
 ### 底层自定义绘制
 

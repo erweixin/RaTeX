@@ -1,6 +1,6 @@
 # RaTeX — Flutter 集成说明
 
-通过 Dart FFI 与 CustomPainter 在 Flutter 中原生渲染 LaTeX 数学公式。  
+通过 Dart FFI 与 CustomPainter 在 Flutter 中原生渲染 LaTeX 数学公式。
 无 WebView、无 JavaScript。
 
 ---
@@ -21,8 +21,9 @@ CustomPaint Widget
 
 ## 开箱即用
 
-1. **添加依赖** — 在 `pubspec.yaml` 中：`ratex_flutter: ^0.0.3`，然后执行 `flutter pub get`。无需自行编译原生库，发布包内已含 Android `.so` 与 iOS XCFramework。
-2. **使用** — 直接使用 `RaTeXWidget`：
+1. **添加依赖** — 在 `pubspec.yaml` 中：`ratex_flutter: ^0.0.12`，然后执行 `flutter pub get`。无需自行编译原生库，发布包内已含 Android `.so` 与 iOS XCFramework。
+2. **注册字体** — Flutter 不会自动为宿主应用注册插件字体。请将 [KaTeX 字体声明](#字体配置) 复制到你的 `pubspec.yaml`（见下方安装说明）。
+3. **使用** — 直接使用 `RaTeXWidget`：
    ```dart
    RaTeXWidget(
      latex: r'\frac{-b \pm \sqrt{b^2-4ac}}{2a}',
@@ -41,10 +42,76 @@ CustomPaint Widget
 
 ```yaml
 dependencies:
-  ratex_flutter: ^0.0.3
+  ratex_flutter: ^0.0.12
 ```
 
 然后执行 `flutter pub get`。无需本地构建 — 已发布包内含预编译的 Android `.so` 与 iOS `RaTeX.xcframework`。
+
+#### 字体配置
+
+Flutter 要求宿主应用显式声明来自插件包的字体（[Flutter 文档](https://docs.flutter.dev/cookbook/design/package-fonts#from-a-package)）。请将以下内容添加到 `pubspec.yaml` 的 `flutter:` 节：
+
+```yaml
+flutter:
+  fonts:
+    - family: KaTeX_AMS
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_AMS-Regular.ttf
+    - family: KaTeX_Caligraphic
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Caligraphic-Regular.ttf
+        - asset: packages/ratex_flutter/fonts/KaTeX_Caligraphic-Bold.ttf
+          weight: 700
+    - family: KaTeX_Fraktur
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Fraktur-Regular.ttf
+        - asset: packages/ratex_flutter/fonts/KaTeX_Fraktur-Bold.ttf
+          weight: 700
+    - family: KaTeX_Main
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Main-Regular.ttf
+        - asset: packages/ratex_flutter/fonts/KaTeX_Main-Bold.ttf
+          weight: 700
+        - asset: packages/ratex_flutter/fonts/KaTeX_Main-Italic.ttf
+          style: italic
+        - asset: packages/ratex_flutter/fonts/KaTeX_Main-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: KaTeX_Math
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Math-Italic.ttf
+          style: italic
+        - asset: packages/ratex_flutter/fonts/KaTeX_Math-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: KaTeX_SansSerif
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_SansSerif-Regular.ttf
+        - asset: packages/ratex_flutter/fonts/KaTeX_SansSerif-Bold.ttf
+          weight: 700
+        - asset: packages/ratex_flutter/fonts/KaTeX_SansSerif-Italic.ttf
+          style: italic
+    - family: KaTeX_Script
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Script-Regular.ttf
+    - family: KaTeX_Typewriter
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Typewriter-Regular.ttf
+    - family: KaTeX_Size1
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Size1-Regular.ttf
+    - family: KaTeX_Size2
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Size2-Regular.ttf
+    - family: KaTeX_Size3
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Size3-Regular.ttf
+    - family: KaTeX_Size4
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Size4-Regular.ttf
+```
+
+若跳过此步骤，`RaTeXPainter` 会静默回退到系统字体，公式渲染将出现异常。
 
 ### 从本地路径（开发）
 
@@ -98,6 +165,51 @@ final painter = RaTeXPainter(displayList: dl, fontSize: 24);
 
 // 在 CustomPaint 中：
 CustomPaint(painter: painter, size: Size(painter.widthPx, painter.totalHeightPx))
+```
+
+### 行内公式（文字 + LaTeX 混排）
+
+Flutter 推荐使用 `RichText` + `WidgetSpan` 实现行内公式混排。使用 `PlaceholderAlignment.middle` 进行垂直居中对齐：
+
+```dart
+import 'package:flutter/material.dart';
+import 'package:ratex_flutter/ratex_flutter.dart';
+
+/// 解析含 `$...$` 行内数学标记的 [text]，返回交织了普通 [TextSpan] 与 [WidgetSpan] 的 [RichText]。
+Widget buildInlineMath(String text, {double mathFontSize = 18, TextStyle? textStyle}) {
+  final style = textStyle ??
+      const TextStyle(fontSize: 16, height: 1.8, color: Colors.black87);
+
+  final parts = text.split(r'$');
+  final spans = <InlineSpan>[];
+
+  for (int i = 0; i < parts.length; i++) {
+    if (parts[i].isEmpty) continue;
+    if (i.isEven) {
+      // 普通文本
+      spans.add(TextSpan(text: parts[i], style: style));
+    } else {
+      // 行内公式
+      spans.add(WidgetSpan(
+        alignment: PlaceholderAlignment.middle,
+        baseline: TextBaseline.alphabetic,
+        child: RaTeXWidget(
+          latex: parts[i],
+          fontSize: mathFontSize,
+          onError: (e) => debugPrint('RaTeX inline error: $e'),
+          loading: const SizedBox.shrink(),
+        ),
+      ));
+    }
+  }
+
+  return RichText(text: TextSpan(children: spans));
+}
+
+// 用法：
+buildInlineMath(
+  r'质能等价关系 $E = mc^2$，其中光速 $c \approx 3\times10^8\ \text{m/s}$。',
+)
 ```
 
 ### 异步（大公式）
@@ -160,4 +272,4 @@ final dl = await compute(
    dart pub publish
    ```
 
-   **CI**：推送版本 tag（如 `v0.0.4`）会触发 [release-flutter.yml](https://github.com/erweixin/RaTeX/blob/main/.github/workflows/release-flutter.yml)：构建 Android 与 iOS 原生库、注入本包并执行 `dart pub publish`。请确保 tag 与 `pubspec.yaml` 中的 `version` 一致。仓库需配置 Secret：`PUB_DEV_TOKEN`（在 https://pub.dev/settings/tokens 创建）。
+   **CI**：推送版本 tag（如 `v{VERSION}`）会触发 [release-flutter.yml](https://github.com/erweixin/RaTeX/blob/main/.github/workflows/release-flutter.yml)：构建 Android 与 iOS 原生库、注入本包并执行 `dart pub publish`。请确保 tag 与 `pubspec.yaml` 中的 `version` 一致。仓库需配置 Secret：`PUB_DEV_TOKEN`（在 https://pub.dev/settings/tokens 创建）。

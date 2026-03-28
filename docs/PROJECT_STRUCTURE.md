@@ -60,6 +60,7 @@ RaTeX/
 │       ├── test_case_ce.txt       # mhchem \\ce / \\pu examples (fixtures_ce/ refs); parser uses Rust mhchem
 │
 ├── scripts/
+│   ├── set-version.sh             # Sync version to all platform manifests
 │   └── update_golden_output.sh    # Renders all test_cases.txt → output/
 │
 └── demo/                         # Web demo + sample apps (web, ios, android, flutter, RN)
@@ -85,7 +86,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.0.10"   # bump with VERSION + scripts/set-version.sh; see RELEASING.md
+version = "0.0.12"   # bump with VERSION + scripts/set-version.sh; see RELEASING.md
 edition = "2021"
 authors = ["RaTeX Contributors"]
 license = "MIT"

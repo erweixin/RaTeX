@@ -213,8 +213,6 @@ buildInlineMath(
 )
 ```
 
-Use `$...$` as delimiters inside the string. The `$` character is split on, so odd-indexed parts are LaTeX, even-indexed are plain text.
-
 ### Async (large formulas)
 
 ```dart
@@ -277,4 +275,4 @@ To publish an **out-of-the-box** package that works without building native code
    dart pub publish
    ```
 
-   **CI**: Pushing a version tag (e.g. `v0.0.4`) runs [release-flutter.yml](https://github.com/erweixin/RaTeX/blob/main/.github/workflows/release-flutter.yml): it builds Android and iOS native libs, injects them into this package, and runs `dart pub publish`. Ensure the tag matches the `version` in `pubspec.yaml`. Repository secret required: `PUB_DEV_TOKEN` (create at https://pub.dev/settings/tokens).
+   **CI**: Pushing a version tag (e.g. `v{VERSION}`) runs [release-flutter.yml](https://github.com/erweixin/RaTeX/blob/main/.github/workflows/release-flutter.yml): it builds Android and iOS native libs, injects them into this package, and runs `dart pub publish`. Ensure the tag matches the `version` in `pubspec.yaml`. Repository secret required: `PUB_DEV_TOKEN` (create at https://pub.dev/settings/tokens).

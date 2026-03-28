@@ -4,6 +4,7 @@
 #   platforms/flutter/ios/ratex_flutter.podspec,
 #   platforms/flutter/android/build.gradle,
 #   platforms/flutter/README.md,
+#   platforms/android/README.md,
 #   demo/flutter/pubspec.yaml,
 #   platforms/web/package.json, platforms/react-native/package.json
 # platforms/android（Maven Central）在未传 -PlibraryVersion 时从本文件读取版本，见 platforms/android/build.gradle.kts。
@@ -48,6 +49,9 @@ sed "s/ratex_flutter: \^[0-9][0-9.]*/ratex_flutter: ^$VER/g" platforms/flutter/R
 # Demo app pubspec（ratex_flutter: ^X.X.X）
 sed "s/ratex_flutter: \^[0-9][0-9.]*/ratex_flutter: ^$VER/" demo/flutter/pubspec.yaml > demo/flutter/pubspec.yaml.tmp && mv demo/flutter/pubspec.yaml.tmp demo/flutter/pubspec.yaml
 
+# Android README（Maven artifact version）
+sed "s/ratex-android:[0-9][0-9.]*/ratex-android:$VER/g" platforms/android/README.md > platforms/android/README.md.tmp && mv platforms/android/README.md.tmp platforms/android/README.md
+
 # npm：Web（ratex-wasm）与 React Native
 node -e "
 const fs = require('fs');
@@ -58,4 +62,4 @@ for (const p of ['platforms/web/package.json', 'platforms/react-native/package.j
 }
 "
 
-echo "Done. Updated: Cargo.toml, platforms/flutter/pubspec.yaml, platforms/flutter/ios/ratex_flutter.podspec, platforms/flutter/android/build.gradle, platforms/flutter/README.md, demo/flutter/pubspec.yaml, platforms/web/package.json, platforms/react-native/package.json; Android Maven 使用根目录 VERSION"
+echo "Done. Updated: Cargo.toml, platforms/flutter/pubspec.yaml, platforms/flutter/ios/ratex_flutter.podspec, platforms/flutter/android/build.gradle, platforms/flutter/README.md, platforms/android/README.md, demo/flutter/pubspec.yaml, platforms/web/package.json, platforms/react-native/package.json; Android Maven 使用根目录 VERSION"

@@ -21,15 +21,13 @@ UIView / SwiftUI View
 
 ## Out of the box
 
-1. **Add dependency** — In Xcode: **File → Add Package Dependencies**, enter the repo URL `https://github.com/erweixin/RaTeX`, select the `RaTeX` library.
+1. **Add dependency** — via Swift Package Manager (see [Installation](#add-to-your-xcode-project) below).
 2. **Use** — Use `RaTeXView` or `RaTeXFormula`; fonts load automatically on first render.
    ```swift
    // SwiftUI
    RaTeXFormula(latex: #"\frac{-b \pm \sqrt{b^2-4ac}}{2a}"#, fontSize: 24)
    ```
-   **Optional:** To preload fonts at startup (e.g. to avoid slight delay on first formula), call `RaTeXFontLoader.loadFromPackageBundle()` when the app launches.
-
-**Local development** (when editing RaTeX source): From the repo root run `bash platforms/ios/build-ios.sh`, then in Xcode **File → Add Package Dependencies → Add Local…** and select the RaTeX repo root.
+   **Optional:** To preload fonts at startup, call `RaTeXFontLoader.loadFromPackageBundle()` when the app launches.
 
 ---
 
@@ -65,11 +63,9 @@ This produces `platforms/ios/RaTeX.xcframework`.
 
 ### Option A — Swift Package Manager (recommended)
 
-**Published release** — In Xcode: **File → Add Package Dependencies**, enter
-the GitHub repo URL and select the `RaTeX` product. Fonts load automatically on first render; optionally call `RaTeXFontLoader.loadFromPackageBundle()` at startup to load earlier.
+In Xcode: **File → Add Package Dependencies**, enter `https://github.com/erweixin/RaTeX` and select the `RaTeX` product.
 
-**Local development** — After building the XCFramework, point Xcode to the
-repo root (`File → Add Package Dependencies → Add Local…`).
+**Local development** — Run `bash platforms/ios/build-ios.sh` first, then point Xcode to the repo root via **File → Add Package Dependencies → Add Local…**.
 
 ### Option B — Manual
 
