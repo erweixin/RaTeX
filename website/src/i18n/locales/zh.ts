@@ -145,6 +145,7 @@ export const zh: TranslationDict = {
           "Dart FFI 链接到 `libratex_ffi`；`CustomPainter` 渲染显示列表。预构建的 iOS XCFramework + Android `.so` 在 pub.dev 上。",
         steps: [
           "在 `pubspec.yaml` 中添加 `ratex_flutter` 并运行 `flutter pub get`。",
+          "在应用的 `pubspec.yaml` 的 `flutter: fonts:` 节中用 `packages/ratex_flutter/` 资源前缀注册 KaTeX 字体——缺少此步骤字形将静默回退到系统字体。完整声明片段见文档。",
           "使用 `RaTeXWidget(latex: r'…', fontSize: 28)`。",
         ],
       },
@@ -158,12 +159,12 @@ export const zh: TranslationDict = {
         ],
       },
       {
-        title: "Server / CLI (PNG)",
+        title: "Server / CLI",
         blurb:
-          "使用 tiny-skia 将相同的显示列表光栅化为 PNG——CI 快照、后端或无头服务器——无需浏览器。",
+          "使用 tiny-skia 光栅化为 PNG（`ratex-render`）或用 `ratex-svg` 导出自包含 SVG——CI 快照、后端或无头服务器——无需浏览器。",
         steps: [
-          "从仓库根目录使用 `ratex-render` crate（见 README\u201c渲染为 PNG\u201d）。",
-          "通过管道传入 LaTeX 标准输入或按文档传递参数；输出为 PNG 文件或标准输出。",
+          "PNG：将 LaTeX 通过管道传入标准输入 — `cargo run --release -p ratex-render`。",
+          "SVG：添加 `--features cli` — `cargo run --release -p ratex-svg --features cli`，输出基于 `<path>` 的 SVG，无需网络字体依赖。",
         ],
       },
     ],
@@ -177,7 +178,7 @@ export const zh: TranslationDict = {
     suggestedOrderLiveLink: "实时对比",
     suggestedOrderDescMid: "开始测试单个公式，然后打开",
     suggestedOrderTableLink: "支持表",
-    suggestedOrderDescSuffix: "扫描全部 916 行，最后在需要分类浏览时使用图库。",
+    suggestedOrderDescSuffix: "扫描全部 1058 行，最后在需要分类浏览时使用图库。",
     howItLoadsLabel: "加载方式：",
     howItLoadsDesc:
       "KaTeX 0.16.9 CSS/JS 来自 jsDelivr。RaTeX 使用本站的 platforms/web/（WASM + 字体）。在 GitHub Pages 上会随部署一起发布；本地请构建 WASM 并使用开发服务器——见",
@@ -188,7 +189,7 @@ export const zh: TranslationDict = {
       "编辑一行 LaTeX 并并排比较 RaTeX Canvas 输出与 KaTeX——状态、错误以及与图库相同的 WASM 包。",
     liveComparisonCta: "打开交互演示",
     supportTableTitle: "支持表",
-    supportTableSubtitle: "916 个基准公式",
+    supportTableSubtitle: "1058 个基准公式",
     supportTableBody:
       "打开全页基准测试：每个基准测试套件行与 KaTeX 0.16.9 对比，批量 IoU 分数以及浏览器中实时的 RaTeX 列——最适合覆盖率和回归分类。",
     supportTableCta: "打开完整支持表",
@@ -226,7 +227,7 @@ export const zh: TranslationDict = {
   supportTable: {
     eyebrow: "基准测试",
     heading: "公式支持表",
-    desc: "RaTeX（Rust + WASM）与 KaTeX 0.16.9 对比 916 个基准测试套件行。离线格使用预计算的墨水 IoU 与 KaTeX 参考 PNG 对比；RaTeX 列由您浏览器中加载的 WASM 实时计算。",
+    desc: "RaTeX（Rust + WASM）与 KaTeX 0.16.9 对比 1058 个基准测试套件行（含 mhchem \\ce / \\pu）。离线格使用预计算的墨水 IoU 与 KaTeX 参考 PNG 对比；RaTeX 列由您浏览器中加载的 WASM 实时计算。",
     dataSourceLabel: "数据来源",
     dataSourceDescPrefix:
       "批量离线分数和聚合计数在 CI 运行中重新生成，可能比最新的",

@@ -7,7 +7,7 @@
 ## 架构
 
 - **ratex-wasm**（`crates/ratex-wasm`）：Rust → WASM，导出 `renderLatex(latex: string) => string`，返回 DisplayList JSON。
-- **web-render**（`src/renderer.ts`）：将 DisplayList 绘制到 Canvas 2D（Line / Rect / Path / GlyphPath）。**GlyphPath** 当前在排版中为占位矩形；浏览器通过 Canvas `fillText` 与数学字体的 `char_code` 绘制字符，因此页面需加载数学字体（如 KaTeX CSS 或 Latin Modern Math）。
+- **web-render**（`src/renderer.ts`）：将 DisplayList 绘制到 Canvas 2D。`GlyphPath` 条目通过 Canvas `fillText` 与 `char_code` 加载的 KaTeX 字体绘制；页面需加载数学字体（随包附带的 `fonts.css` 已覆盖此需求）。
 - **入口**（`src/index.ts`）：初始化 WASM，提供 `renderLatexToCanvas(latex, canvas, options)` 一步渲染。
 
 ## 开箱即用
@@ -84,21 +84,3 @@ const json = renderLatex('x^2 + y^2 = z^2');
 const displayList = JSON.parse(json);
 ```
 
-### 方式三：本地 Demo 页
-
-Demo 位于仓库根目录的 `demo/`。构建 web 平台后，在仓库根目录起服务并打开 demo：
-
-```bash
-# 在仓库根目录（RaTeX/）
-cd platforms/web && npm run build && cd ../..
-npx serve .
-# 打开 http://localhost:8080/demo/
-```
-
-## 与其他平台的关系
-
-- **ratex-ffi**：iOS、Android（JNI）、Flutter、React Native 的 C ABI。
-- **ratex-render**：原生 tiny-skia 渲染为 PNG。
-- **ratex-wasm + platforms/web**：同一 DisplayList 在浏览器中由 **web-render** 在 Canvas 2D 上绘制。
-
-**web-render** 即“在浏览器中将 DisplayList 绘制到 Canvas 2D”的这一层。

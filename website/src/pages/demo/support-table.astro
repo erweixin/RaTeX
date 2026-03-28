@@ -18,7 +18,7 @@ const filterIdle =
 
 <BaseLayout
   title="RaTeX — Formula support table"
-  description="916 golden formulas: RaTeX WASM vs KaTeX 0.16.9, IoU vs reference PNGs. Batch offline scores plus a live RaTeX column in your browser."
+  description="1058 golden formulas (incl. mhchem \\ce / \\pu): RaTeX WASM vs KaTeX 0.16.9, IoU vs reference PNGs. Batch offline scores plus a live RaTeX column in your browser."
   active="demo"
   lang={lang}
   copyright={t.footer.copyright}
@@ -39,7 +39,8 @@ const filterIdle =
     slot="head"
     defer
     src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/mhchem.min.js"
-    crossorigin="anonymous"></script>
+    crossorigin="anonymous"
+    id="mhchem-script"></script>
   <script slot="head" src={`${base}katex-fonts-link.js`}></script>
   <style is:global>
     /* Sticky thead: viewport offset = fixed nav (5.5rem) + measured filter toolbar (--support-toolbar-h). */
@@ -251,7 +252,7 @@ const filterIdle =
       >
         <div class="flex flex-wrap gap-2 items-center" role="toolbar" aria-label="Filter formulas">
           <button type="button" class={filterActive} data-filter="all">
-            {t.supportTable.filterAll} <span id="b-all">916</span>
+            {t.supportTable.filterAll} <span id="b-all">1058</span>
           </button>
           <button type="button" class={filterIdle} data-filter="great">
             {t.supportTable.filterGreat} <span id="b-great">—</span>

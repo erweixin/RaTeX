@@ -25,14 +25,15 @@ Default **pass threshold** for the script summary is **0.30** (see `--threshold`
 |-------|---------------------|--------|
 | `\url` / `\href` | 0831, 0359 | Web/hyperlink semantics; raster baseline may not be comparable. |
 | `\imageof`, `\origof` | 0375, 0599 | Symbol/glyph or metric mismatch vs KaTeX. |
-| `\overbrace` / `\underbrace` + `\text` | 0603, 0810 | Brace + label layout; see also `docs/KATEX_SVG_PATH_PLAN.md`. |
+| `\overbrace` / `\underbrace` + `\text` | 0603, 0810 | Brace + label layout. |
 | `\cancel`, `\bcancel`, `\xcancel` | 0074, 0146, 0890 | Strikeout drawing vs KaTeX. |
 | `\copyright`, `\textregistered`, `\char"263a` | 0198, 0770, 0157 | Text/compound symbol rendering. |
 | Arrays / environments | 0061, 0286, 0315, 0037, 0880, 0878, 0879, 0730 | `arraystretch`, `equation`, `gather`, `alignat`, starred matrices, `smallmatrix`. |
 | Delimiters / `\genfrac` | 0454, 0695, 0662, 0092, 0321 | `\llbracket`, `\rrbracket`, `\rBrace`, `\Biggm\vert`, `\genfrac`. |
+| Brace notation | 0138 | `{n\brace k}` glyph/metric mismatch. |
 | Other | 0699 (`\rule`), 0156 (`\cfrac`), 0263 (`\dotsi`) | Spacing, nested fractions, dots. |
 
-Stretchy-arrow SVG work is still documented in [`KATEX_SVG_PATH_PLAN.md`](./KATEX_SVG_PATH_PLAN.md); **this** list is driven by whatever scores below 0.5 **today**, not only arrows.
+This list is driven by whatever scores below 0.5 **today**.
 
 ---
 
@@ -85,7 +86,7 @@ Then mark the row below with `[x]`.
 
 ## SOP: Fixing low-scoring **stretchy arrow** cases
 
-Applies to `\xrightarrow`, `\xleftarrow`, `\xtwoheadrightarrow`, `\xtwoheadleftarrow`, `\xmapsto`, and similar commands. For **braces**, prefer the brace path plan in [`KATEX_SVG_PATH_PLAN.md`](./KATEX_SVG_PATH_PLAN.md).
+Applies to `\xrightarrow`, `\xleftarrow`, `\xtwoheadrightarrow`, `\xtwoheadleftarrow`, `\xmapsto`, and similar commands. For **braces**, the same `katex_stretchy_path()` in `crates/ratex-layout/src/katex_svg.rs` handles `overbrace`/`underbrace`.
 
 ### 1. Find KaTeX SVG path data
 

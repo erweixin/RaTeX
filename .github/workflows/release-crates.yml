@@ -51,7 +51,7 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
           # 拓扑序：依赖在前，被依赖在后（与 workspace 的 path 依赖一致）
-          for crate in ratex-types ratex-font ratex-lexer ratex-parser ratex-layout ratex-ffi ratex-render ratex-wasm; do
+          for crate in ratex-types ratex-font ratex-lexer ratex-parser ratex-layout ratex-svg ratex-ffi ratex-render ratex-wasm; do
             echo "Publishing $crate..."
             cargo publish -p "$crate"
           done

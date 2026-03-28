@@ -8,6 +8,8 @@ Each platform wraps this library with a thin native layer:
 - **iOS** — Swift Package + CoreGraphics renderer
 - **Android** — JNI + Kotlin + Android Canvas renderer
 - **Flutter** — Dart FFI + CustomPainter renderer
+- **Web** — WebAssembly + Canvas 2D renderer (TypeScript)
+- **React Native** — Native module wrapping iOS/Android views
 
 RaTeX 通过 `ratex-ffi` crate 对外暴露一个 C ABI 静态/动态库。
 每个平台只需实现一层薄薄的 native wrapper：
@@ -15,6 +17,8 @@ RaTeX 通过 `ratex-ffi` crate 对外暴露一个 C ABI 静态/动态库。
 - **iOS** — Swift Package + CoreGraphics 渲染
 - **Android** — JNI + Kotlin + Android Canvas 渲染
 - **Flutter** — Dart FFI + CustomPainter 渲染
+- **Web** — WebAssembly + Canvas 2D 渲染（TypeScript）
+- **React Native** — 封装 iOS/Android 原生视图的 Native Module
 
 ---
 
@@ -69,31 +73,32 @@ LaTeX string  (UTF-8)
   "height": 1.84,   // ascent above baseline (基线以上高度)
   "depth":  0.21,   // descent below baseline (基线以下深度)
   "items": [
-    // ---- GlyphPath: a glyph rendered as outline path commands ----
+    // ---- GlyphPath: a glyph rendered via bundled KaTeX font ----
+    // Internally-tagged: "type" key is at the same level as other fields.
+    // "font" is a short ID like "Main-Regular", "Math-Italic", "Size1-Regular";
+    // platform renderers prepend "KaTeX_" to map to the font family name.
     {
-      "GlyphPath": {
-        "x": 0.0, "y": 0.0,   // position (top-left of glyph, in em)
-        "scale": 1.0,           // uniform scale applied to commands
-        "font": "KaTeX_Main-Regular",
-        "char_code": 120,       // Unicode code point
-        "commands": [
-          { "MoveTo": { "x": 0.1, "y": 0.7 } },
-          { "CubicTo": { "x1": 0.2, "y1": 0.5, "x2": 0.4, "y2": 0.3, "x": 0.6, "y": 0.1 } },
-          { "Close": null }
-        ],
-        "color": { "r": 0.0, "g": 0.0, "b": 0.0, "a": 1.0 }
-      }
+      "type": "GlyphPath",
+      "x": 0.0, "y": 0.0,     // position (top-left of glyph bounding box, in em)
+      "scale": 1.0,             // uniform scale applied to path commands
+      "font": "Main-Regular",   // short font ID (NOT "KaTeX_Main-Regular")
+      "char_code": 120,         // Unicode code point
+      "commands": [
+        { "type": "MoveTo",  "x": 0.1, "y": 0.7 },
+        { "type": "CubicTo", "x1": 0.2, "y1": 0.5, "x2": 0.4, "y2": 0.3, "x": 0.6, "y": 0.1 },
+        { "type": "Close" }
+      ],
+      "color": { "r": 0.0, "g": 0.0, "b": 0.0, "a": 1.0 }
     },
     // ---- Line: horizontal rule (fraction bar, etc.) ----
-    { "Line": { "x": 0.1, "y": 0.9, "width": 4.8, "thickness": 0.04,
-                "color": { "r": 0.0, "g": 0.0, "b": 0.0, "a": 1.0 } } },
+    { "type": "Line", "x": 0.1, "y": 0.9, "width": 4.8, "thickness": 0.04,
+      "color": { "r": 0.0, "g": 0.0, "b": 0.0, "a": 1.0 } },
     // ---- Rect: filled rectangle ----
-    { "Rect": { "x": 0.5, "y": 1.0, "width": 2.0, "height": 0.5,
-                "color": { "r": 0.0, "g": 0.0, "b": 0.0, "a": 1.0 } } },
-    // ---- Path: arbitrary outline (radical, delimiter) ----
-    { "Path": { "x": 0.0, "y": 0.0, "commands": [ /* ... */ ],
-                "fill": true,
-                "color": { "r": 0.0, "g": 0.0, "b": 0.0, "a": 1.0 } } }
+    { "type": "Rect", "x": 0.5, "y": 1.0, "width": 2.0, "height": 0.5,
+      "color": { "r": 0.0, "g": 0.0, "b": 0.0, "a": 1.0 } },
+    // ---- Path: arbitrary outline (radical corner, stretchy delimiter) ----
+    { "type": "Path", "x": 0.0, "y": 0.0, "commands": [ /* ... */ ],
+      "fill": true, "color": { "r": 0.0, "g": 0.0, "b": 0.0, "a": 1.0 } }
   ]
 }
 ```
@@ -108,7 +113,9 @@ LaTeX string  (UTF-8)
 
 ### PathCommand variants / 路径指令
 
-| Variant | Fields | Meaning |
+All commands use internally-tagged JSON: `"type"` is a field alongside the coordinates.
+
+| `type` value | Additional fields | Meaning |
 |---------|--------|---------|
 | `MoveTo` | `x, y` | Move pen to (x, y) |
 | `LineTo` | `x, y` | Draw line to (x, y) |

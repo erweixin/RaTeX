@@ -7,7 +7,7 @@ Use RaTeX in the browser: Rust compiled to WASM handles parsing and layout; Type
 ## Architecture
 
 - **ratex-wasm** (`crates/ratex-wasm`): Rust → WASM, exports `renderLatex(latex: string) => string` returning DisplayList JSON.
-- **web-render** (`src/renderer.ts`): Renders the DisplayList to Canvas 2D (Line / Rect / Path / GlyphPath). **GlyphPath** is currently a placeholder rectangle in layout; the browser draws characters via Canvas `fillText` and a math font using `char_code`, so the page must load a math font (e.g. KaTeX CSS or Latin Modern Math).
+- **web-render** (`src/renderer.ts`): Renders the DisplayList to Canvas 2D. `GlyphPath` items are drawn via Canvas `fillText` using `char_code` and the loaded KaTeX font; the page must load a math font (bundled `fonts.css` covers this).
 - **Entry** (`src/index.ts`): Initializes WASM and provides `renderLatexToCanvas(latex, canvas, options)` for one-step rendering.
 
 ## Out of the box
@@ -15,13 +15,7 @@ Use RaTeX in the browser: Rust compiled to WASM handles parsing and layout; Type
 No build required — use the published npm package:
 
 1. **Install** — `npm install ratex-wasm` (or `yarn add ratex-wasm`).
-2. **In your page** — Load fonts and register the web component, then use the custom element:
-   ```html
-   <link rel="stylesheet" href="node_modules/ratex-wasm/fonts.css" />
-   <script type="module" src="node_modules/ratex-wasm/dist/ratex-formula.js"></script>
-   <ratex-formula latex="\frac{-b \pm \sqrt{b^2-4ac}}{2a}" font-size="48"></ratex-formula>
-   ```
-3. Supported attributes: `latex`, `font-size`, `padding`, `background-color`; you can also set `element.latex = '...'` via JS.
+2. **Use** — see [Drop-in Web Component](#drop-in-web-component-ratex-formula) below.
 
 ## Build
 
@@ -84,21 +78,3 @@ const json = renderLatex('x^2 + y^2 = z^2');
 const displayList = JSON.parse(json);
 ```
 
-### Option 3: Local demo page
-
-Demo page lives in the repo root under `demo/`. After building the web platform, serve the repo root and open the demo:
-
-```bash
-# From repo root (RaTeX/)
-cd platforms/web && npm run build && cd ../..
-npx serve .
-# open http://localhost:8080/demo/
-```
-
-## Relation to other platforms
-
-- **ratex-ffi**: C ABI for iOS, Android (JNI), Flutter, React Native.
-- **ratex-render**: Native tiny-skia rendering to PNG.
-- **ratex-wasm + platforms/web**: Same DisplayList in the browser, drawn by **web-render** on Canvas 2D.
-
-So **web-render** is the layer that “draws the DisplayList to Canvas 2D in the browser”.

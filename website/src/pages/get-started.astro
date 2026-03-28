@@ -68,9 +68,13 @@ binding.mathView.fontSize = 24f`,
   {
     id: "server",
     icon: "cloud",
-    code: `echo '\\frac{1}{2} + \\sqrt{x}' | cargo run --release -p ratex-render`,
+    code: `# PNG (tiny-skia rasterizer)
+echo '\\frac{1}{2} + \\sqrt{x}' | cargo run --release -p ratex-render
+
+# SVG (self-contained <path> glyphs, no web fonts needed)
+echo '\\frac{1}{2} + \\sqrt{x}' | cargo run --release -p ratex-svg --features cli`,
     doc: "README.md",
-    anchor: "#render-to-png",
+    anchor: "#quick-start",
   },
 ];
 
@@ -84,7 +88,7 @@ const platforms = platformsMeta.map((meta, i) => ({
 
 <BaseLayout
   title="RaTeX — Get started: Web, iOS, Android, Flutter, React Native"
-  description="Integrate RaTeX on Web (WASM), iOS, Android, Flutter, React Native, or server-side PNG—same Rust core everywhere."
+  description="Integrate RaTeX on Web (WASM), iOS, Android, Flutter, React Native, or server-side PNG / SVG—same Rust core everywhere."
   active="get-started"
   lang={lang}
   copyright={t.footer.copyright}

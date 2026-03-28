@@ -21,8 +21,9 @@ CustomPaint Widget
 
 ## Out of the box
 
-1. **Add dependency** — In `pubspec.yaml`: `ratex_flutter: ^0.0.3`, then run `flutter pub get`. No native build required — the published package includes prebuilt Android `.so` and iOS XCFramework.
-2. **Use** — Use `RaTeXWidget`:
+1. **Add dependency** — add `ratex_flutter: ^0.0.12` to `pubspec.yaml`, then run `flutter pub get`. No native build required — the published package includes prebuilt Android `.so` and iOS XCFramework.
+2. **Register fonts** — Flutter does not auto-register plugin fonts for the host app. Copy the [KaTeX font declarations](#font-setup) into your `pubspec.yaml` (see Installation below).
+3. **Use** — Use `RaTeXWidget`:
    ```dart
    RaTeXWidget(
      latex: r'\frac{-b \pm \sqrt{b^2-4ac}}{2a}',
@@ -41,10 +42,76 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  ratex_flutter: ^0.0.3
+  ratex_flutter: ^0.0.12
 ```
 
 Then run `flutter pub get`. No native build required — the published package includes prebuilt Android `.so` and iOS `RaTeX.xcframework`.
+
+#### Font setup
+
+Flutter requires host apps to explicitly declare fonts from plugin packages ([Flutter docs](https://docs.flutter.dev/cookbook/design/package-fonts#from-a-package)). Add the following to the `flutter:` section of your `pubspec.yaml`:
+
+```yaml
+flutter:
+  fonts:
+    - family: KaTeX_AMS
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_AMS-Regular.ttf
+    - family: KaTeX_Caligraphic
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Caligraphic-Regular.ttf
+        - asset: packages/ratex_flutter/fonts/KaTeX_Caligraphic-Bold.ttf
+          weight: 700
+    - family: KaTeX_Fraktur
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Fraktur-Regular.ttf
+        - asset: packages/ratex_flutter/fonts/KaTeX_Fraktur-Bold.ttf
+          weight: 700
+    - family: KaTeX_Main
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Main-Regular.ttf
+        - asset: packages/ratex_flutter/fonts/KaTeX_Main-Bold.ttf
+          weight: 700
+        - asset: packages/ratex_flutter/fonts/KaTeX_Main-Italic.ttf
+          style: italic
+        - asset: packages/ratex_flutter/fonts/KaTeX_Main-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: KaTeX_Math
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Math-Italic.ttf
+          style: italic
+        - asset: packages/ratex_flutter/fonts/KaTeX_Math-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: KaTeX_SansSerif
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_SansSerif-Regular.ttf
+        - asset: packages/ratex_flutter/fonts/KaTeX_SansSerif-Bold.ttf
+          weight: 700
+        - asset: packages/ratex_flutter/fonts/KaTeX_SansSerif-Italic.ttf
+          style: italic
+    - family: KaTeX_Script
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Script-Regular.ttf
+    - family: KaTeX_Typewriter
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Typewriter-Regular.ttf
+    - family: KaTeX_Size1
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Size1-Regular.ttf
+    - family: KaTeX_Size2
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Size2-Regular.ttf
+    - family: KaTeX_Size3
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Size3-Regular.ttf
+    - family: KaTeX_Size4
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Size4-Regular.ttf
+```
+
+Without this step, `RaTeXPainter` silently falls back to the system font and formulas render incorrectly.
 
 ### From local path (development)
 
@@ -146,8 +213,6 @@ buildInlineMath(
 )
 ```
 
-Use `$...$` as delimiters inside the string. The `$` character is split on, so odd-indexed parts are LaTeX, even-indexed are plain text.
-
 ### Async (large formulas)
 
 ```dart
@@ -210,4 +275,4 @@ To publish an **out-of-the-box** package that works without building native code
    dart pub publish
    ```
 
-   **CI**: Pushing a version tag (e.g. `v0.0.4`) runs [release-flutter.yml](https://github.com/erweixin/RaTeX/blob/main/.github/workflows/release-flutter.yml): it builds Android and iOS native libs, injects them into this package, and runs `dart pub publish`. Ensure the tag matches the `version` in `pubspec.yaml`. Repository secret required: `PUB_DEV_TOKEN` (create at https://pub.dev/settings/tokens).
+   **CI**: Pushing a version tag (e.g. `v{VERSION}`) runs [release-flutter.yml](https://github.com/erweixin/RaTeX/blob/main/.github/workflows/release-flutter.yml): it builds Android and iOS native libs, injects them into this package, and runs `dart pub publish`. Ensure the tag matches the `version` in `pubspec.yaml`. Repository secret required: `PUB_DEV_TOKEN` (create at https://pub.dev/settings/tokens).

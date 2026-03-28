@@ -113,13 +113,7 @@ Renders a mixed string of plain text and `$...$` LaTeX formulas as a single inli
 
 ## Architecture Support
 
-### New Architecture (Fabric)
-
-The component is defined via **Codegen** (`RaTeXViewNativeComponent.ts`) and uses Fabric's synchronous rendering pipeline. No additional configuration is needed — React Native ≥ 0.73 with `newArchEnabled=true` picks it up automatically.
-
-### Old Architecture (Bridge)
-
-A `RaTeXViewManager` (iOS: `RaTeXViewManager.mm`, Android: `RaTeXViewManager.kt`) is provided for projects still on the classic bridge. The same JS component works for both architectures.
+Supports both **New Architecture** (Fabric / Codegen) and **Old Architecture** (Bridge) — no configuration needed. React Native ≥ 0.73 with `newArchEnabled=true` uses Fabric automatically; older projects fall back to the Bridge manager.
 
 ## Font size note
 

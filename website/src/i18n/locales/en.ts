@@ -144,6 +144,7 @@ export const en = {
           "Dart FFI to `libratex_ffi`; `CustomPainter` renders the display list. Prebuilt iOS XCFramework + Android `.so` on pub.dev.",
         steps: [
           "Add `ratex_flutter` to `pubspec.yaml` and run `flutter pub get`.",
+          "Register KaTeX fonts in your app's `pubspec.yaml` under `flutter: fonts:` using the `packages/ratex_flutter/` asset prefix — without this step glyphs silently fall back to system fonts. See the full doc for the complete snippet.",
           "Use `RaTeXWidget(latex: r'…', fontSize: 28)`.",
         ],
       },
@@ -157,12 +158,12 @@ export const en = {
         ],
       },
       {
-        title: "Server / CLI (PNG)",
+        title: "Server / CLI",
         blurb:
-          "Rasterize the same display list to PNG with tiny-skia—CI snapshots, backends, or headless servers—no browser.",
+          "Rasterize to PNG with tiny-skia (`ratex-render`) or export to self-contained SVG with `ratex-svg`—CI snapshots, backends, or headless servers—no browser needed.",
         steps: [
-          "From the repo root, use the `ratex-render` crate (see README \u201cRender to PNG\u201d).",
-          "Pipe LaTeX stdin or pass flags as documented; output is a PNG file or stdout.",
+          "PNG: pipe LaTeX to stdin — `cargo run --release -p ratex-render`.",
+          "SVG: add `--features cli` — `cargo run --release -p ratex-svg --features cli`. Outputs `<path>`-based SVG with no web-font dependency.",
         ],
       },
     ],
@@ -178,7 +179,7 @@ export const en = {
     suggestedOrderDescMid: "for one formula, open the",
     suggestedOrderTableLink: "support table",
     suggestedOrderDescSuffix:
-      "to scan all 916 lines, then use galleries when you want categorized scrolling.",
+      "to scan all 1058 lines, then use galleries when you want categorized scrolling.",
     howItLoadsLabel: "How it loads:",
     howItLoadsDesc:
       "KaTeX 0.16.9 CSS/JS from jsDelivr. RaTeX uses this site\u2019s platforms/web/ (WASM + fonts). On GitHub Pages that ships with the deployment; locally, build WASM and use the dev server\u2014see",
@@ -189,7 +190,7 @@ export const en = {
       "Edit one LaTeX line and compare RaTeX canvas output with KaTeX side by side\u2014status, errors, and the same WASM bundle as the galleries.",
     liveComparisonCta: "Open interactive demo",
     supportTableTitle: "Support table",
-    supportTableSubtitle: "916 golden formulas",
+    supportTableSubtitle: "1058 golden formulas",
     supportTableBody:
       "Opens the full-page benchmark: every golden-suite line vs KaTeX 0.16.9, with batch IoU scores and a live RaTeX column in your browser\u2014best for coverage and regression triage.",
     supportTableCta: "Open full support table",
@@ -227,7 +228,7 @@ export const en = {
   supportTable: {
     eyebrow: "Benchmarks",
     heading: "Formula support table",
-    desc: "RaTeX (Rust + WASM) vs KaTeX 0.16.9 across 916 golden-suite lines. Offline cells use pre-computed ink IoU vs KaTeX reference PNGs; the RaTeX column is computed live in your browser from the loaded WASM.",
+    desc: "RaTeX (Rust + WASM) vs KaTeX 0.16.9 across 1058 golden-suite lines (includes mhchem \\ce / \\pu). Offline cells use pre-computed ink IoU vs KaTeX reference PNGs; the RaTeX column is computed live in your browser from the loaded WASM.",
     dataSourceLabel: "Data source",
     dataSourceDescPrefix:
       "Batch offline scores and aggregate counts are regenerated in CI runs and may lag the latest",

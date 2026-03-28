@@ -113,13 +113,7 @@ function Paragraph() {
 
 ## 架构支持
 
-### 新架构（Fabric）
-
-组件通过 **Codegen**（`RaTeXViewNativeComponent.ts`）定义，使用 Fabric 同步渲染管线。React Native ≥ 0.73 开启 `newArchEnabled=true` 后无需任何额外配置。
-
-### 旧架构（Bridge）
-
-为仍在使用旧架构的项目提供了 `RaTeXViewManager`（iOS：`RaTeXViewManager.mm`，Android：`RaTeXViewManager.kt`）。同一个 JS 组件在两种架构下均可使用。
+同时支持**新架构**（Fabric / Codegen）和**旧架构**（Bridge），无需任何配置。React Native ≥ 0.73 开启 `newArchEnabled=true` 后自动使用 Fabric；旧项目则回退到 Bridge 管理器。
 
 ## fontSize 说明
 
