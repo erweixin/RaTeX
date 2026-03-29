@@ -542,6 +542,14 @@ fn missing_glyph_metrics_fallback(ch: char, options: &LayoutOptions) -> (f64, f6
 
 fn layout_symbol(text: &str, mode: Mode, options: &LayoutOptions) -> LayoutBox {
     let ch = resolve_symbol_char(text, mode);
+
+    // Synthetic symbols not present in any KaTeX font; built from SVG paths.
+    match ch as u32 {
+        0x22B7 => return layout_imageof_origof(true, options),  // \imageof  •—○
+        0x22B6 => return layout_imageof_origof(false, options), // \origof   ○—•
+        _ => {}
+    }
+
     let mut font_id = select_font(text, ch, mode, options);
     let char_code = ch as u32;
 
@@ -3183,6 +3191,118 @@ fn layout_textcircled(body_box: LayoutBox, options: &LayoutOptions) -> LayoutBox
 // ============================================================================
 // Path generation helpers
 // ============================================================================
+
+// ============================================================================
+// \imageof / \origof  (U+22B7 / U+22B6)
+// ============================================================================
+
+/// Synthesise \imageof (•—○) or \origof (○—•).
+///
+/// Neither glyph exists in any KaTeX font.  We build each symbol as an HBox
+/// of three pieces:
+///   disk  : filled circle SVG path
+///   bar   : Rule (horizontal segment at circle-centre height)
+///   ring  : stroked circle SVG path
+///
+/// The ordering is reversed for \origof.
+///
+/// Dimensions are calibrated against the KaTeX reference PNG (DPR=2, 20px font):
+///   ink bbox ≈ 0.700w × 0.225h em, centre ≈ 0.263em above baseline.
+///
+/// Coordinate convention in path commands:
+///   origin = baseline-left of the box, x right, y positive → below baseline.
+fn layout_imageof_origof(imageof: bool, options: &LayoutOptions) -> LayoutBox {
+    // Disk radius: filled circle ink height = 2·r = 0.225em  →  r = 0.1125em
+    let r: f64 = 0.1125;
+    // Circle centre above baseline (negative = above in path coords).
+    // Calibrated to the math axis (≈0.25em) so both symbols sit at the same height
+    // as the reference KaTeX rendering.
+    let cy: f64 = -0.2625;
+    // Cubic-Bezier circle approximation constant (4*(√2−1)/3)
+    let k: f64 = 0.5523;
+    // Each circle sub-box is 2r wide; the circle centre sits at x = r within it.
+    let cx: f64 = r;
+
+    // Box height/depth: symbol sits entirely above baseline.
+    let h: f64 = r + cy.abs(); // 0.1125 + 0.2625 = 0.375
+    let d: f64 = 0.0;
+
+    // The renderer strokes rings with width = 1.5 × DPR pixels.
+    // At the golden-test resolution (font=40px, DPR=1) that is 1.5 px = 0.0375em.
+    // To keep the ring's outer ink edge coincident with the disk's outer edge,
+    // draw the ring path at r_ring = r − stroke_half so the outer ink = r − stroke_half + stroke_half = r.
+    let stroke_half: f64 = 0.01875; // 0.75px / 40px·em⁻¹
+    let r_ring: f64 = r - stroke_half; // 0.09375em
+
+    // Closed circle path (counter-clockwise) centred at (ox, cy) with radius rad.
+    let circle_commands = |ox: f64, rad: f64| -> Vec<PathCommand> {
+        vec![
+            PathCommand::MoveTo { x: ox + rad, y: cy },
+            PathCommand::CubicTo {
+                x1: ox + rad,     y1: cy - k * rad,
+                x2: ox + k * rad, y2: cy - rad,
+                x:  ox,           y:  cy - rad,
+            },
+            PathCommand::CubicTo {
+                x1: ox - k * rad, y1: cy - rad,
+                x2: ox - rad,     y2: cy - k * rad,
+                x:  ox - rad,     y:  cy,
+            },
+            PathCommand::CubicTo {
+                x1: ox - rad,     y1: cy + k * rad,
+                x2: ox - k * rad, y2: cy + rad,
+                x:  ox,           y:  cy + rad,
+            },
+            PathCommand::CubicTo {
+                x1: ox + k * rad, y1: cy + rad,
+                x2: ox + rad,     y2: cy + k * rad,
+                x:  ox + rad,     y:  cy,
+            },
+            PathCommand::Close,
+        ]
+    };
+
+    let disk = LayoutBox {
+        width: 2.0 * r,
+        height: h,
+        depth: d,
+        content: BoxContent::SvgPath { commands: circle_commands(cx, r), fill: true },
+        color: options.color,
+    };
+
+    let ring = LayoutBox {
+        width: 2.0 * r,
+        height: h,
+        depth: d,
+        content: BoxContent::SvgPath { commands: circle_commands(cx, r_ring), fill: false },
+        color: options.color,
+    };
+
+    // Connecting bar centred on the same axis as the circles.
+    // Rule.raise = distance from baseline to the bottom edge of the rule.
+    // bar centre at |cy| = 0.2625em  →  raise = 0.2625 − bar_th/2
+    let bar_len: f64 = 0.25;
+    let bar_th: f64 = 0.04;
+    let bar_raise: f64 = cy.abs() - bar_th / 2.0; // 0.2625 − 0.02 = 0.2425
+
+    let bar = LayoutBox::new_rule(bar_len, h, d, bar_th, bar_raise);
+
+    let children = if imageof {
+        vec![disk, bar, ring]
+    } else {
+        vec![ring, bar, disk]
+    };
+
+    // Total width = 2r (disk) + bar_len + 2r (ring) = 0.225 + 0.25 + 0.225 = 0.700em
+    let total_width = 4.0 * r + bar_len;
+    LayoutBox {
+        width: total_width,
+        height: h,
+        depth: d,
+        content: BoxContent::HBox(children),
+        color: options.color,
+    }
+}
 
 /// Build path commands for a horizontal ellipse (circle overlay for \oiint, \oiiint).
 /// Box-local coords: origin at baseline-left, x right, y down (positive = below baseline).
