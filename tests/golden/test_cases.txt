@@ -957,3 +957,13 @@ f^{(n)}(x) = \dfrac{\mathrm{d}^n f}{\mathrm{d}x^n}
 \begin{CD} A @= B \\ @| @| \\ C @= D \end{CD}
 \begin{CD} A @<f<< B \\ @AAA @AAA \\ C @<g<< D \end{CD}
 \begin{CD} A @>f>> B @>g>> C \\ @VVV @. @VVV \\ D @>h>> E @>k>> F \end{CD}
+\begin{CD} 0 @>>> 1 @>>> 2 \\ @VVV @VVV @VVV \\ 3 @>>> 4 @>>> 5 \\ @VVV @VVV @VVV \\ 6 @>>> 7 @>>> 8 \end{CD}
+\begin{CD} A @>p>q>> B \\ @VVV @VVV \\ C @>r>s>> D \end{CD}
+\begin{CD} X @>{\alpha}>{}>> Y \\ @V{\beta}V{}V @A{}A{\gamma}A \\ Z @= W \end{CD}
+\begin{CD} X\times Y @>>> Z \\ @VVV @VVV \\ A @>>> B \end{CD}
+\begin{CD} \mathbb{Z} @>>> \mathbb{Q} \\ @VVV @VVV \\ 0 @= 0 \end{CD}
+\begin{CD} E @<a<b<< F \\ @AAA @AAA \\ G @<c<d<< H \end{CD}
+\begin{CD} P @VpVqVV Q \\ @VVV @VVV \\ R @= S \end{CD}
+\begin{CD} P @>>> Q \\ @VVV @. @VVV \\ R @>>> S \\ @VVV @VVV \\ T @>>> U \end{CD}
+\begin{CD} W @>>> X \\ @| @| \\ Y @>>> Z \end{CD}
+\begin{CD} \operatorname{Hom}(A,B) @>>> \mathrm{End}(V) \\ @VVV @VVV \\ 0 @>>> 1 \end{CD}
