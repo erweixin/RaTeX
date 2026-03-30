@@ -836,6 +836,10 @@ fn katex_image_data(label: &str) -> Option<KatexImageData> {
         "underrightarrow" => Some(KatexImageData { paths: &["rightarrow"],  min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
         "underleftarrow"  => Some(KatexImageData { paths: &["leftarrow"],   min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
         "xrightarrow"     => Some(KatexImageData { paths: &["rightarrow"],  min_width: 1.469, vb_height: 522.0, align: Some("xMaxYMin") }),
+        // KaTeX `stretchy.js` `katexImagesData`: `\\cdrightarrow` / `\\cdlongequal` use minWidth 3.0em
+        // (comment “CD minwwidth2.5pc” — amscd `\minCDarrowwidth`, ~2.5pc ≈ 3em at 10pt).
+        "cdrightarrow"    => Some(KatexImageData { paths: &["rightarrow"],  min_width: 3.0, vb_height: 522.0, align: Some("xMaxYMin") }),
+        "cdleftarrow"     => Some(KatexImageData { paths: &["leftarrow"],   min_width: 3.0, vb_height: 522.0, align: Some("xMinYMin") }),
         "xleftarrow"      => Some(KatexImageData { paths: &["leftarrow"],   min_width: 1.469, vb_height: 522.0, align: Some("xMinYMin") }),
         "Overrightarrow"  => Some(KatexImageData { paths: &["doublerightarrow"], min_width: 0.888, vb_height: 560.0, align: Some("xMaxYMin") }),
         "xRightarrow"     => Some(KatexImageData { paths: &["doublerightarrow"], min_width: 1.526, vb_height: 560.0, align: Some("xMaxYMin") }),
@@ -845,6 +849,7 @@ fn katex_image_data(label: &str) -> Option<KatexImageData> {
         "overrightharpoon" | "xrightharpoonup"  => Some(KatexImageData { paths: &["rightharpoon"], min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
         "xrightharpoondown"                     => Some(KatexImageData { paths: &["rightharpoondown"], min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
         "xlongequal"         => Some(KatexImageData { paths: &["longequal"],   min_width: 0.888, vb_height: 334.0, align: Some("xMinYMin") }),
+        "cdlongequal"        => Some(KatexImageData { paths: &["longequal"],   min_width: 3.0, vb_height: 334.0, align: Some("xMinYMin") }),
         "xtwoheadleftarrow"  => Some(KatexImageData { paths: &["twoheadleftarrow"],  min_width: 0.888, vb_height: 334.0, align: Some("xMinYMin") }),
         "xtwoheadrightarrow" => Some(KatexImageData { paths: &["twoheadrightarrow"], min_width: 0.888, vb_height: 334.0, align: Some("xMaxYMin") }),
         "overleftrightarrow"  => Some(KatexImageData { paths: &["leftarrow", "rightarrow"], min_width: 0.888, vb_height: 522.0, align: None }),
@@ -1022,6 +1027,77 @@ pub fn katex_stretchy_path(label: &str, width_em: f64) -> Option<(Vec<PathComman
     }
 }
 
+fn map_path_xy_horizontal_to_vertical_cd<F>(cmds: &[PathCommand], map: F) -> Vec<PathCommand>
+where
+    F: Fn(f64, f64) -> (f64, f64) + Copy,
+{
+    cmds.iter()
+        .map(|c| match *c {
+            PathCommand::MoveTo { x, y } => {
+                let (nx, ny) = map(x, y);
+                PathCommand::MoveTo { x: nx, y: ny }
+            }
+            PathCommand::LineTo { x, y } => {
+                let (nx, ny) = map(x, y);
+                PathCommand::LineTo { x: nx, y: ny }
+            }
+            PathCommand::CubicTo {
+                x1,
+                y1,
+                x2,
+                y2,
+                x,
+                y,
+            } => {
+                let (n1x, n1y) = map(x1, y1);
+                let (n2x, n2y) = map(x2, y2);
+                let (nx, ny) = map(x, y);
+                PathCommand::CubicTo {
+                    x1: n1x,
+                    y1: n1y,
+                    x2: n2x,
+                    y2: n2y,
+                    x: nx,
+                    y: ny,
+                }
+            }
+            PathCommand::QuadTo { x1, y1, x, y } => {
+                let (n1x, n1y) = map(x1, y1);
+                let (nx, ny) = map(x, y);
+                PathCommand::QuadTo {
+                    x1: n1x,
+                    y1: n1y,
+                    x: nx,
+                    y: ny,
+                }
+            }
+            PathCommand::Close => PathCommand::Close,
+        })
+        .collect()
+}
+
+/// Vertical `{CD}` ↑ / ↓: same filled KaTeX SVG as horizontal `\cdrightarrow`, rotated into the column.
+///
+/// Horizontal stretchy path uses x ∈ [0, `total_height_em`] (shaft length) and thin y-extent; we map
+/// `(x,y) → (y_lateral + y, x - row_height)` (down) or mirrored for up so the arrowhead matches the
+/// proven horizontal renderer in [`katex_stretchy_path`].
+pub fn katex_cd_vert_arrow_from_rightarrow(
+    down: bool,
+    total_height_em: f64,
+    axis_height_em: f64,
+) -> Option<(Vec<PathCommand>, f64)> {
+    let row_depth = (total_height_em / 2.0 - axis_height_em).max(0.0);
+    let row_height = total_height_em - row_depth;
+    let (cmds_h, lateral_em) = katex_stretchy_path("\\cdrightarrow", total_height_em)?;
+    let w_lat = lateral_em;
+    let cmds = if down {
+        map_path_xy_horizontal_to_vertical_cd(&cmds_h, |xh, yh| (w_lat / 2.0 + yh, xh - row_height))
+    } else {
+        map_path_xy_horizontal_to_vertical_cd(&cmds_h, |xh, yh| (w_lat / 2.0 + yh, row_depth - xh))
+    };
+    Some((cmds, lateral_em))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1101,5 +1177,20 @@ mod tests {
         assert!(!l.unwrap().is_empty());
         assert!(katex_stretchy_arrow_path("\\xrightarrow", 2.0, 0.3).is_some());
         assert!(katex_stretchy_arrow_path("\\xleftarrow", 2.0, 0.3).is_some());
+    }
+
+    #[test]
+    fn test_katex_cd_vert_arrow_from_rightarrow() {
+        let axis = 0.25_f64;
+        for down in [true, false] {
+            let r = katex_cd_vert_arrow_from_rightarrow(down, 2.5, axis);
+            assert!(r.is_some(), "down={}", down);
+            let (cmds, w) = r.unwrap();
+            assert!(!cmds.is_empty());
+            assert!(
+                w > 0.45 && w < 0.58,
+                "lateral extent should match horizontal arrow ink height ~0.522em, got {w}"
+            );
+        }
     }
 }
