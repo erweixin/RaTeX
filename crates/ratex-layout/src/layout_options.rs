@@ -11,6 +11,8 @@ pub struct LayoutOptions {
     pub align_relation_spacing: Option<f64>,
     /// When inside \\left...\\right, the stretch height for \\middle delimiters (second pass only).
     pub leftright_delim_height: Option<f64>,
+    /// Extra horizontal kern between glyphs (em), e.g. for `\\url` / `\\href` to match browser tracking.
+    pub inter_glyph_kern_em: f64,
 }
 
 impl Default for LayoutOptions {
@@ -20,6 +22,7 @@ impl Default for LayoutOptions {
             color: Color::BLACK,
             align_relation_spacing: None,
             leftright_delim_height: None,
+            inter_glyph_kern_em: 0.0,
         }
     }
 }
@@ -39,6 +42,7 @@ impl LayoutOptions {
             color: self.color,
             align_relation_spacing: self.align_relation_spacing,
             leftright_delim_height: self.leftright_delim_height,
+            inter_glyph_kern_em: self.inter_glyph_kern_em,
         }
     }
 
@@ -48,6 +52,14 @@ impl LayoutOptions {
             color,
             align_relation_spacing: self.align_relation_spacing,
             leftright_delim_height: self.leftright_delim_height,
+            inter_glyph_kern_em: self.inter_glyph_kern_em,
+        }
+    }
+
+    pub fn with_inter_glyph_kern(&self, em: f64) -> Self {
+        Self {
+            inter_glyph_kern_em: em,
+            ..self.clone()
         }
     }
 }
