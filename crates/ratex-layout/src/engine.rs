@@ -704,7 +704,7 @@ fn select_font(text: &str, resolved_char: char, mode: Mode, _options: &LayoutOpt
         Mode::Math => {
             if resolved_char.is_ascii_lowercase()
                 || resolved_char.is_ascii_uppercase()
-                || is_greek_letter(resolved_char)
+                || is_math_italic_greek(resolved_char)
             {
                 FontId::MathItalic
             } else {
@@ -715,9 +715,11 @@ fn select_font(text: &str, resolved_char: char, mode: Mode, _options: &LayoutOpt
     }
 }
 
-fn is_greek_letter(ch: char) -> bool {
+/// Lowercase Greek letters and variant forms use Math-Italic in math mode.
+/// Uppercase Greek (U+0391–U+03A9) stays upright in Main-Regular per TeX convention.
+fn is_math_italic_greek(ch: char) -> bool {
     matches!(ch,
-        '\u{0391}'..='\u{03C9}' |
+        '\u{03B1}'..='\u{03C9}' |
         '\u{03D1}' | '\u{03D5}' | '\u{03D6}' |
         '\u{03F1}' | '\u{03F5}'
     )
@@ -1190,11 +1192,34 @@ fn layout_op(
     // Center symbol operators on the math axis (TeX Rule 13a)
     if symbol && !suppress_base_shift {
         let axis = options.metrics().axis_height;
-        let _total = base_box.height + base_box.depth;
         let shift = (base_box.height - base_box.depth) / 2.0 - axis;
         if shift.abs() > 0.001 {
             base_box.height -= shift;
             base_box.depth += shift;
+        }
+    }
+
+    // For user-defined \mathop{content} (e.g. \vcentcolon), center the content
+    // on the math axis via a RaiseBox so the glyph physically moves up/down.
+    // The HBox emit pass keeps all children at the same baseline, so adjusting
+    // height/depth alone doesn't move the glyph.
+    if !suppress_base_shift && !symbol && body.is_some() {
+        let axis = options.metrics().axis_height;
+        let delta = (base_box.height - base_box.depth) / 2.0 - axis;
+        if delta.abs() > 0.001 {
+            let w = base_box.width;
+            // delta < 0 → center is below axis → raise (positive RaiseBox shift)
+            let raise = -delta;
+            base_box = LayoutBox {
+                width: w,
+                height: (base_box.height + raise).max(0.0),
+                depth: (base_box.depth - raise).max(0.0),
+                content: BoxContent::RaiseBox {
+                    body: Box::new(base_box),
+                    shift: raise,
+                },
+                color: options.color,
+            };
         }
     }
 
