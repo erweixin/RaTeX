@@ -107,9 +107,15 @@ fn layout_expression(
                 } else {
                     atom_spacing(prev, cur, options.style.is_tight())
                 };
-                let mu = options
-                    .align_relation_spacing
-                    .map_or(mu, |cap| mu.min(cap));
+                let mu = if let Some(cap) = options.align_relation_spacing {
+                    if prev == MathClass::Rel || cur == MathClass::Rel {
+                        mu.min(cap)
+                    } else {
+                        mu
+                    }
+                } else {
+                    mu
+                };
                 if mu > 0.0 {
                     let em = mu_to_em(mu, options.metrics().quad);
                     children.push(LayoutBox::new_kern(em));
