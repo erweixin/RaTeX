@@ -12,6 +12,10 @@ use crate::katex_svg::parse_svg_path_data;
 use crate::spacing::{atom_spacing, mu_to_em, MathClass};
 use crate::stacked_delim::make_stacked_delim_if_needed;
 
+/// TeX `\nulldelimiterspace` = 1.2pt = 0.12em (at 10pt design size).
+/// KaTeX wraps every `\frac` / `\atop` in mopen+mclose nulldelimiter spans of this width.
+const NULL_DELIMITER_SPACE: f64 = 0.12;
+
 /// Main entry point: lay out a list of ParseNodes into a LayoutBox.
 pub fn layout(nodes: &[ParseNode], options: &LayoutOptions) -> LayoutBox {
     layout_expression(nodes, options, true)
@@ -230,7 +234,12 @@ fn layout_node(node: &ParseNode, options: &LayoutOptions) -> LayoutBox {
                     color: options.color,
                 }
             } else {
-                frac
+                let right_nds = if *continued { 0.0 } else { NULL_DELIMITER_SPACE };
+                make_hbox(vec![
+                    LayoutBox::new_kern(NULL_DELIMITER_SPACE),
+                    frac,
+                    LayoutBox::new_kern(right_nds),
+                ])
             }
         }
 
