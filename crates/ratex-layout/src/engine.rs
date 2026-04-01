@@ -60,6 +60,14 @@ fn apply_bin_cancellation(raw: &[Option<MathClass>]) -> Vec<Option<MathClass>> {
     eff
 }
 
+/// KaTeX HTML: `\middle` delimiters are built with class `delimsizing`, which
+/// `getTypeOfDomTree` does not map to a math atom type, so **no** implicit
+/// table glue is inserted next to them (buildHTML.js). RaTeX must match that or
+/// `\frac` (Inner) gains spurious 3mu on each side of every `\middle\vert`.
+fn node_is_middle_fence(node: &ParseNode) -> bool {
+    matches!(node, ParseNode::Middle { .. })
+}
+
 /// Lay out an expression (list of nodes) as a horizontal sequence with spacing.
 fn layout_expression(
     nodes: &[ParseNode],
@@ -82,6 +90,8 @@ fn layout_expression(
 
     let mut children = Vec::new();
     let mut prev_class: Option<MathClass> = None;
+    // Index of the last node that contributed `prev_class` (for `\middle` glue suppression).
+    let mut prev_class_node_idx: Option<usize> = None;
 
     for (i, node) in nodes.iter().enumerate() {
         let lbox = layout_node(node, options);
@@ -89,7 +99,14 @@ fn layout_expression(
 
         if is_real_group {
             if let (Some(prev), Some(cur)) = (prev_class, cur_class) {
-                let mu = atom_spacing(prev, cur, options.style.is_tight());
+                let prev_middle = prev_class_node_idx
+                    .is_some_and(|j| node_is_middle_fence(&nodes[j]));
+                let cur_middle = node_is_middle_fence(node);
+                let mu = if prev_middle || cur_middle {
+                    0.0
+                } else {
+                    atom_spacing(prev, cur, options.style.is_tight())
+                };
                 let mu = options
                     .align_relation_spacing
                     .map_or(mu, |cap| mu.min(cap));
@@ -102,6 +119,7 @@ fn layout_expression(
 
         if cur_class.is_some() {
             prev_class = cur_class;
+            prev_class_node_idx = Some(i);
         }
 
         children.push(lbox);
@@ -3101,6 +3119,7 @@ fn node_math_class(node: &ParseNode) -> Option<MathClass> {
         // CD arrows are structural; treat as Rel for spacing.
         ParseNode::CdArrow { .. } => Some(MathClass::Rel),
         ParseNode::DelimSizing { mclass, .. } => Some(mclass_str_to_math_class(mclass)),
+        ParseNode::Middle { .. } => Some(MathClass::Ord),
         _ => Some(MathClass::Ord),
     }
 }

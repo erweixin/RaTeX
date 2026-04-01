@@ -344,9 +344,9 @@ def main():
         if len(failures) > 20:
             print(f"  ... and {len(failures) - 20} more")
 
-    low_score = [(n, f, s) for n, f, s, _ in results if s["score"] < 0.6]
+    low_score = [(n, f, s) for n, f, s, _ in results if s["score"] < 0.7]
     if low_score:
-        print(f"\nScore < 0.6 ({len(low_score)}):")
+        print(f"\nScore < 0.7 ({len(low_score)}):")
         for name, formula, stats in low_score[:20]:
             print(f"  {name}: score={stats['score']:.3f} iou={stats['iou']:.3f} "
                   f"recall={stats['recall']:.3f} aspect={stats['aspect_sim']:.2f} | {formula[:50]}")

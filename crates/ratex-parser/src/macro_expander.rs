@@ -364,7 +364,7 @@ impl<'a> MacroExpander<'a> {
             ("\\bra", "\\mathinner{\\langle{#1}|}"),
             ("\\ket", "\\mathinner{|{#1}\\rangle}"),
             ("\\braket", "\\mathinner{\\langle{#1}\\rangle}"),
-            ("\\Braket", "\\bra@ket{\\left\\langle}{\\;\\middle\\vert\\;}{\\;\\middle\\Vert\\;}{\\right\\rangle}"),
+            ("\\Braket", "\\bra@ket{\\left\\langle}{\\,\\middle\\vert\\,}{\\,\\middle\\vert\\,}{\\right\\rangle}"),
             ("\\Bra", "\\left\\langle#1\\right|"),
             ("\\Ket", "\\left|#1\\right\\rangle"),
 
