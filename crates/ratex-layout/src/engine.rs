@@ -969,18 +969,14 @@ fn layout_supsub(
             .max(sup_depth_scaled + 0.25 * metrics.x_height);
     }
 
-    // `\overbrace{…}^{…}` / `\underbrace{…}_{…}`: default sup_shift = height - sup_drop places
-    // the script baseline *inside* tall atoms (by design for single glyphs). For stretchy
-    // horizontal braces the label must sit above/below the ink with limit-style clearance.
+    // KaTeX `horizBrace.js` htmlBuilder: the script is placed using a VList with a fixed 0.2em
+    // kern between the brace result and the script, plus the script's own (scaled) dimensions.
+    // This overrides the default TeX Rule 18 sub_shift / sup_shift with the exact KaTeX layout.
     if horiz_brace_over && sup_box.is_some() {
-        sup_shift += sup_style_metrics.sup_drop * sup_ratio;
-        // Same order of gap as `\xrightarrow` labels (`big_op_spacing1` ≈ 2mu); extra +0.3em
-        // pushed the script too far above the brace vs KaTeX reference (golden 0603).
-        sup_shift += metrics.big_op_spacing1;
+        sup_shift = base_box.height + 0.2 + sup_depth_scaled;
     }
     if horiz_brace_under && sub_box.is_some() {
-        sub_shift += sub_style_metrics.sub_drop * sub_ratio;
-        sub_shift += metrics.big_op_spacing2 + 0.2;
+        sub_shift = base_box.depth + 0.2 + sub_height_scaled;
     }
 
     // Superscript horizontal offset: `layout_symbol` already uses advance width + italic
