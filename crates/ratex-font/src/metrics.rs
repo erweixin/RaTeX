@@ -135,7 +135,7 @@ fn get_metrics_table(font_id: FontId) -> &'static [MetricsEntry] {
         FontId::AmsRegular => metrics_data::AMS_REGULAR,
         FontId::CaligraphicRegular => metrics_data::CALIGRAPHIC_REGULAR,
         FontId::FrakturRegular => metrics_data::FRAKTUR_REGULAR,
-        FontId::FrakturBold => metrics_data::FRAKTUR_REGULAR,
+        FontId::FrakturBold => metrics_data::FRAKTUR_BOLD,
         FontId::MainBold => metrics_data::MAIN_BOLD,
         FontId::MainBoldItalic => metrics_data::MAIN_BOLDITALIC,
         FontId::MainItalic => metrics_data::MAIN_ITALIC,

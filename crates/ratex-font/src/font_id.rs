@@ -6,7 +6,7 @@ pub enum FontId {
     AmsRegular,
     CaligraphicRegular,
     FrakturRegular,
-    /// Bold Fraktur (same metrics table as [`Self::FrakturRegular`]; distinct face for glyphs).
+    /// Bold Fraktur — glyphs from `KaTeX_Fraktur-Bold.ttf`; advances from bold `hmtx` (`FRAKTUR_BOLD`).
     FrakturBold,
     MainBold,
     MainBoldItalic,
