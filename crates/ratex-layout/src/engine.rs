@@ -1373,6 +1373,9 @@ fn layout_op_with_limits(
         _ => return layout_supsub(Some(base_node), sup_node, sub_node, options, None),
     };
 
+    // KaTeX-exact limit kerning (no +0.08em) for `\overset`/`\underset` only (`suppress_base_shift`).
+    let legacy_limit_kern_padding = !suppress_base_shift;
+
     let (base_box, slant) = build_op_base(name, symbol, body, options);
     // baseShift only applies to symbol operators (KaTeX: base instanceof SymbolNode)
     let base_shift = if symbol && !suppress_base_shift {
@@ -1381,16 +1384,28 @@ fn layout_op_with_limits(
         0.0
     };
 
-    layout_op_limits_inner(&base_box, sup_node, sub_node, slant, base_shift, options)
+    layout_op_limits_inner(
+        &base_box,
+        sup_node,
+        sub_node,
+        slant,
+        base_shift,
+        legacy_limit_kern_padding,
+        options,
+    )
 }
 
-/// Assemble an operator with limits above/below (KaTeX's assembleSupSub).
+/// Assemble an operator with limits above/below (KaTeX's `assembleSupSub`).
+///
+/// `legacy_limit_kern_padding`: +0.08em on limit kerns for all ops except `\overset`/`\underset`
+/// (`ParseNode::Op { suppress_base_shift: true }`), matching KaTeX on `\dddot`/`\ddddot` PNGs.
 fn layout_op_limits_inner(
     base: &LayoutBox,
     sup_node: Option<&ParseNode>,
     sub_node: Option<&ParseNode>,
     slant: f64,
     base_shift: f64,
+    legacy_limit_kern_padding: bool,
     options: &LayoutOptions,
 ) -> LayoutBox {
     let metrics = options.metrics();
@@ -1400,22 +1415,32 @@ fn layout_op_limits_inner(
     let sup_ratio = sup_style.size_multiplier() / options.style.size_multiplier();
     let sub_ratio = sub_style.size_multiplier() / options.style.size_multiplier();
 
-    // Extra vertical padding so limits don't sit too close to the operator (e.g. ∫_0^1).
-    let extra_clearance = 0.08_f64;
+    let extra_kern = if legacy_limit_kern_padding { 0.08_f64 } else { 0.0_f64 };
 
     let sup_data = sup_node.map(|s| {
         let sup_opts = options.with_style(sup_style);
         let elem = layout_node(s, &sup_opts);
-        let kern = (metrics.big_op_spacing1 + extra_clearance)
-            .max(metrics.big_op_spacing3 - elem.depth * sup_ratio + extra_clearance);
+        // `\overset`/`\underset`: KaTeX `assembleSupSub` uses `elem.depth` as-is. Other limits
+        // (e.g. `\lim\limits_x`) keep the legacy `depth * sup_ratio` term so ink scores stay
+        // aligned with our KaTeX PNG fixtures.
+        let d = if legacy_limit_kern_padding {
+            elem.depth * sup_ratio
+        } else {
+            elem.depth
+        };
+        let kern = (metrics.big_op_spacing1 + extra_kern).max(metrics.big_op_spacing3 - d + extra_kern);
         (elem, kern)
     });
 
     let sub_data = sub_node.map(|s| {
         let sub_opts = options.with_style(sub_style);
         let elem = layout_node(s, &sub_opts);
-        let kern = (metrics.big_op_spacing2 + extra_clearance)
-            .max(metrics.big_op_spacing4 - elem.height * sub_ratio + extra_clearance);
+        let h = if legacy_limit_kern_padding {
+            elem.height * sub_ratio
+        } else {
+            elem.height
+        };
+        let kern = (metrics.big_op_spacing2 + extra_kern).max(metrics.big_op_spacing4 - h + extra_kern);
         (elem, kern)
     });
 
@@ -2547,7 +2572,9 @@ fn layout_sizing(size: u8, body: &[ParseNode], options: &LayoutOptions) -> Layou
         _ => 1.0,
     };
 
-    let inner = layout_expression(body, options, true);
+    // KaTeX `Options.havingSize`: inner is built in `this.style.text()` (≥ textstyle).
+    let inner_opts = options.with_style(options.style.text());
+    let inner = layout_expression(body, &inner_opts, true);
     let ratio = multiplier / options.size_multiplier();
     if (ratio - 1.0).abs() < 0.001 {
         inner
@@ -2605,6 +2632,13 @@ fn layout_verb(body: &str, star: bool, options: &LayoutOptions) -> LayoutBox {
     hbox
 }
 
+/// Lay out `\text{…}` / `HBox` contents as a simple horizontal row.
+///
+/// KaTeX's HTML builder may merge consecutive text symbols into **one** DOM text run; the
+/// browser then applies OpenType kerning (GPOS) on that run. We place each character using
+/// bundled TeX metrics only (no GPOS), so compared to Puppeteer+KaTeX PNGs, long `\text{…}`
+/// strings can appear slightly wider with a small cumulative horizontal shift — not a wrong
+/// font file, but a shaping model difference.
 fn layout_text(body: &[ParseNode], options: &LayoutOptions) -> LayoutBox {
     let mut children = Vec::new();
     for node in body {
