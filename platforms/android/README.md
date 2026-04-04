@@ -7,7 +7,7 @@ minSdk 21, targetSdk 34.
 
 1. **Add dependency** — In your app's `build.gradle`:
    ```kotlin
-   implementation("io.github.erweixin:ratex-android:0.0.13")
+   implementation("io.github.erweixin:ratex-android:0.0.14")
    ```
 2. **Use** — Add `RaTeXView` in your layout and set LaTeX in code; fonts load automatically on first render.
    ```kotlin

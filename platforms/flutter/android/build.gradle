@@ -4,7 +4,7 @@
 // Build native libs: from repo root run ./platforms/android/build-android.sh
 
 group 'io.ratex'
-version '0.0.13'
+version '0.0.14'
 
 rootProject.allprojects {
     repositories {

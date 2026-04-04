@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'ratex_flutter'
-  s.version          = '0.0.13'
+  s.version          = '0.0.14'
   s.summary          = 'Flutter FFI bindings for RaTeX — native LaTeX math rendering.'
   s.description      = <<-DESC
     Provides a Flutter plugin that links the RaTeX static library (xcframework)
