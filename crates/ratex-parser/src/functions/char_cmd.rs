@@ -38,6 +38,9 @@ fn handle_at_char(
         .ok_or_else(|| ParseError::msg(format!("\\@char with invalid code point {}", code)))?
         .to_string();
 
+    // Match KaTeX `src/functions/char.ts`: `\@char` always yields `textord`, even when the
+    // codepoint is also listed as `\\sum` / op-token in `symbols.js`. `\char"2211` must not
+    // become a large `Size1` operator (that glyph is much wider than KaTeX’s textord path).
     Ok(ParseNode::TextOrd {
         mode: ctx.parser.mode,
         text,

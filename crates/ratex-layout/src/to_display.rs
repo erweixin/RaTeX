@@ -97,6 +97,13 @@ pub fn to_display_list(root: &LayoutBox) -> DisplayList {
         }
     }
 
+    // Expand depth when content extends below the nominal bottom but nothing went above the top.
+    // This handles e.g. \smash[b] which zeroes the layout depth while content still renders below
+    // the baseline — the pixmap would otherwise be too short and clip the denominator.
+    if total_h >= 0.01 && min_y >= -0.001 && max_y > height + depth + 0.001 {
+        depth = max_y - height;
+    }
+
     DisplayList {
         items,
         width,
@@ -245,6 +252,8 @@ fn emit_box(lbox: &LayoutBox, x: f64, y: f64, scale: f64, items: &mut Vec<Displa
         } => {
             let radical_width = lbox.width - index_offset - body.width;
 
+            let surd_x = x + index_offset * scale;
+
             if let Some(index_box) = index {
                 // Root index (scriptscript): KaTeX `htmlBuilder` builds a vlist with
                 // `positionType: "shift", positionData: -toShift` where
@@ -253,23 +262,21 @@ fn emit_box(lbox: &LayoutBox, x: f64, y: f64, scale: f64, items: &mut Vec<Displa
                 // That aligns the root span with the sqrt body on the math baseline, then
                 // shifts the glyph upward by `toShift` — not pinned to the top of the surd.
                 //
-                // Horizontal: KaTeX uses `margin-left: 5/18 em` on `.sqrt > .root` (`\mkern 5mu`).
-                // Outline-font U+221A vs KaTeX SVG shifts the crook; ~0.55em parent-em inset matches
-                // `tests/golden/fixtures/0744.png` better than 5/18 (~0.278) for our glyph pipeline.
-                const INDEX_PADDING_LEFT_EM: f64 = 0.62;
+                // Horizontal: KaTeX places the index at `\mkern 5mu` (5/18 em) from the LEFT
+                // of the surd glyph, matching `.sqrt > .root { margin-left: 5/18em }`.
+                // Using surd_x as the reference makes this scale correctly for all surd sizes
+                // and for nested radicals where each level has a different index_offset.
                 let to_shift = 0.6 * (lbox.height - lbox.depth);
                 let index_baseline_y = y - to_shift * scale;
                 let child_scale = scale * index_scale;
                 emit_box(
                     index_box,
-                    x + INDEX_PADDING_LEFT_EM * scale,
+                    surd_x + (5.0 / 18.0) * scale,
                     index_baseline_y,
                     child_scale,
                     items,
                 );
             }
-
-            let surd_x = x + index_offset * scale;
             let surd_font = surd_font_for_inner_height(*inner_height);
             let (gw, gh, gd) = ratex_font::get_char_metrics(surd_font, SURD_CHAR)
                 .map(|m| (m.width, m.height, m.depth))

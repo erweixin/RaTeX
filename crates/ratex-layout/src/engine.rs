@@ -645,9 +645,27 @@ fn layout_symbol(text: &str, mode: Mode, options: &LayoutOptions) -> LayoutBox {
         }
     }
 
-    let (width, height, depth) = match metrics {
-        Some(m) => (math_glyph_advance_em(&m, mode), m.height, m.depth),
-        None => missing_glyph_metrics_fallback(ch, options),
+    // KaTeX `Main-Regular` has no metrics/cmap for some codepoints (e.g. U+2211) that only exist
+    // in `Size1`/`Size2`. `\@char` yields `textord`, so we still rasterize via the normal lookup
+    // chain (unicode fallback when Main has no glyph). Using `missing_glyph_metrics_fallback`
+    // (0.5em wide) then clips the real fallback outline in PNG/SVG — borrow Size-font TeX metrics
+    // for the box only, without switching `font_id`.
+    let (width, height, depth) = if let Some(m) = metrics {
+        (math_glyph_advance_em(&m, mode), m.height, m.depth)
+    } else if mode == Mode::Math {
+        let size_font = if options.style.is_display() {
+            FontId::Size2Regular
+        } else {
+            FontId::Size1Regular
+        };
+        match get_char_metrics(size_font, char_code)
+            .or_else(|| get_char_metrics(FontId::Size1Regular, char_code))
+        {
+            Some(m) => (math_glyph_advance_em(&m, mode), m.height, m.depth),
+            None => missing_glyph_metrics_fallback(ch, options),
+        }
+    } else {
+        missing_glyph_metrics_fallback(ch, options)
     };
 
     LayoutBox {
@@ -2981,7 +2999,7 @@ fn layout_font(font: &str, body: &ParseNode, options: &LayoutOptions) -> LayoutB
     let font_id = match font {
         "mathrm" | "\\mathrm" | "textrm" | "\\textrm" | "rm" | "\\rm" => Some(FontId::MainRegular),
         "mathbf" | "\\mathbf" | "textbf" | "\\textbf" | "bf" | "\\bf" => Some(FontId::MainBold),
-        "mathit" | "\\mathit" | "textit" | "\\textit" => Some(FontId::MainItalic),
+        "mathit" | "\\mathit" | "textit" | "\\textit" | "\\emph" => Some(FontId::MainItalic),
         "mathsf" | "\\mathsf" | "textsf" | "\\textsf" => Some(FontId::SansSerifRegular),
         "mathtt" | "\\mathtt" | "texttt" | "\\texttt" => Some(FontId::TypewriterRegular),
         "mathcal" | "\\mathcal" | "cal" | "\\cal" => Some(FontId::CaligraphicRegular),
@@ -3022,17 +3040,18 @@ fn layout_with_font(node: &ParseNode, font_id: FontId, options: &LayoutOptions) 
             }
             layout_supsub(base.as_deref(), sup.as_deref(), sub.as_deref(), options, Some(font_id))
         }
-        ParseNode::MathOrd { text, .. }
-        | ParseNode::TextOrd { text, .. }
-        | ParseNode::Atom { text, .. } => {
-            let ch = resolve_symbol_char(text, Mode::Math);
+        ParseNode::MathOrd { text, mode, .. }
+        | ParseNode::TextOrd { text, mode, .. }
+        | ParseNode::Atom { text, mode, .. } => {
+            let ch = resolve_symbol_char(text, *mode);
             let char_code = ch as u32;
             let metric_cp = ratex_font::font_and_metric_for_mathematical_alphanumeric(char_code)
                 .map(|(_, m)| m)
                 .unwrap_or(char_code);
             if let Some(m) = get_char_metrics(font_id, metric_cp) {
                 LayoutBox {
-                    width: math_glyph_advance_em(&m, Mode::Math),
+                    // Text mode: no italic correction (it's a typographic hint for math sub/sup).
+                    width: math_glyph_advance_em(&m, *mode),
                     height: m.height,
                     depth: m.depth,
                     content: BoxContent::Glyph { font_id, char_code },
