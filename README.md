@@ -11,24 +11,31 @@ One Rust core, one display list, every platform renders natively.
 ```
 
 **[→ Live Demo](https://erweixin.github.io/RaTeX/demo/live.html)** — type LaTeX and compare RaTeX vs KaTeX side-by-side ·
-**[→ Support table](https://erweixin.github.io/RaTeX/demo/support-table.html)** — RaTeX vs KaTeX across all test formulas
+**[→ Support table](https://erweixin.github.io/RaTeX/demo/support-table.html)** — RaTeX vs KaTeX across all test formulas ·
+**[→ Web benchmark](https://erweixin.github.io/RaTeX/demo/benchmark.html)** — head-to-head perf in the browser
 
 ---
 
 ## Why RaTeX?
 
-Every major cross-platform math renderer today runs LaTeX through a browser or JavaScript engine — a hidden WebView eating 50–150 MB RAM, startup latency before the first formula, no offline guarantee.
+Every major cross-platform math renderer today runs LaTeX through a browser or JavaScript engine — a hidden WebView eating 50–150 MB RAM, startup latency before the first formula, no offline guarantee. KaTeX is excellent on the web, but on every other surface — iOS, Android, Flutter, server-side, embedded — you're either hosting a WebView or shelling out to headless Chrome.
 
-RaTeX cuts the web stack out entirely:
+RaTeX is the same KaTeX-compatible math engine compiled to a portable Rust core, so the *same* renderer runs natively everywhere — and produces byte-identical output across every target.
 
-| | KaTeX (web) | MathJax | **RaTeX** |
+| | KaTeX | MathJax | **RaTeX** |
 |---|---|---|---|
-| Runtime | V8 + DOM | V8 + DOM | **Pure Rust** |
-| Mobile | WebView | WebView | **Native** |
+| Runtime | JS (V8) | JS (V8) | **Pure Rust** |
+| Surfaces it runs on | Web only* | Web only* | **iOS · Android · Flutter · RN · Web · server · SVG** |
+| Mobile | WebView wrapper | WebView wrapper | **Native** |
+| Server-side rendering | headless Chrome | mathjax-node | **Single binary, no JS runtime** |
+| Output substrate | DOM (`<span>` tree) | DOM / SVG | **Display list → Canvas / PNG / SVG** |
+| Memory | GC / heap | GC / heap | **Predictable, no GC** |
 | Offline | Depends | Depends | **Yes** |
-| Bundle overhead | ~280 kB JS | ~500 kB JS | **0 kB JS** |
-| Memory | GC / heap | GC / heap | **Predictable** |
 | Syntax coverage | 100% | ~100% | **~99%** |
+
+<sub>\* Embeddable in non-web targets only by hosting a WebView or headless browser, which most native and server contexts can't tolerate.</sub>
+
+**On the web specifically**, KaTeX has a decade of V8 JIT optimization behind it and remains the obvious choice for web-only projects. RaTeX's contribution isn't beating it on its home turf — it's being the only KaTeX-compatible engine that runs natively on every *other* surface, with pixel-identical output across all of them.
 
 ---
 
