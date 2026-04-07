@@ -7,7 +7,7 @@
 
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous" />
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous" id="katex-script"></script>
-  <link rel="stylesheet" href="../../platforms/web/fonts.css" />
+  <link rel="stylesheet" href="../platforms/web/fonts.css" />
 
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -401,7 +401,7 @@ async function loadFontsAndWasm(){
 
   setStatus('loading', 'Loading WASM…');
   try {
-    const mod = await import('../../platforms/web/pkg/ratex_wasm.js');
+    const mod = await import('../platforms/web/pkg/ratex_wasm.js');
     await mod.default();
     renderLatex = mod.renderLatex;
     wasmReady = true;
