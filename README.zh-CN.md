@@ -11,24 +11,31 @@
 ```
 
 **[→ 在线演示](https://erweixin.github.io/RaTeX/demo/live.html)** — 输入 LaTeX，对比 RaTeX vs KaTeX ·
-**[→ 支持表](https://erweixin.github.io/RaTeX/demo/support-table.html)** — 全量测试公式的 RaTeX vs KaTeX 对比
+**[→ 支持表](https://erweixin.github.io/RaTeX/demo/support-table.html)** — 全量测试公式的 RaTeX vs KaTeX 对比 ·
+**[→ Web 性能基准](https://erweixin.github.io/RaTeX/demo/benchmark.html)** — 浏览器内的正面性能对比
 
 ---
 
 ## 为什么选 RaTeX？
 
-目前主流的跨平台数学渲染方案都依赖浏览器或 JavaScript 引擎跑 LaTeX，带来隐藏 WebView 占用 50–150 MB 内存、首屏公式要等 JS 启动、无法保证离线等问题。
+目前主流的跨平台数学渲染方案都依赖浏览器或 JavaScript 引擎跑 LaTeX，带来隐藏 WebView 占用 50–150 MB 内存、首屏公式要等 JS 启动、无法保证离线等问题。KaTeX 在 Web 上非常出色，但在其他任何目标——iOS、Android、Flutter、服务端、嵌入式——你要么内嵌 WebView，要么调用 headless Chrome。
 
-RaTeX 完全去掉 Web 栈：
+RaTeX 是同一个 KaTeX 兼容的数学引擎，但编译到一个可移植的 Rust 核心：**同一套渲染器在每个平台原生运行**，并在所有目标上产出**像素一致**的输出。
 
-| | KaTeX (Web) | MathJax | **RaTeX** |
+| | KaTeX | MathJax | **RaTeX** |
 |---|---|---|---|
-| 运行时 | V8 + DOM | V8 + DOM | **纯 Rust** |
-| 移动端 | WebView | WebView | **原生** |
+| 运行时 | JS (V8) | JS (V8) | **纯 Rust** |
+| 可运行的目标 | 仅 Web* | 仅 Web* | **iOS · Android · Flutter · RN · Web · 服务端 · SVG** |
+| 移动端 | WebView 套壳 | WebView 套壳 | **原生** |
+| 服务端渲染 | headless Chrome | mathjax-node | **单二进制，无需 JS 运行时** |
+| 输出形态 | DOM（`<span>` 树）| DOM / SVG | **显示列表 → Canvas / PNG / SVG** |
+| 内存模型 | GC / 堆 | GC / 堆 | **可预期，无 GC** |
 | 离线 | 视情况 | 视情况 | **支持** |
-| 包体积 | ~280 kB JS | ~500 kB JS | **0 kB JS** |
-| 内存模型 | GC / 堆 | GC / 堆 | **可预期** |
 | 语法覆盖 | 100% | ~100% | **~99%** |
+
+<sub>\* 在非 Web 目标上只能通过内嵌 WebView 或 headless 浏览器使用，而大多数原生和服务端场景都无法接受这种方式。</sub>
+
+**单看 Web**，KaTeX 背后有十年的 V8 JIT 优化积累，对纯 Web 项目仍然是显而易见的选择。RaTeX 的价值不在于在 KaTeX 的主场击败它，而在于：它是**唯一**一个能在所有其他平台原生运行的 KaTeX 兼容引擎，且在所有平台之间输出像素一致。
 
 ---
 
