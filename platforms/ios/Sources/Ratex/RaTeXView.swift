@@ -28,6 +28,12 @@ public class RaTeXView: UIView {
         didSet { guard fontSize != oldValue else { return }; rerender() }
     }
 
+    /// Rendering mode. `true` (default) for display/block style (`$$...$$`);
+    /// `false` for inline/text style (`$...$`).
+    public var displayMode: Bool = true {
+        didSet { guard displayMode != oldValue else { return }; rerender() }
+    }
+
     /// Called when a render error occurs (e.g. invalid LaTeX).
     public var onError: ((Error) -> Void)?
 
@@ -98,7 +104,7 @@ public class RaTeXView: UIView {
         // before the render completes, making cells invisible.
         RaTeXFontLoader.ensureLoaded()
         do {
-            let dl = try RaTeXEngine.shared.parse(latex)
+            let dl = try RaTeXEngine.shared.parse(latex, displayMode: displayMode)
             renderer = RaTeXRenderer(displayList: dl, fontSize: fontSize)
             mathAscent  = renderer?.height ?? 0
             mathDescent = renderer?.depth  ?? 0
@@ -161,36 +167,39 @@ public struct RaTeXFormulaAscentKey: LayoutValueKey {
 public struct RaTeXFormula: View {
     public let latex: String
     public var fontSize: CGFloat = 24
+    public var displayMode: Bool = true
     public var onError: ((Error) -> Void)? = nil
     public var onLayout: ((CGFloat, CGFloat) -> Void)? = nil
 
     public init(
         latex: String,
         fontSize: CGFloat = 24,
+        displayMode: Bool = true,
         onError: ((Error) -> Void)? = nil,
         onLayout: ((CGFloat, CGFloat) -> Void)? = nil
     ) {
-        self.latex    = latex
-        self.fontSize = fontSize
-        self.onError  = onError
-        self.onLayout = onLayout
+        self.latex       = latex
+        self.fontSize    = fontSize
+        self.displayMode = displayMode
+        self.onError     = onError
+        self.onLayout    = onLayout
     }
 
     /// Synchronously computes the formula's ascent (top-of-view → baseline).
     /// Called in `body` so the value is available on the very first layout pass.
     /// `parse()` is < 1ms and is called internally by `RaTeXView.rerender()` anyway.
     private var ascent: CGFloat {
-        guard let dl = try? RaTeXEngine.shared.parse(latex) else { return 0 }
+        guard let dl = try? RaTeXEngine.shared.parse(latex, displayMode: displayMode) else { return 0 }
         return CGFloat(dl.height) * fontSize
     }
 
     public var body: some View {
         if #available(iOS 16, *) {
-            _RaTeXRepresentable(latex: latex, fontSize: fontSize,
+            _RaTeXRepresentable(latex: latex, fontSize: fontSize, displayMode: displayMode,
                                 onError: onError, onLayout: onLayout)
                 .layoutValue(key: RaTeXFormulaAscentKey.self, value: ascent)
         } else {
-            _RaTeXRepresentable(latex: latex, fontSize: fontSize,
+            _RaTeXRepresentable(latex: latex, fontSize: fontSize, displayMode: displayMode,
                                 onError: onError, onLayout: onLayout)
         }
     }
@@ -202,6 +211,7 @@ public struct RaTeXFormula: View {
 private struct _RaTeXRepresentable: UIViewRepresentable {
     let latex: String
     var fontSize: CGFloat
+    var displayMode: Bool
     var onError: ((Error) -> Void)?
     var onLayout: ((CGFloat, CGFloat) -> Void)?
 
@@ -213,9 +223,10 @@ private struct _RaTeXRepresentable: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: RaTeXView, context: Context) {
-        uiView.fontSize  = fontSize
-        uiView.onError   = onError
-        uiView.onLayout  = onLayout
-        uiView.latex     = latex
+        uiView.fontSize    = fontSize
+        uiView.displayMode = displayMode
+        uiView.onError     = onError
+        uiView.onLayout    = onLayout
+        uiView.latex       = latex
     }
 }

@@ -5,6 +5,8 @@ import RaTeXViewNativeComponent from './RaTeXViewNativeComponent';
 export interface RaTeXViewProps {
   latex: string;
   fontSize?: number;
+  /** true (default) = display/block style ($$...$$); false = inline/text style ($...$). */
+  displayMode?: boolean;
   style?: StyleProp<ViewStyle>;
   onError?: (e: {nativeEvent: {error: string}}) => void;
   /** Called when content size is measured (e.g. for scroll layout). */
@@ -16,6 +18,7 @@ export interface RaTeXViewProps {
 export function RaTeXView({
   latex,
   fontSize = 24,
+  displayMode = true,
   style,
   onError,
   onContentSizeChange,
@@ -44,6 +47,7 @@ export function RaTeXView({
     <RaTeXViewNativeComponent
       latex={latex}
       fontSize={fontSize}
+      displayMode={displayMode}
       style={resolvedStyle}
       onError={onError}
       onContentSizeChange={handleContentSizeChange}

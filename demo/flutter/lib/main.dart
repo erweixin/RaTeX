@@ -37,6 +37,7 @@ Widget buildInlineMath(
         child: RaTeXWidget(
           latex: parts[i],
           fontSize: mathFontSize,
+          displayMode: false,
           onError: (e) => debugPrint('RaTeX inline error: $e'),
           loading: const SizedBox.shrink(),
         ),
@@ -79,6 +80,9 @@ class DemoPage extends StatefulWidget {
 }
 
 class _DemoPageState extends State<DemoPage> {
+  /// Block (`true`) vs inline (`false`) — applies to formula list + custom input.
+  bool _displayMode = true;
+
   static const _formulas = [
     (name: 'Quadratic formula',    latex: r'\frac{-b \pm \sqrt{b^2-4ac}}{2a}'),
     (name: "Euler's identity",     latex: r'e^{i\pi} + 1 = 0'),
@@ -116,6 +120,40 @@ class _DemoPageState extends State<DemoPage> {
           // ── Showcase — first visible screen ─────────────────────────────
           _SectionHeader('RaTeX · Native Cross-Platform Math'),
           const _ShowcaseCard(),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Preset & custom formulas use:',
+                      style: Theme.of(context).textTheme.labelLarge,
+                    ),
+                  ),
+                  SegmentedButton<bool>(
+                    segments: const [
+                      ButtonSegment<bool>(
+                        value: true,
+                        label: Text('Block'),
+                        tooltip: r'Display mode ($$...$$)',
+                      ),
+                      ButtonSegment<bool>(
+                        value: false,
+                        label: Text('Inline'),
+                        tooltip: r'Inline mode ($...$)',
+                      ),
+                    ],
+                    selected: {_displayMode},
+                    onSelectionChanged: (Set<bool> next) {
+                      setState(() => _displayMode = next.first);
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 24),
 
           // ── Inline math ──────────────────────────────────────────────────
@@ -166,7 +204,11 @@ class _DemoPageState extends State<DemoPage> {
                       children: [
                         _label(context, f.name),
                         const SizedBox(height: 8),
-                        _FormulaCard(latex: f.latex, fontSize: 22),
+                        _FormulaCard(
+                          latex: f.latex,
+                          fontSize: 22,
+                          displayMode: _displayMode,
+                        ),
                       ],
                     ),
                   ),
@@ -210,7 +252,11 @@ class _DemoPageState extends State<DemoPage> {
                     ],
                   ),
                   const SizedBox(height: 8),
-                  _FormulaCard(latex: _controller.text, fontSize: _fontSize),
+                  _FormulaCard(
+                    latex: _controller.text,
+                    fontSize: _fontSize,
+                    displayMode: _displayMode,
+                  ),
                 ],
               ),
             ),
@@ -339,8 +385,13 @@ class _SectionHeader extends StatelessWidget {
 class _FormulaCard extends StatelessWidget {
   final String latex;
   final double fontSize;
+  final bool displayMode;
 
-  const _FormulaCard({required this.latex, required this.fontSize});
+  const _FormulaCard({
+    required this.latex,
+    required this.fontSize,
+    this.displayMode = true,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -350,6 +401,7 @@ class _FormulaCard extends StatelessWidget {
       child: RaTeXWidget(
         latex: latex,
         fontSize: fontSize,
+        displayMode: displayMode,
         onError: (e) => debugPrint('RaTeX error: $e'),
         loading: const SizedBox.shrink(),
       ),

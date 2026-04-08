@@ -3,7 +3,7 @@ PODS:
   - hermes-engine (250829098.0.9):
     - hermes-engine/Pre-built (= 250829098.0.9)
   - hermes-engine/Pre-built (250829098.0.9)
-  - ratex-react-native (0.0.10):
+  - ratex-react-native (0.0.16):
     - hermes-engine
     - RCTRequired
     - RCTTypeSafety
@@ -2112,7 +2112,7 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   FBLazyVector: e97c19a5a442429d1988f182a1940fb08df514da
   hermes-engine: 3f497cc225411a611d807f241eb217451c7cd621
-  ratex-react-native: 7d86835cd242148bd4b718e91730fc6ff6e88ef7
+  ratex-react-native: 64635b21f20aa4262f728abbc3478183accb87b4
   RCTDeprecation: af44b104091a34482596cd9bd7e8d90c4e9b4bd7
   RCTRequired: bb77b070f75f53398ce43c0aaaa58337cebe2bf6
   RCTSwiftUI: afc0a0a635860da1040a0b894bfd529da06d7810

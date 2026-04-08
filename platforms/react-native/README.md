@@ -82,6 +82,7 @@ Use `$...$` delimiters anywhere inside the `content` string. Multiple formulas i
 |------|------|---------|-------------|
 | `latex` | `string` | — | LaTeX math-mode string to render (required) |
 | `fontSize` | `number` | `24` | Font size in **dp** (density-independent pixels). The rendered formula scales proportionally. |
+| `displayMode` | `boolean` | `true` | `true` = display/block style (`$$...$$`); `false` = inline/text style (`$...$`). |
 | `style` | `StyleProp<ViewStyle>` | — | Standard React Native style. Width and height are automatically set from measured content unless overridden. |
 | `onError` | `(e: { nativeEvent: { error: string } }) => void` | — | Called when the LaTeX string fails to parse. |
 | `onContentSizeChange` | `(e: { nativeEvent: { width: number; height: number } }) => void` | — | Called after layout with the formula's rendered dimensions in dp. Useful for scroll views or dynamic containers. |
@@ -110,6 +111,8 @@ Renders a mixed string of plain text and `$...$` LaTeX formulas as a single inli
 | `content` | `string` | — | Text string with `$...$` markers for inline LaTeX (required). |
 | `fontSize` | `number` | `16` | Font size passed to each formula renderer (dp). |
 | `textStyle` | `StyleProp<TextStyle>` | — | Style applied to plain-text segments. |
+
+> `InlineTeX` automatically passes `displayMode={false}` to every formula it renders — `$...$` is always inline style.
 
 ## Architecture Support
 

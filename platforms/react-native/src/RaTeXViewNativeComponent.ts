@@ -13,6 +13,8 @@ type OnContentSizeChangeEvent = {width: Double; height: Double};
 export interface NativeProps extends ViewProps {
   latex: string;
   fontSize?: Float;
+  /** true (default) = display/block style; false = inline/text style. */
+  displayMode?: boolean;
   onError?: BubblingEventHandler<OnErrorEvent>;
   onContentSizeChange?: DirectEventHandler<OnContentSizeChangeEvent>;
 }

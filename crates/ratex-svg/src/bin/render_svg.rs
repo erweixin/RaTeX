@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use ratex_layout::{layout, to_display_list, LayoutOptions};
 use ratex_parser::parser::parse;
 use ratex_svg::{render_to_svg, SvgOptions};
+use ratex_types::math_style::MathStyle;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -49,7 +50,9 @@ fn main() {
         font_dir,
     };
 
-    let layout_opts = LayoutOptions::default();
+    let inline = args.contains(&"--inline".to_string());
+    let style = if inline { MathStyle::Text } else { MathStyle::Display };
+    let layout_opts = LayoutOptions::default().with_style(style);
 
     let stdin = io::stdin();
     let mut idx = 0;

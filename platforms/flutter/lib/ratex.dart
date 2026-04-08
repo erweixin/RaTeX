@@ -29,17 +29,27 @@ class RaTeXEngine {
 
   /// Parse and lay out [latex], returning a [DisplayList].
   ///
-  /// This is a synchronous, CPU-bound call. For long formulas, wrap in an
-  /// isolate:
+  /// [displayMode] — `true` (default) for display/block style (`$$...$$`);
+  /// `false` for inline/text style (`$...$`).
+  ///
+  /// This is a synchronous, CPU-bound call. For long formulas, use [compute]
+  /// with [ratexParseAndLayoutInIsolate]:
   /// ```dart
-  /// final dl = await compute(RaTeXEngine.instance.parseAndLayout, latex);
+  /// final dl = await compute(
+  ///   ratexParseAndLayoutInIsolate,
+  ///   (latex: tex, displayMode: true),
+  /// );
   /// ```
-  DisplayList parseAndLayout(String latex) => _ffi.parseAndLayout(latex);
+  DisplayList parseAndLayout(String latex, {bool displayMode = true}) =>
+      _ffi.parseAndLayout(latex, displayMode: displayMode);
 }
 
-// Top-level function required by compute() — must not be a closure or instance method.
-DisplayList _parseAndLayoutInIsolate(String latex) =>
-    RaTeXEngine.instance.parseAndLayout(latex);
+/// Arguments for [ratexParseAndLayoutInIsolate] (e.g. pass to [compute]).
+typedef RaTeXParseAndLayoutArgs = ({String latex, bool displayMode});
+
+/// Top-level isolate entry for [compute]; calls [RaTeXEngine.parseAndLayout].
+DisplayList ratexParseAndLayoutInIsolate(RaTeXParseAndLayoutArgs args) =>
+    RaTeXEngine.instance.parseAndLayout(args.latex, displayMode: args.displayMode);
 
 // MARK: - Stateful widget
 
@@ -58,6 +68,9 @@ class RaTeXWidget extends StatefulWidget {
   /// Font size in logical pixels.
   final double fontSize;
 
+  /// `true` (default) — display/block style; `false` — inline/text style.
+  final bool displayMode;
+
   /// Widget displayed while the formula is being computed.
   final Widget? loading;
 
@@ -68,6 +81,7 @@ class RaTeXWidget extends StatefulWidget {
     super.key,
     required this.latex,
     this.fontSize = 24,
+    this.displayMode = true,
     this.loading,
     this.onError,
   });
@@ -83,20 +97,25 @@ class _RaTeXWidgetState extends State<RaTeXWidget> {
   @override
   void initState() {
     super.initState();
-    _render(widget.latex);
+    _render();
   }
 
   @override
   void didUpdateWidget(RaTeXWidget old) {
     super.didUpdateWidget(old);
-    if (old.latex != widget.latex || old.fontSize != widget.fontSize) {
-      _render(widget.latex);
+    if (old.latex != widget.latex ||
+        old.fontSize != widget.fontSize ||
+        old.displayMode != widget.displayMode) {
+      _render();
     }
   }
 
-  Future<void> _render(String latex) async {
+  Future<void> _render() async {
     try {
-      final dl = await compute(_parseAndLayoutInIsolate, latex);
+      final dl = await compute(
+        ratexParseAndLayoutInIsolate,
+        (latex: widget.latex, displayMode: widget.displayMode),
+      );
       if (mounted) setState(() { _displayList = dl; _error = null; });
     } on RaTeXException catch (e) {
       widget.onError?.call(e);

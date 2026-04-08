@@ -86,9 +86,10 @@ bash platforms/ios/build-ios.sh
 import RaTeX
 
 let mathView = RaTeXView()
-mathView.latex    = #"\frac{-b \pm \sqrt{b^2-4ac}}{2a}"#
-mathView.fontSize = 28
-mathView.onError  = { print("RaTeX error:", $0) }
+mathView.latex       = #"\frac{-b \pm \sqrt{b^2-4ac}}{2a}"#
+mathView.fontSize    = 28
+mathView.displayMode = true   // true = 独立块（默认）；false = 行内
+mathView.onError     = { print("RaTeX error:", $0) }
 
 // 自动布局
 mathView.translatesAutoresizingMaskIntoConstraints = false
@@ -109,6 +110,7 @@ struct ContentView: View {
         RaTeXFormula(
             latex: #"\int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}"#,
             fontSize: 24
+            // displayMode: true  ← 默认独立块；传 false 切换为行内样式
         )
         .padding()
     }
@@ -151,8 +153,12 @@ struct FlowLayout: Layout {
 ```swift
 import RaTeX
 
+// 独立块（默认）
 let displayList = try RaTeXEngine.shared.parse(#"\sum_{n=1}^\infty \frac{1}{n^2}"#)
-let renderer    = RaTeXRenderer(displayList: displayList, fontSize: 20)
+// 行内
+let displayList = try RaTeXEngine.shared.parse(#"\frac{1}{2}"#, displayMode: false)
+
+let renderer = RaTeXRenderer(displayList: displayList, fontSize: 20)
 
 // 在你的 UIView.draw(_:) 或 CGContext 块中：
 renderer.draw(in: UIGraphicsGetCurrentContext()!)
