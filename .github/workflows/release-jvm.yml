@@ -1,0 +1,78 @@
+# 推送版本 tag（如 v0.0.15）时：构建全平台 native 库、上传到 Maven Central、创建 GitHub Release 并附带 JAR。
+# 使用 com.vanniktech.maven.publish 插件简化发布流程。
+#
+# 仓库 Secrets：SONATYPE_NEXUS_USERNAME, SONATYPE_NEXUS_PASSWORD, GPG_PRIVATE_KEY, GPG_PASSPHRASE
+name: Release JVM (Maven Central)
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin,aarch64-unknown-linux-gnu,x86_64-unknown-linux-gnu,x86_64-pc-windows-gnu
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+
+      - name: Install zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.13.0
+
+      - name: Install cargo-zigbuild
+        run: cargo install cargo-zigbuild
+
+      - name: Build JVM native libraries (all platforms)
+        run: bash platforms/jvm/build-jvm.sh --all
+
+      - name: Publish to Maven Central
+        # Central Portal 验证较慢，build service 轮询可能超时，但包已上传并触发 release，不影响实际发布
+        continue-on-error: true
+        run: |
+          cd demo/jvm
+          ./gradlew :ratex-jvm:publishAndReleaseToMavenCentral --no-daemon -PlibraryVersion=${{ steps.version.outputs.version }}
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.SONATYPE_NEXUS_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.SONATYPE_NEXUS_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.GPG_PRIVATE_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ratex-jvm-jar
+          path: platforms/jvm/build/libs/*.jar
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: platforms/jvm/build/libs/*.jar
+          generate_release_notes: true

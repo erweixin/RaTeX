@@ -6,6 +6,7 @@ Cargo.lock
 node_modules/
 venv
 .DS_Store
+local.properties
 platforms/web/dist/
 # Local deploy / build copy (do not commit)
 deploy/
@@ -31,6 +32,9 @@ xcuserdata/
 
 # Android — native libs built by platforms/android/build-android.sh (do not commit)
 platforms/android/src/main/jniLibs/
+
+# JVM — native libs built by platforms/jvm/build-jvm.sh (do not commit)
+platforms/jvm/native/
 
 # iOS — XCFramework built by platforms/ios/build-ios.sh (do not commit)
 platforms/ios/RaTeX.xcframework/
