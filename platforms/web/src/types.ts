@@ -10,6 +10,8 @@ export interface Color {
   a: number;
 }
 
+export type KnownDisplayItemType = "GlyphPath" | "Line" | "Rect" | "Path";
+
 export type PathCommand =
   | { type: "MoveTo"; x: number; y: number }
   | { type: "LineTo"; x: number; y: number }
@@ -36,6 +38,8 @@ export type DisplayItem =
       width: number;
       thickness: number;
       color: Color;
+      /** Optional; defaults to false when absent. */
+      dashed?: boolean;
     }
   | {
       type: "Rect";
@@ -52,9 +56,22 @@ export type DisplayItem =
       commands: PathCommand[];
       fill: boolean;
       color: Color;
-    };
+    }
+  | UnknownDisplayItem;
+
+/**
+ * Forward-compatibility: allow newer DisplayItem variants.
+ * Decoders should ignore unknown item types (protocol requires this).
+ */
+export type UnknownDisplayItem = {
+  type: Exclude<string, KnownDisplayItemType>;
+  // Allow extra fields without failing type-checks at call sites.
+  [key: string]: unknown;
+};
 
 export interface DisplayList {
+  /** DisplayList JSON protocol version (optional). Missing implies version 0. */
+  version?: number;
   items: DisplayItem[];
   width: number;
   height: number;

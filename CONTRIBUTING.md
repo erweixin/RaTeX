@@ -27,7 +27,7 @@ Reference PNGs live under `tests/golden/fixtures/`. Regenerate RaTeX outputs wit
 ./scripts/update_golden_output.sh
 ```
 
-Comparison helpers: `tools/golden_compare/`, and `crates/ratex-render/tests/golden_test.rs`. See `docs/LOW_SCORE_CASES.md` for known weak cases.
+Comparison helpers: `tools/golden_compare/`, and `crates/ratex-render/tests/golden_test.rs`. Some cases score lower than others due to font subpixel rendering, anti-aliasing, or layout edge differences versus KaTeX reference PNGs — that does not always indicate a visible bug.
 
 **mhchem (`\ce` / `\pu`) golden**: reference PNGs in `tests/golden/fixtures_ce/` (KaTeX + mhchem, via Puppeteer):
 

@@ -137,7 +137,7 @@ struct ShowcaseView: View {
             // 2. Fourier transform — multi-level exponent nesting
             VStack(alignment: .leading, spacing: 6) {
                 badge("Fourier transform")
-                RaTeXFormula(
+                ScrollableFormula(
                     latex: #"\hat{f}(\xi) = \int_{-\infty}^{\infty} f(x)\,e^{-2\pi i x \xi}\,dx"#,
                     fontSize: 22, onError: { _ in }
                 )
@@ -149,7 +149,7 @@ struct ShowcaseView: View {
             // 3. 3×3 rotation matrix
             VStack(alignment: .leading, spacing: 6) {
                 badge("3D rotation matrix")
-                RaTeXFormula(
+                ScrollableFormula(
                     latex: #"R_z(\theta)=\begin{pmatrix}\cos\theta&-\sin\theta&0\\\sin\theta&\cos\theta&0\\0&0&1\end{pmatrix}"#,
                     fontSize: 21, onError: { _ in }
                 )
@@ -161,7 +161,7 @@ struct ShowcaseView: View {
             // 4. Time-dependent Schrödinger equation
             VStack(alignment: .leading, spacing: 6) {
                 badge("Schrödinger equation")
-                RaTeXFormula(
+                ScrollableFormula(
                     latex: #"i\hbar\frac{\partial}{\partial t}\Psi = \left[-\frac{\hbar^2}{2m}\nabla^2 + V\right]\Psi"#,
                     fontSize: 21, onError: { _ in }
                 )
@@ -173,7 +173,7 @@ struct ShowcaseView: View {
             // 5. Residue theorem — \operatorname
             VStack(alignment: .leading, spacing: 6) {
                 badge("Residue theorem · \\operatorname")
-                RaTeXFormula(
+                ScrollableFormula(
                     latex: #"\oint_C f(z)\,dz = 2\pi i \sum_k \operatorname{Res}(f,z_k)"#,
                     fontSize: 21, onError: { _ in }
                 )
@@ -392,7 +392,7 @@ struct BlockExamplesView: View {
                 Text("Einstein derived from special relativity that the rest energy of a body with mass m is")
                     .fixedSize(horizontal: false, vertical: true)
 
-                RaTeXFormula(latex: #"E = mc^2"#, fontSize: 28, onError: { _ in })
+                ScrollableFormula(latex: #"E = mc^2"#, fontSize: 28, onError: { _ in })
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 4)
 
@@ -419,7 +419,7 @@ struct BlockExamplesView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .frame(width: 90, alignment: .trailing)
-                            RaTeXFormula(latex: eq.latex, fontSize: 18, onError: { _ in })
+                            ScrollableFormula(latex: eq.latex, fontSize: 18, onError: { _ in })
                         }
                     }
                 }
@@ -438,7 +438,7 @@ struct BlockExamplesView: View {
                 Text("The Taylor series of f(x) around x = a is:")
                     .fixedSize(horizontal: false, vertical: true)
 
-                RaTeXFormula(
+                ScrollableFormula(
                     latex: #"f(x) = \sum_{n=0}^{\infty} \frac{f^{(n)}(a)}{n!}(x-a)^n"#,
                     fontSize: 20,
                     onError: { _ in }
@@ -455,7 +455,7 @@ struct BlockExamplesView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .frame(width: 36, alignment: .trailing)
-                            RaTeXFormula(latex: item.latex, fontSize: 17, onError: { _ in })
+                            ScrollableFormula(latex: item.latex, fontSize: 17, onError: { _ in })
                         }
                     }
                 }
@@ -503,7 +503,7 @@ struct DerivationView: View {
                     }
 
                     if let latex = step.latex {
-                        RaTeXFormula(latex: latex, fontSize: 20, onError: { _ in })
+                        ScrollableFormula(latex: latex, fontSize: 20, onError: { _ in })
                             .frame(maxWidth: .infinity, alignment: .center)
                             .padding(.vertical, 4)
                             .padding(.leading, 26)
@@ -553,15 +553,34 @@ struct RaTeXFormulaCell: View {
                     .font(.caption)
                     .foregroundStyle(.red)
             } else {
-                RaTeXFormula(
+                ScrollableFormula(
                     latex: latex,
                     fontSize: fontSize,
                     onError: { e in errorMessage = e.localizedDescription }
                 )
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .onChange(of: latex) { _ in errorMessage = nil }
+    }
+}
+
+// MARK: - Scrollable formula (for very long equations)
+
+/// Wrap a single formula in a horizontal scroll view so long expressions can be inspected.
+/// This keeps the formula's intrinsic size, and scrolls only when it exceeds the available width.
+struct ScrollableFormula: View {
+    let latex: String
+    let fontSize: CGFloat
+    var displayMode: Bool = true
+    var onError: ((Error) -> Void)? = nil
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            RaTeXFormula(latex: latex, fontSize: fontSize, displayMode: displayMode, onError: onError)
+                .fixedSize(horizontal: true, vertical: true)
+                .padding(.vertical, 2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

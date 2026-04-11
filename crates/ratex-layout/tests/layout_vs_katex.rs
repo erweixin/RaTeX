@@ -224,6 +224,17 @@ fn accent_tilde_n() {
 }
 
 #[test]
+fn accent_nested_tilde_x() {
+    // KaTeX 0.16.38 strut from tools/layout_compare/katex_layout.mjs
+    check("\\tilde{\\tilde{x}}", 0.9047, 0.0);
+}
+
+#[test]
+fn accent_nested_hat_x() {
+    check("\\hat{\\hat{x}}", 0.9579, 0.0);
+}
+
+#[test]
 fn accent_dot_y() {
     check("\\dot{y}", 0.78056, 0.1944);
 }

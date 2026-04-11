@@ -46,8 +46,9 @@ Then in your app: `implementation(project(":ratex-android"))`.
 ```
 
 ```kotlin
-binding.mathView.latex = """\frac{-b \pm \sqrt{b^2-4ac}}{2a}"""
-binding.mathView.fontSize = 24f   // dp — no manual density conversion needed
+binding.mathView.latex       = """\frac{-b \pm \sqrt{b^2-4ac}}{2a}"""
+binding.mathView.fontSize    = 24f     // dp — no manual density conversion needed
+binding.mathView.displayMode = true    // true = display/block (default); false = inline/text
 ```
 
 ### Inline formula — `RaTeXSpan`
@@ -87,7 +88,11 @@ fun showInlineFormula(textView: TextView) {
 ### Low-level (Compose / custom drawing)
 
 ```kotlin
-val dl       = RaTeXEngine.parse(latex)
+// display mode (default)
+val dl = RaTeXEngine.parse(latex)
+// inline mode
+val dl = RaTeXEngine.parse(latex, displayMode = false)
+
 val renderer = RaTeXRenderer(dl, fontSize) { RaTeXFontLoader.getTypeface(it) }
 renderer.draw(canvas)
 ```

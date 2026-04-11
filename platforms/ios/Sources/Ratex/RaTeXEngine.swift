@@ -33,11 +33,19 @@ public final class RaTeXEngine {
     /// This call is synchronous and CPU-bound; run it on a background queue for
     /// complex formulas.
     ///
-    /// - Parameter latex: A LaTeX math-mode string, e.g. `\frac{1}{2}`.
+    /// - Parameters:
+    ///   - latex: A LaTeX math-mode string, e.g. `\frac{1}{2}`.
+    ///   - displayMode: `true` (default) for display/block style (`$$...$$`);
+    ///     `false` for inline/text style (`$...$`).
     /// - Returns: A `DisplayList` ready to be drawn.
     /// - Throws: `RaTeXError.parseError` on invalid LaTeX syntax.
-    public func parse(_ latex: String) throws -> DisplayList {
-        guard let ptr = ratex_parse_and_layout(latex) else {
+    public func parse(_ latex: String, displayMode: Bool = true) throws -> DisplayList {
+        var opts = RatexOptions(
+            struct_size: MemoryLayout<RatexOptions>.size,
+            display_mode: displayMode ? 1 : 0
+        )
+        let result = ratex_parse_and_layout(latex, &opts)
+        guard result.error_code == 0, let ptr = result.data else {
             let msg: String
             if let errPtr = ratex_get_last_error() {
                 msg = String(cString: errPtr)

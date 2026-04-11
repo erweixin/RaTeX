@@ -6,6 +6,13 @@ use ratex_types::display_item::{DisplayItem, DisplayList};
 use ratex_types::path_command::PathCommand;
 use wasm_bindgen::prelude::*;
 
+#[derive(serde::Serialize)]
+struct VersionedDisplayList<'a> {
+    version: u32,
+    #[serde(flatten)]
+    display_list: &'a DisplayList,
+}
+
 /// Parse LaTeX string and return the display list as JSON.
 /// The browser can deserialize this and draw with Canvas 2D (web-render).
 ///
@@ -22,7 +29,11 @@ pub fn render_latex(latex: &str) -> Result<String, JsValue> {
     // to_string directly without going through Value (which used to double
     // the work and triple the allocations).
     sanitize_display_list(&mut display_list);
-    serde_json::to_string(&display_list).map_err(|e| JsValue::from_str(&e.to_string()))
+    let versioned = VersionedDisplayList {
+        version: 1,
+        display_list: &display_list,
+    };
+    serde_json::to_string(&versioned).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 fn sanitize_display_list(dl: &mut DisplayList) {

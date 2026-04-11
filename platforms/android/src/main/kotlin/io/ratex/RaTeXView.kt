@@ -56,6 +56,17 @@ class RaTeXView @JvmOverloads constructor(
             rerender()
         }
 
+    /**
+     * Rendering mode. `true` (default) for display/block style (`$$...$$`);
+     * `false` for inline/text style (`$...$`). Setting this triggers an async re-render.
+     */
+    var displayMode: Boolean = true
+        set(value) {
+            if (field == value) return
+            field = value
+            rerender()
+        }
+
     /** Called on the main thread when a render error occurs. */
     var onError: ((RaTeXException) -> Unit)? = null
 
@@ -102,7 +113,7 @@ class RaTeXView @JvmOverloads constructor(
         renderJob = scope.launch {
             try {
                 withContext(Dispatchers.IO) { RaTeXFontLoader.ensureLoaded(context) }
-                val dl = RaTeXEngine.parse(latex)
+                val dl = RaTeXEngine.parse(latex, displayMode)
                 val fontSizePx = fontSize * context.resources.displayMetrics.density
                 renderer = RaTeXRenderer(dl, fontSizePx) { RaTeXFontLoader.getTypeface(it) }
                 post {

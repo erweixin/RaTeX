@@ -1,6 +1,6 @@
 PODS:
   - Flutter (1.0.0)
-  - ratex_flutter (0.0.3):
+  - ratex_flutter (0.0.16):
     - Flutter
 
 DEPENDENCIES:
@@ -15,7 +15,7 @@ EXTERNAL SOURCES:
 
 SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  ratex_flutter: c2fafb0e74515b93e0e1ffe2ae888164e914e37f
+  ratex_flutter: 1a87b2bfbbf31fb5e2eba55e51bbe595143ec903
 
 PODFILE CHECKSUM: 3c63482e143d1b91d2d2560aee9fb04ecc74ac7e
 

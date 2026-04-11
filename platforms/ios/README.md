@@ -84,9 +84,10 @@ In Xcode: **File → Add Package Dependencies**, enter `https://github.com/erwei
 import RaTeX
 
 let mathView = RaTeXView()
-mathView.latex    = #"\frac{-b \pm \sqrt{b^2-4ac}}{2a}"#
-mathView.fontSize = 28
-mathView.onError  = { print("RaTeX error:", $0) }
+mathView.latex       = #"\frac{-b \pm \sqrt{b^2-4ac}}{2a}"#
+mathView.fontSize    = 28
+mathView.displayMode = true   // true = display/block (default); false = inline/text
+mathView.onError     = { print("RaTeX error:", $0) }
 
 // Auto-sizing
 mathView.translatesAutoresizingMaskIntoConstraints = false
@@ -107,6 +108,7 @@ struct ContentView: View {
         RaTeXFormula(
             latex: #"\int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}"#,
             fontSize: 24
+            // displayMode: true  ← default; pass false for inline/text style
         )
         .padding()
     }
@@ -150,8 +152,12 @@ struct FlowLayout: Layout {
 ```swift
 import RaTeX
 
+// display mode (default)
 let displayList = try RaTeXEngine.shared.parse(#"\sum_{n=1}^\infty \frac{1}{n^2}"#)
-let renderer    = RaTeXRenderer(displayList: displayList, fontSize: 20)
+// inline mode
+let displayList = try RaTeXEngine.shared.parse(#"\frac{1}{2}"#, displayMode: false)
+
+let renderer = RaTeXRenderer(displayList: displayList, fontSize: 20)
 
 // In your UIView.draw(_:) or CGContext block:
 renderer.draw(in: UIGraphicsGetCurrentContext()!)

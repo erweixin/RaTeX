@@ -48,9 +48,16 @@ LaTeX string  (UTF-8)
 
 | Signature | Description |
 |-----------|-------------|
-| `const char* ratex_parse_and_layout(const char* latex)` | Parse + layout → JSON DisplayList. Caller must free with `ratex_free_display_list`. Returns NULL on error. |
-| `void ratex_free_display_list(char* json)` | Free the JSON string. NULL is a no-op. |
+| `RatexResult ratex_parse_and_layout(const char* latex, const RatexOptions* opts)` | Parse + layout → JSON DisplayList. On success: `error_code==0`, `data!=NULL` (free with `ratex_free_display_list`). On error: `error_code!=0`, `data==NULL` (details via `ratex_get_last_error`). |
+| `void ratex_free_display_list(char* json)` | Free the JSON string returned by `ratex_parse_and_layout`. NULL is a no-op. |
 | `const char* ratex_get_last_error(void)` | Thread-local last error. Valid until next call on this thread. Do NOT free. |
+
+### Structs
+
+| Name | Fields | Notes |
+|------|--------|------|
+| `RatexOptions` | `size_t struct_size; int display_mode;` | Always set `struct_size = sizeof(RatexOptions)`. Fields beyond `struct_size` are ignored (forward compatibility). `display_mode`: `0` inline (`$...$`), `1` display (`$$...$$`). `opts` may be NULL (defaults to display). |
+| `RatexResult` | `char* data; int error_code;` | Success: `error_code==0`, `data` is a heap string. Error: `error_code!=0`, `data==NULL`. |
 
 ### Build artifacts
 
@@ -66,6 +73,8 @@ LaTeX string  (UTF-8)
 ---
 
 ## DisplayList JSON format / DisplayList JSON 格式
+
+Authoritative protocol: see [`docs/DISPLAYLIST_JSON_PROTOCOL.md`](DISPLAYLIST_JSON_PROTOCOL.md) (schema + compatibility rules).
 
 ```jsonc
 {
@@ -83,11 +92,7 @@ LaTeX string  (UTF-8)
       "scale": 1.0,             // uniform scale applied to path commands
       "font": "Main-Regular",   // short font ID (NOT "KaTeX_Main-Regular")
       "char_code": 120,         // Unicode code point
-      "commands": [
-        { "type": "MoveTo",  "x": 0.1, "y": 0.7 },
-        { "type": "CubicTo", "x1": 0.2, "y1": 0.5, "x2": 0.4, "y2": 0.3, "x": 0.6, "y": 0.1 },
-        { "type": "Close" }
-      ],
+      // NOTE: `commands` is intentionally omitted in current JSON output for GlyphPath.
       "color": { "r": 0.0, "g": 0.0, "b": 0.0, "a": 1.0 }
     },
     // ---- Line: horizontal rule (fraction bar, etc.) ----

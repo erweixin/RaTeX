@@ -82,6 +82,7 @@ function Paragraph() {
 |-----|------|--------|------|
 | `latex` | `string` | — | 要渲染的 LaTeX 数学字符串（必填） |
 | `fontSize` | `number` | `24` | 字体大小，单位为 **dp**（密度无关像素）。公式整体等比缩放。 |
+| `displayMode` | `boolean` | `true` | `true` = 独立块样式（`$$...$$`）；`false` = 行内样式（`$...$`）。 |
 | `style` | `StyleProp<ViewStyle>` | — | 标准 React Native 样式。宽高会自动从测量结果设置，也可手动覆盖。 |
 | `onError` | `(e: { nativeEvent: { error: string } }) => void` | — | LaTeX 字符串解析失败时调用。 |
 | `onContentSizeChange` | `(e: { nativeEvent: { width: number; height: number } }) => void` | — | 排版完成后回调，携带公式渲染尺寸（dp）。适用于滚动视图或动态容器。 |
@@ -110,6 +111,8 @@ function Paragraph() {
 | `content` | `string` | — | 包含 `$...$` 标记的文字字符串（必填）。 |
 | `fontSize` | `number` | `16` | 传给每个公式渲染器的字体大小（dp）。 |
 | `textStyle` | `StyleProp<TextStyle>` | — | 应用于纯文字片段的样式。 |
+
+> `InlineTeX` 会自动对所有公式传入 `displayMode={false}`——`$...$` 始终使用行内样式。
 
 ## 架构支持
 

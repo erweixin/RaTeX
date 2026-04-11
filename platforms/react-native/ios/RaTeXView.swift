@@ -27,6 +27,12 @@ public class RaTeXView: UIView {
         didSet { guard fontSize != oldValue else { return }; rerender() }
     }
 
+    /// Rendering mode. `true` (default) for display/block style (`$$...$$`);
+    /// `false` for inline/text style (`$...$`).
+    public var displayMode: Bool = true {
+        didSet { guard displayMode != oldValue else { return }; rerender() }
+    }
+
     /// Called when a render error occurs (e.g. invalid LaTeX).
     public var onError: ((Error) -> Void)?
 
@@ -72,7 +78,7 @@ public class RaTeXView: UIView {
         // before the render completes, making cells invisible.
         RaTeXFontLoader.ensureLoaded()
         do {
-            let dl = try RaTeXEngine.shared.parse(latex)
+            let dl = try RaTeXEngine.shared.parse(latex, displayMode: displayMode)
             renderer = RaTeXRenderer(displayList: dl, fontSize: fontSize)
             invalidateIntrinsicContentSize()
             setNeedsDisplay()

@@ -1,0 +1,1 @@
+../../../skills/golden-test-case/SKILL.md

@@ -1803,13 +1803,10 @@ fn layout_accent(
     } else {
         // Clearance = how high above baseline the accent is positioned.
         // - For simple letters (M, b, o): body_box.height is the letter top → use directly.
-        // - For a body that is itself an above-accent (\r{a} = \aa, \bar{x}, …):
-        //   body_box.height = inner_clearance + 0.35 (the 0.35 rendering correction is
-        //   already baked in). Using it as outer clearance adds ANOTHER 0.35 on top
-        //   (staircase effect), placing hat 0.35em above ring — too spaced.
-        //   Instead, read the inner accent's clearance directly from BoxContent and add
-        //   a small ε (0.07em ≈ 3px) so the marks don't pixel-overlap in the rasterizer.
-        //   This is equivalent to KaTeX's min(body.height, xHeight) approach.
+        // - For a body that is itself an above-accent (\r{a}, `\tilde{\tilde{x}}`, …):
+        //   use the same kern basis as a plain base (`max(0, body.height - xHeight) +
+        //   correction`, with `\bar`/`\=` exceptions) instead of `inner_clearance + ε`, which
+        //   double-counted stacked accent depths and inflated nested spacing vs KaTeX.
         let base_clearance = match &body_box.content {
             BoxContent::Accent { clearance: inner_cl, is_below, accent: inner_accent, .. }
                 if !is_below =>
@@ -1817,8 +1814,6 @@ fn layout_accent(
                 // For SVG accents (height≈0, e.g. \vec): body_box.height = clearance + H_EM,
                 // which matches KaTeX's body.height. Use min(body.height, xHeight) exactly as
                 // KaTeX does: clearance = min(body.height, xHeight).
-                // For glyph accents the 0.35 rendering shift is baked into body_box.height,
-                // so we use inner_cl + 0.3 to avoid double-counting that correction.
                 if inner_accent.height <= 0.001 {
                     // For SVG accents like \vec: KaTeX places the outer glyph accent with
                     // its baseline at body.height - min(body.height, xHeight) above formula
@@ -1829,7 +1824,29 @@ fn layout_accent(
                     let correction = (accent_box.height - 0.35_f64.min(accent_box.height)).max(0.0);
                     katex_pos + correction
                 } else {
-                    inner_cl + 0.3
+                    // `inner_cl` already includes the inner accent glyph's depth. Using
+                    // `inner_cl + ε` stacked another full kern on top (e.g. `\tilde{\tilde{x}}`
+                    // blew up to ~1.32em vs KaTeX ~0.90em). KaTeX recomputes clearance from the
+                    // built inner span via `min(body.height, xHeight)`; matching the non-nested
+                    // glyph path (`max(0, body.height - xHeight) + correction`) tracks that.
+                    if label == "\\bar" || label == "\\=" {
+                        body_box.height
+                    } else {
+                        // `\hat{x}` / `\dot{x}` / … enforce a 0.78056em strut so `body_box.height`
+                        // exceeds the ink top, while KaTeX's nested accent still uses the inner
+                        // span height (~0.6944em) for clearance. `\tilde{x}` keeps body ≈ visual
+                        // top, so we keep `body_box.height` when it is not strut-inflated.
+                        let inner_visual_top = inner_cl + 0.35_f64.min(inner_accent.height);
+                        let h_for_kern = if body_box.height > inner_visual_top + 0.002 {
+                            inner_visual_top
+                        } else {
+                            body_box.height
+                        };
+                        let katex_pos = (h_for_kern - options.metrics().x_height).max(0.0);
+                        let correction =
+                            (accent_box.height - 0.35_f64.min(accent_box.height)).max(0.0);
+                        katex_pos + correction
+                    }
                 }
             }
             _ => {

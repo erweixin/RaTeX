@@ -4,14 +4,19 @@
  * Provides LaTeX-to-DisplayList rendering for iOS, Android, Flutter, and React Native.
  *
  * Usage:
- *   const char* json = ratex_parse_and_layout("\\frac{1}{2}");
- *   if (json) {
- *       // json is a UTF-8 JSON string describing the display list
- *       ratex_free_display_list(json);
+ *   RatexOptions opts = { sizeof(RatexOptions), 1 };  // display_mode=1 (block)
+ *   RatexResult r = ratex_parse_and_layout("\\frac{1}{2}", &opts);
+ *   if (r.error_code == 0) {
+ *       // r.data is a heap-allocated UTF-8 JSON string
+ *       ratex_free_display_list(r.data);
  *   } else {
  *       const char* err = ratex_get_last_error();
  *       fprintf(stderr, "RaTeX error: %s\n", err ? err : "(unknown)");
  *   }
+ *
+ * display_mode values:
+ *   1 — display (block) style, equivalent to $$...$$
+ *   0 — inline (text) style,   equivalent to $...$
  *
  * Thread safety:
  *   ratex_parse_and_layout and ratex_get_last_error use thread-local storage for
@@ -20,29 +25,33 @@
  *
  * DisplayList JSON format:
  *   {
+ *     "version": 1,         // protocol version (optional; decoders may treat missing as 0)
  *     "width":  <number>,   // total width in em units
  *     "height": <number>,   // ascent above baseline in em units
  *     "depth":  <number>,   // descent below baseline in em units
  *     "items":  [           // array of drawing commands (see below)
- *       { "GlyphPath": { "x": <f64>, "y": <f64>, "scale": <f64>,
- *                        "font": <string>, "char_code": <u32>,
- *                        "commands": [<PathCommand>, ...],
- *                        "color": {"r":<f32>,"g":<f32>,"b":<f32>,"a":<f32>} } },
- *       { "Line":      { "x": <f64>, "y": <f64>, "width": <f64>, "thickness": <f64>,
- *                        "color": {...} } },
- *       { "Rect":      { "x": <f64>, "y": <f64>, "width": <f64>, "height": <f64>,
- *                        "color": {...} } },
- *       { "Path":      { "x": <f64>, "y": <f64>, "commands": [...],
- *                        "fill": <bool>, "color": {...} } }
+ *       { "type": "GlyphPath", "x": <f64>, "y": <f64>, "scale": <f64>,
+ *         "font": <string>, "char_code": <u32>, "color": {"r":<f32>,"g":<f32>,"b":<f32>,"a":<f32>} },
+ *       { "type": "Line", "x": <f64>, "y": <f64>, "width": <f64>, "thickness": <f64>,
+ *         "color": {...}, "dashed": <bool?> },
+ *       { "type": "Rect", "x": <f64>, "y": <f64>, "width": <f64>, "height": <f64>,
+ *         "color": {...} },
+ *       { "type": "Path", "x": <f64>, "y": <f64>, "commands": [<PathCommand>, ...],
+ *         "fill": <bool>, "color": {...} }
  *     ]
  *   }
  *
  * PathCommand variants:
- *   { "MoveTo": {"x":<f64>,"y":<f64>} }
- *   { "LineTo": {"x":<f64>,"y":<f64>} }
- *   { "CubicTo": {"x1":<f64>,"y1":<f64>,"x2":<f64>,"y2":<f64>,"x":<f64>,"y":<f64>} }
- *   { "QuadTo": {"x1":<f64>,"y1":<f64>,"x":<f64>,"y":<f64>} }
- *   { "Close": null }
+ *   { "type": "MoveTo",  "x":<f64>,"y":<f64> }
+ *   { "type": "LineTo",  "x":<f64>,"y":<f64> }
+ *   { "type": "CubicTo", "x1":<f64>,"y1":<f64>,"x2":<f64>,"y2":<f64>,"x":<f64>,"y":<f64> }
+ *   { "type": "QuadTo",  "x1":<f64>,"y1":<f64>,"x":<f64>,"y":<f64> }
+ *   { "type": "Close" }
+ *
+ * Protocol and compatibility:
+ *   Treat this JSON as a public protocol. Decoders should ignore unknown fields
+ *   and tolerate missing optional fields for forward/backward compatibility.
+ *   See docs/DISPLAYLIST_JSON_PROTOCOL.md for the full schema and change policy.
  *
  * Coordinate system:
  *   All coordinates are in em units. Multiply by font_size (pt or px) to get
@@ -60,19 +69,42 @@ extern "C" {
 #include <stddef.h>
 
 /**
- * Parse a LaTeX string and compute its display list as JSON.
+ * Options for ratex_parse_and_layout().
+ *
+ * Always set struct_size = sizeof(RatexOptions) before use.
+ * Fields beyond struct_size are ignored, allowing forward compatibility.
+ */
+typedef struct {
+    size_t struct_size;
+    int display_mode; /* 0 = inline ($...$), 1 = display block ($$...$$) */
+} RatexOptions;
+
+/**
+ * Result returned by ratex_parse_and_layout().
+ *
+ * On success: error_code == 0 and data is a heap-allocated JSON string;
+ * free it with ratex_free_display_list().
+ * On error: error_code != 0, data is NULL; call ratex_get_last_error() for details.
+ */
+typedef struct {
+    char* data;      /* JSON display list on success, NULL on error */
+    int error_code;  /* 0 on success, non-zero on error */
+} RatexResult;
+
+/**
+ * Parse a LaTeX string and compute its display list.
  *
  * @param latex  Null-terminated UTF-8 LaTeX string. Must not be NULL.
- * @return       On success: a heap-allocated, null-terminated JSON string.
- *               The caller is responsible for freeing it with ratex_free_display_list().
- *               On error: NULL. Call ratex_get_last_error() for the reason.
+ * @param opts   Pointer to RatexOptions with struct_size set. May be NULL (defaults to display mode).
+ * @return       RatexResult. On success error_code == 0 and data is a JSON string
+ *               (free with ratex_free_display_list). On error error_code != 0 and data is NULL.
  */
-char* ratex_parse_and_layout(const char* latex);
+RatexResult ratex_parse_and_layout(const char* latex, const RatexOptions* opts);
 
 /**
  * Free a JSON string returned by ratex_parse_and_layout().
  *
- * @param json  Pointer returned by ratex_parse_and_layout(). Passing NULL is a no-op.
+ * @param json  Pointer to free. Passing NULL is a no-op.
  */
 void ratex_free_display_list(char* json);
 

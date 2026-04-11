@@ -63,7 +63,7 @@ RaTeX/
 │   ├── set-version.sh             # Sync version to all platform manifests
 │   └── update_golden_output.sh    # Renders all test_cases.txt → output/
 │
-└── demo/                         # Web demo + sample apps (web, ios, android, flutter, RN)
+└── demo/                         # Web demo + sample apps (web, ios, android, flutter, RN, jvm)
 ```
 
 ---
@@ -81,22 +81,24 @@ members = [
     "crates/ratex-layout",
     "crates/ratex-ffi",
     "crates/ratex-render",
-    "crates/ratex-wasm",
     "crates/ratex-svg",
+    "crates/ratex-wasm",
 ]
 
 [workspace.package]
-version = "0.0.12"   # bump with VERSION + scripts/set-version.sh; see RELEASING.md
+version = "0.0.16"   # 与根目录 VERSION 及 scripts/set-version.sh 同步；见 RELEASING.md
 edition = "2021"
 authors = ["RaTeX Contributors"]
 license = "MIT"
+repository = "https://github.com/erweixin/RaTeX"
+homepage = "https://github.com/erweixin/RaTeX"
+documentation = "https://github.com/erweixin/RaTeX#readme"
 
 [workspace.dependencies]
-ratex-types  = { path = "crates/ratex-types" }
-ratex-font   = { path = "crates/ratex-font" }
-ratex-lexer  = { path = "crates/ratex-lexer" }
-ratex-parser = { path = "crates/ratex-parser" }
-ratex-layout = { path = "crates/ratex-layout" }
+# 节选：各 ratex-* crate 使用 path + 与 workspace 对齐的 version；完整依赖表见仓库根 Cargo.toml
+ratex-types  = { path = "crates/ratex-types", version = "0.0.16" }
+ratex-font   = { path = "crates/ratex-font", version = "0.0.16" }
+# …
 
 phf        = { version = "0.11", features = ["macros"] }
 thiserror  = "1.0"
@@ -248,4 +250,4 @@ platforms/ (ios, android, flutter, react-native, web)
 2. **RaTeX output**: `scripts/update_golden_output.sh` runs `ratex-render` to produce `tests/golden/output/*.png`.
 3. **Comparison**: `tools/golden_compare/compare_golden.py` (or Rust test `crates/ratex-render/tests/golden_test.rs`) compares output vs fixtures (e.g. ink-coverage threshold).
 
-See also `docs/MHCHEM_DATA.md` (updating `\ce` / `\pu` JSON from KaTeX mhchem), `docs/LOW_SCORE_CASES.md` for low-scoring cases, and `docs/KATEX_SVG_PATH_PLAN.md` for stretchy SVG path improvements. Contributing: root `CONTRIBUTING.md`; releases: `RELEASING.md`.
+See also `docs/MHCHEM_DATA.md` (updating `\ce` / `\pu` JSON from KaTeX mhchem). Contributing: root `CONTRIBUTING.md`; releases: `RELEASING.md`.

@@ -13,6 +13,7 @@ let package = Package(
     platforms: [.macOS(.v13)],
     products: [
         .library(name: "RaTeXCore", targets: ["RaTeXCore"]),
+        .executable(name: "ratex-smoke", targets: ["RaTeXSmoke"]),
     ],
     targets: [
         // C system library — just exposes the header; links libratex_ffi via module.modulemap
@@ -26,6 +27,13 @@ let package = Package(
             name: "RaTeXCore",
             dependencies: ["CRaTeX"],
             path: "Sources/RaTeXCore"
+        ),
+
+        // Smoke test executable (runs on macOS; links the same C ABI).
+        .executableTarget(
+            name: "RaTeXSmoke",
+            dependencies: ["RaTeXCore"],
+            path: "Sources/RaTeXSmoke"
         ),
 
         // Tests

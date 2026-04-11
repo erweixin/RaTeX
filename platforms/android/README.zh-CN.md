@@ -7,7 +7,7 @@ minSdk 21，targetSdk 34。
 
 1. **添加依赖** — 在 app 的 `build.gradle` 中：
    ```kotlin
-   implementation("io.github.erweixin:ratex-android:0.0.12")
+   implementation("io.github.erweixin:ratex-android:0.0.16")
    ```
 2. **使用** — 布局里放 `RaTeXView`，代码中设置 LaTeX 与字号；字体会在首次渲染时自动加载，无需手动调用。
    ```kotlin
@@ -46,8 +46,9 @@ project(":ratex-android").projectDir = file("path/to/RaTeX/platforms/android")
 ```
 
 ```kotlin
-binding.mathView.latex = """\frac{-b \pm \sqrt{b^2-4ac}}{2a}"""
-binding.mathView.fontSize = 24f   // dp — 无需手动换算密度
+binding.mathView.latex       = """\frac{-b \pm \sqrt{b^2-4ac}}{2a}"""
+binding.mathView.fontSize    = 24f     // dp — 无需手动换算密度
+binding.mathView.displayMode = true    // true = 独立块（默认）；false = 行内
 ```
 
 ### 行内公式 — `RaTeXSpan`
@@ -87,7 +88,11 @@ fun showInlineFormula(textView: TextView) {
 ### 底层（Compose / 自定义绘制）
 
 ```kotlin
-val dl       = RaTeXEngine.parse(latex)
+// 独立块（默认）
+val dl = RaTeXEngine.parse(latex)
+// 行内
+val dl = RaTeXEngine.parse(latex, displayMode = false)
+
 val renderer = RaTeXRenderer(dl, fontSize) { RaTeXFontLoader.getTypeface(it) }
 renderer.draw(canvas)
 ```

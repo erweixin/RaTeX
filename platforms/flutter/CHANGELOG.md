@@ -1,3 +1,11 @@
+## 0.0.16
+
+- Monorepo version alignment with bundled Android `.so` and iOS `RaTeX.xcframework`.
+
+## 0.0.10–0.0.15
+
+- Workspace version bumps; Flutter plugin `pubspec` / podspec / Android `build.gradle` kept in sync with native artifacts (see repository tags).
+
 ## 0.0.8
 
 - Publish to pub.dev with bundled Android jniLibs and iOS RaTeX.xcframework (out-of-the-box)

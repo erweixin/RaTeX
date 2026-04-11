@@ -1,7 +1,7 @@
 // ratex_ffi.dart — Dart FFI bindings to libratex_ffi (iOS static / Android .so).
 //
-// The three C functions exposed are:
-//   const char* ratex_parse_and_layout(const char* latex);
+// C ABI:
+//   RatexResult ratex_parse_and_layout(const char* latex, const RatexOptions* opts);
 //   void        ratex_free_display_list(char* json);
 //   const char* ratex_get_last_error(void);
 
@@ -13,10 +13,35 @@ import 'package:ffi/ffi.dart';
 
 import 'display_list.dart';
 
+// MARK: - C struct mirrors
+
+/// Mirror of `RatexOptions` from ratex.h.
+///
+/// Always set [structSize] to `sizeOf<RatexOptions>()` before use.
+final class RatexOptions extends Struct {
+  /// Must equal `sizeOf<RatexOptions>()`.
+  @UintPtr()
+  external int structSize;
+
+  /// `0` = inline/text style (`$...$`), `1` = display/block style (`$$...$$`).
+  @Int32()
+  external int displayMode;
+}
+
+/// Mirror of `RatexResult` from ratex.h.
+final class RatexResult extends Struct {
+  /// JSON display list on success, null pointer on error.
+  external Pointer<Utf8> data;
+
+  /// `0` on success, non-zero on error.
+  @Int32()
+  external int errorCode;
+}
+
 // MARK: - Native function type definitions
 
-typedef _ParseAndLayoutC    = Pointer<Utf8> Function(Pointer<Utf8>);
-typedef _ParseAndLayoutDart = Pointer<Utf8> Function(Pointer<Utf8>);
+typedef _ParseAndLayoutC    = RatexResult Function(Pointer<Utf8>, Pointer<RatexOptions>);
+typedef _ParseAndLayoutDart = RatexResult Function(Pointer<Utf8>, Pointer<RatexOptions>);
 
 typedef _FreeDisplayListC    = Void Function(Pointer<Utf8>);
 typedef _FreeDisplayListDart = void Function(Pointer<Utf8>);
@@ -67,25 +92,39 @@ class RaTeXFfi {
 
   /// Parse and lay out [latex], returning a [DisplayList].
   ///
+  /// [displayMode] controls the rendering style:
+  /// - `true` (default) — display/block style, equivalent to `$$...$$`
+  /// - `false`          — inline/text style, equivalent to `$...$`
+  ///
   /// Throws [RaTeXException] on parse errors.
-  DisplayList parseAndLayout(String latex) {
+  DisplayList parseAndLayout(String latex, {bool displayMode = true}) {
     final inputPtr = latex.toNativeUtf8();
+    final optsPtr  = calloc<RatexOptions>();
     try {
-      final resultPtr = _ffi._parseAndLayout(inputPtr);
-      if (resultPtr.address == 0) {
+      optsPtr.ref.structSize   = sizeOf<RatexOptions>();
+      optsPtr.ref.displayMode  = displayMode ? 1 : 0;
+
+      final result = _ffi._parseAndLayout(inputPtr, optsPtr);
+      if (result.errorCode != 0) {
         final errPtr = _ffi._getLastError();
-        final msg = errPtr.address == 0
-            ? 'unknown error'
+        final tail = errPtr.address == 0
+            ? 'no message (code ${result.errorCode})'
             : errPtr.toDartString();
-        throw RaTeXException(msg);
+        throw RaTeXException(tail);
       }
-      final json = resultPtr.toDartString();
-      _ffi._freeDisplayList(resultPtr);
+      if (result.data.address == 0) {
+        throw const RaTeXException(
+          'native returned success but null data (FFI layout or linking issue)',
+        );
+      }
+      final json = result.data.toDartString();
+      _ffi._freeDisplayList(result.data);
 
       final decoded = jsonDecode(json) as Map<String, dynamic>;
       return DisplayList.fromJson(decoded);
     } finally {
       calloc.free(inputPtr);
+      calloc.free(optsPtr);
     }
   }
 }

@@ -3,8 +3,9 @@
 #   Cargo.toml, platforms/flutter/pubspec.yaml,
 #   platforms/flutter/ios/ratex_flutter.podspec,
 #   platforms/flutter/android/build.gradle,
-#   platforms/flutter/README.md,
-#   platforms/android/README.md,
+#   platforms/flutter/README.md, platforms/flutter/README.zh-CN.md,
+#   platforms/android/README.md, platforms/android/README.zh-CN.md,
+#   demo/android/README.md（Maven 示例坐标）,
 #   platforms/jvm/README.md, platforms/jvm/README.zh-CN.md,
 #   demo/flutter/pubspec.yaml,
 #   platforms/web/package.json, platforms/react-native/package.json
@@ -44,14 +45,21 @@ sed "s/s\.version *= *'[^']*'/s.version = '$VER'/" platforms/flutter/ios/ratex_f
 # Flutter android/build.gradle（version 'X.X.X'）
 sed "s/^version '[^']*'/version '$VER'/" platforms/flutter/android/build.gradle > platforms/flutter/android/build.gradle.tmp && mv platforms/flutter/android/build.gradle.tmp platforms/flutter/android/build.gradle
 
-# Flutter README.md（ratex_flutter: ^X.X.X in code blocks）
-sed "s/ratex_flutter: \^[0-9][0-9.]*/ratex_flutter: ^$VER/g" platforms/flutter/README.md > platforms/flutter/README.md.tmp && mv platforms/flutter/README.md.tmp platforms/flutter/README.md
+# Flutter README（ratex_flutter: ^X.X.X in code blocks）
+for flutter_readme in platforms/flutter/README.md platforms/flutter/README.zh-CN.md; do
+  sed "s/ratex_flutter: \^[0-9][0-9.]*/ratex_flutter: ^$VER/g" "$flutter_readme" > "$flutter_readme.tmp" && mv "$flutter_readme.tmp" "$flutter_readme"
+done
 
 # Demo app pubspec（ratex_flutter: ^X.X.X）
 sed "s/ratex_flutter: \^[0-9][0-9.]*/ratex_flutter: ^$VER/" demo/flutter/pubspec.yaml > demo/flutter/pubspec.yaml.tmp && mv demo/flutter/pubspec.yaml.tmp demo/flutter/pubspec.yaml
 
 # Android README（Maven artifact version）
-sed "s/ratex-android:[0-9][0-9.]*/ratex-android:$VER/g" platforms/android/README.md > platforms/android/README.md.tmp && mv platforms/android/README.md.tmp platforms/android/README.md
+for android_readme in platforms/android/README.md platforms/android/README.zh-CN.md; do
+  sed "s/ratex-android:[0-9][0-9.]*/ratex-android:$VER/g" "$android_readme" > "$android_readme.tmp" && mv "$android_readme.tmp" "$android_readme"
+done
+
+# Demo Android README（published Maven 示例）
+sed "s/ratex-android:[0-9][0-9.]*/ratex-android:$VER/g" demo/android/README.md > demo/android/README.md.tmp && mv demo/android/README.md.tmp demo/android/README.md
 
 # JVM README（Maven artifact version，与根目录 VERSION / -PlibraryVersion 一致）
 for jvm_readme in platforms/jvm/README.md platforms/jvm/README.zh-CN.md; do
@@ -68,4 +76,4 @@ for (const p of ['platforms/web/package.json', 'platforms/react-native/package.j
 }
 "
 
-echo "Done. Updated: Cargo.toml, platforms/flutter/pubspec.yaml, platforms/flutter/ios/ratex_flutter.podspec, platforms/flutter/android/build.gradle, platforms/flutter/README.md, platforms/android/README.md, platforms/jvm/README.md, platforms/jvm/README.zh-CN.md, demo/flutter/pubspec.yaml, platforms/web/package.json, platforms/react-native/package.json; Android/JVM Maven 使用根目录 VERSION"
+echo "Done. Updated: Cargo.toml, platforms/flutter/pubspec.yaml, platforms/flutter/ios/ratex_flutter.podspec, platforms/flutter/android/build.gradle, platforms/flutter/README.md, platforms/flutter/README.zh-CN.md, platforms/android/README.md, platforms/android/README.zh-CN.md, demo/android/README.md, platforms/jvm/README.md, platforms/jvm/README.zh-CN.md, demo/flutter/pubspec.yaml, platforms/web/package.json, platforms/react-native/package.json; Android/JVM Maven 使用根目录 VERSION"

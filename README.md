@@ -191,6 +191,16 @@ cargo test --all
 
 ---
 
+## Equation numbering and `\tag`
+
+RaTeX aims for KaTeX-compatible rendering. **Automatic equation numbering is not implemented**:
+
+- **No auto-numbering** for `equation`, `align`, `gather`, `alignat`, etc. (their non-starred forms render the same as the starred forms).
+- To display a number/label, use **explicit** `\tag{...}` or `\tag*{...}` at the end of a row (amsmath semantics).
+- `\notag` / `\nonumber` are treated as no-ops when auto-numbering is not present.
+
+---
+
 ## Acknowledgements
 
 RaTeX owes a great debt to [KaTeX](https://katex.org/) — its parser architecture, symbol tables, font metrics, and layout semantics are the foundation of this engine. Chemistry notation (`\ce`, `\pu`) is powered by a Rust port of the [mhchem](https://mhchem.github.io/MathJax-mhchem/) state machine.

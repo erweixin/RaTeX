@@ -24,6 +24,12 @@ public class RaTeXRNView: UIView {
         set { innerView.fontSize = newValue }
     }
 
+    /// `true` (default) = display/block style; `false` = inline/text style.
+    @objc public var displayMode: Bool {
+        get { innerView.displayMode }
+        set { innerView.displayMode = newValue }
+    }
+
     /// Old-arch event block set by React Native via KVC.
     /// When called, passes `{ "error": "<message>" }` as the body.
     @objc public var onError: ((NSDictionary?) -> Void)? {

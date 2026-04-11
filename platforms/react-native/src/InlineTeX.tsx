@@ -69,6 +69,7 @@ export function InlineTeX({
           key={`m${s.id}`}
           latex={s.content}
           fontSize={fontSize}
+          displayMode={false}
           style={styles.measureView}
           onContentSizeChange={e => {
             const {width, height} = e.nativeEvent;
@@ -94,6 +95,7 @@ export function InlineTeX({
                 key={i}
                 latex={s.content}
                 fontSize={fontSize}
+                displayMode={false}
                 style={{width: sz.width, height: sz.height}}
               />
             );

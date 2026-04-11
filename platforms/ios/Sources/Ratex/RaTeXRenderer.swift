@@ -38,6 +38,9 @@ public struct RaTeXRenderer {
             case .line(let l):      drawLine(l, in: context)
             case .rect(let r):      drawRect(r, in: context)
             case .path(let p):      drawPath(p, in: context)
+            case .unknown:
+                // Forward compatibility: ignore items newer than this decoder.
+                break
             }
         }
     }
@@ -133,6 +136,9 @@ public struct RaTeXRenderer {
                                   control: CGPoint(x: ox + pt(x1), y: oy + pt(y1)))
             case .close:
                 path.closeSubpath()
+            case .unknown:
+                // Forward compatibility: ignore newer command variants.
+                break
             }
         }
         return path

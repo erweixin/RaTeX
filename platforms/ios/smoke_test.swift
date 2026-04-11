@@ -13,8 +13,19 @@ guard let handle = dlopen(libPath, RTLD_NOW) else {
 }
 print("✓ 库加载成功:", libPath)
 
-typealias ParseFn = @convention(c) (UnsafePointer<Int8>?) -> UnsafeMutablePointer<Int8>?
-typealias FreeFn  = @convention(c) (UnsafeMutablePointer<Int8>?) -> Void
+// Mirror ratex.h ABI
+@frozen struct RatexOptions {
+    var struct_size: Int
+    var display_mode: Int32   // 0 = inline, 1 = display
+}
+
+@frozen struct RatexResult {
+    var data: UnsafeMutablePointer<CChar>?
+    var error_code: Int32
+}
+
+typealias ParseFn = @convention(c) (UnsafePointer<CChar>?, UnsafePointer<RatexOptions>?) -> RatexResult
+typealias FreeFn  = @convention(c) (UnsafeMutablePointer<CChar>?) -> Void
 typealias ErrFn   = @convention(c) () -> UnsafePointer<Int8>?
 
 let parseRaw = dlsym(handle, "ratex_parse_and_layout")!
@@ -26,14 +37,20 @@ let free  = unsafeBitCast(freeRaw,  to: FreeFn.self)
 let err   = unsafeBitCast(errRaw,   to: ErrFn.self)
 
 func render(_ latex: String) -> [String: Any]? {
-    guard let ptr = latex.withCString({ parse($0) }) else {
+    var opts = RatexOptions(struct_size: MemoryLayout<RatexOptions>.size, display_mode: 1)
+    let result = latex.withCString { cstr in
+        withUnsafePointer(to: &opts) { pOpts in
+            parse(cstr, pOpts)
+        }
+    }
+    guard result.error_code == 0, let ptr = result.data else {
         let msg = err().map { String(cString: $0) } ?? "unknown error"
         print("  ❌ 解析失败:", msg)
         return nil
     }
     defer { free(ptr) }
     let json = String(cString: ptr)
-    return try? JSONSerialization.jsonObject(with: json.data(using: .utf8)!) as? [String: Any]
+    return try? JSONSerialization.jsonObject(with: json.data(using: String.Encoding.utf8)!) as? [String: Any]
 }
 
 func check(_ label: String, _ latex: String) {
@@ -46,7 +63,7 @@ func check(_ label: String, _ latex: String) {
 
     // 检查第一个 item 的类型
     if let first = (dl["items"] as? [[String: Any]])?.first {
-        let kind = first.keys.first ?? "?"
+        let kind = (first["type"] as? String) ?? "?"
         print("  ✓  first item type:", kind)
     }
 }

@@ -28,3 +28,35 @@ jobs:
         run: cargo test -p ratex-svg --features standalone
       - name: Clippy ratex-svg standalone
         run: cargo clippy -p ratex-svg --features standalone -- -D warnings
+
+  web-wasm-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Build ratex-wasm npm package (platforms/web)
+        run: |
+          cd platforms/web
+          npm ci
+          npm run build
+
+  ios-swift-smoke:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build ratex-ffi (release, host)
+        run: cargo build --release -p ratex-ffi
+      - name: Swift binding tests (macOS)
+        run: LIBRARY_PATH=$(pwd)/target/release swift test --package-path platforms/ios/tests
+      - name: Smoke executable (macOS)
+        run: LIBRARY_PATH=$(pwd)/target/release swift run --package-path platforms/ios/tests ratex-smoke

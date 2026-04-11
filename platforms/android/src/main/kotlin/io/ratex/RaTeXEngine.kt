@@ -32,13 +32,14 @@ object RaTeXEngine {
     // -------------------------------------------------------------------------
 
     /**
-     * Parse and lay out a LaTeX string.
+     * Parse and lay out a LaTeX string with explicit display mode.
+     * @param displayMode true = display/block style, false = inline/text style.
      * @return JSON DisplayList string on success, or null on error.
      */
-    @JvmStatic private external fun nativeParseAndLayout(latex: String): String?
+    @JvmStatic private external fun nativeParseAndLayout(latex: String, displayMode: Boolean): String?
 
     /**
-     * Retrieve the last error message produced by nativeParseAndLayout on this thread.
+     * Retrieve the last error message produced by a native layout call on this thread.
      */
     @JvmStatic private external fun nativeGetLastError(): String?
 
@@ -50,20 +51,21 @@ object RaTeXEngine {
      * Parse [latex] and return a [DisplayList] decoded from the JSON result.
      * Runs on [Dispatchers.Default].
      *
+     * @param displayMode `true` (default) for display/block style; `false` for inline/text style.
      * @throws RaTeXException on parse or decode error.
      */
-    suspend fun parse(latex: String): DisplayList = withContext(Dispatchers.Default) {
-        parseBlocking(latex)
-    }
+    suspend fun parse(latex: String, displayMode: Boolean = true): DisplayList =
+        withContext(Dispatchers.Default) { parseBlocking(latex, displayMode) }
 
     /**
      * Blocking variant of [parse]. Safe to call on any background thread.
      * **Do not call on the main thread** — use [parse] instead.
      *
+     * @param displayMode `true` (default) for display/block style; `false` for inline/text style.
      * @throws RaTeXException on parse or decode error.
      */
-    fun parseBlocking(latex: String): DisplayList {
-        val json = nativeParseAndLayout(latex)
+    fun parseBlocking(latex: String, displayMode: Boolean = true): DisplayList {
+        val json = nativeParseAndLayout(latex, displayMode)
             ?: throw RaTeXException(nativeGetLastError() ?: "unknown error")
         return try {
             ratexJson.decodeFromString(DisplayList.serializer(), json)

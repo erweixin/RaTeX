@@ -103,37 +103,61 @@ function drawItem(
 ): void {
   switch (item.type) {
     case "GlyphPath": {
+      const g = item as Extract<DisplayItem, { type: "GlyphPath" }>;
       // Layout emits placeholder rectangle paths; browser has no font outline data.
       // Use item.font (FontId string from Rust) to select the exact KaTeX variant.
       // No save/restore needed: fillText uses absolute coords and doesn't modify the CTM.
-      ctx.font = fontIdToCss(item.font, item.scale * em);
+      ctx.font = fontIdToCss(g.font, g.scale * em);
       ctx.textBaseline = "alphabetic";
       ctx.textAlign = "left";
-      ctx.fillStyle = colorToCss(item.color);
-      ctx.fillText(String.fromCodePoint(item.char_code), item.x * em, item.y * em);
+      ctx.fillStyle = colorToCss(g.color);
+      ctx.fillText(String.fromCodePoint(g.char_code), g.x * em, g.y * em);
       break;
     }
     case "Line": {
-      const x = item.x * em;
-      const y = item.y * em;
-      const w = item.width * em;
-      const t = Math.max(0.5, item.thickness * em);
-      ctx.fillStyle = colorToCss(item.color);
-      ctx.fillRect(x, y - t / 2, w, t);
+      const l = item as Extract<DisplayItem, { type: "Line" }>;
+      const x = l.x * em;
+      const y = l.y * em;
+      const w = l.width * em;
+      const t = Math.max(0.5, l.thickness * em);
+      const css = colorToCss(l.color);
+      if (l.dashed) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.strokeStyle = css;
+        ctx.lineWidth = t;
+        ctx.lineCap = "butt";
+        // Simple, visually stable dash pattern in pixel units.
+        ctx.setLineDash([t * 3, t * 3]);
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + w, y);
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        ctx.fillStyle = css;
+        ctx.fillRect(x, y - t / 2, w, t);
+      }
       break;
     }
     case "Rect": {
-      ctx.fillStyle = colorToCss(item.color);
-      ctx.fillRect(item.x * em, item.y * em, item.width * em, item.height * em);
+      const r = item as Extract<DisplayItem, { type: "Rect" }>;
+      ctx.fillStyle = colorToCss(r.color);
+      ctx.fillRect(r.x * em, r.y * em, r.width * em, r.height * em);
       break;
     }
     case "Path": {
+      const p = item as Extract<DisplayItem, { type: "Path" }>;
       ctx.beginPath();
-      applyPathCommands(ctx, item.commands, em, item.x * em, item.y * em);
-      ctx.strokeStyle = colorToCss(item.color);
-      ctx.fillStyle = colorToCss(item.color);
-      if (item.fill) ctx.fill();
+      applyPathCommands(ctx, p.commands, em, p.x * em, p.y * em);
+      ctx.strokeStyle = colorToCss(p.color);
+      ctx.fillStyle = colorToCss(p.color);
+      if (p.fill) ctx.fill();
       else ctx.stroke();
+      break;
+    }
+    default: {
+      // Forward compatibility: ignore items newer than this renderer.
+      void mathFontFamily;
       break;
     }
   }

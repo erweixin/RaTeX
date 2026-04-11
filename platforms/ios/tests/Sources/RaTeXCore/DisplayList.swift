@@ -9,6 +9,8 @@ import Foundation
 // MARK: - Top-level output
 
 public struct DisplayList: Codable {
+    /// DisplayList JSON protocol version (optional). Missing implies version 0.
+    public let version: Int?
     /// Total width in em units.
     public let width: Double
     /// Ascent above baseline in em units.
@@ -26,6 +28,8 @@ public enum DisplayItem: Codable {
     case line(LineData)
     case rect(RectData)
     case path(PathData)
+    /// Forward-compatibility: unknown item type; should be ignored by renderers/tests.
+    case unknown(String)
 
     private enum TypeKey: String, CodingKey { case type }
 
@@ -38,10 +42,7 @@ public enum DisplayItem: Codable {
         case "Rect":      self = .rect(try RectData(from: decoder))
         case "Path":      self = .path(try PathData(from: decoder))
         default:
-            throw DecodingError.dataCorruptedError(
-                forKey: .type,
-                in: try decoder.container(keyedBy: TypeKey.self),
-                debugDescription: "Unknown DisplayItem type: \(tag)")
+            self = .unknown(tag)
         }
     }
 
@@ -51,6 +52,9 @@ public enum DisplayItem: Codable {
         case .line(let d):      try d.encode(to: encoder)
         case .rect(let d):      try d.encode(to: encoder)
         case .path(let d):      try d.encode(to: encoder)
+        case .unknown(let tag):
+            var c = encoder.container(keyedBy: TypeKey.self)
+            try c.encode(tag, forKey: .type)
         }
     }
 }
@@ -63,6 +67,7 @@ public struct GlyphPathData: Codable {
     public let scale: Double
     public let font: String
     public let charCode: UInt32
+    /// Placeholder paths; omitted in current serialized output. Default to empty when absent.
     public let commands: [PathCommand]
     public let color: RaTeXColor
 
@@ -70,6 +75,17 @@ public struct GlyphPathData: Codable {
         case x, y, scale, font
         case charCode = "char_code"
         case commands, color
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        x = try c.decode(Double.self, forKey: .x)
+        y = try c.decode(Double.self, forKey: .y)
+        scale = try c.decode(Double.self, forKey: .scale)
+        font = try c.decode(String.self, forKey: .font)
+        charCode = try c.decode(UInt32.self, forKey: .charCode)
+        commands = try c.decodeIfPresent([PathCommand].self, forKey: .commands) ?? []
+        color = try c.decode(RaTeXColor.self, forKey: .color)
     }
 }
 
@@ -105,6 +121,8 @@ public enum PathCommand: Codable {
     case cubicTo(x1: Double, y1: Double, x2: Double, y2: Double, x: Double, y: Double)
     case quadTo(x1: Double, y1: Double, x: Double, y: Double)
     case close
+    /// Forward-compatibility: unknown command type; should be ignored.
+    case unknown(String)
 
     private enum TypeKey: String, CodingKey { case type }
 
@@ -132,10 +150,7 @@ public enum PathCommand: Codable {
         case "Close":
             self = .close
         default:
-            throw DecodingError.dataCorruptedError(
-                forKey: .type,
-                in: try decoder.container(keyedBy: TypeKey.self),
-                debugDescription: "Unknown PathCommand type: \(tag)")
+            self = .unknown(tag)
         }
     }
 
@@ -156,6 +171,8 @@ public enum PathCommand: Codable {
             try Quad(x1: x1, y1: y1, x: x, y: y).encode(to: encoder)
         case .close:
             try c.encode("Close", forKey: .type)
+        case .unknown(let tag):
+            try c.encode(tag, forKey: .type)
         }
     }
 }

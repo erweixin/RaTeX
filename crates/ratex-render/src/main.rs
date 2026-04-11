@@ -5,6 +5,7 @@ use ratex_layout::{layout, LayoutOptions};
 use ratex_layout::to_display_list;
 use ratex_parser::parser::parse;
 use ratex_render::{render_to_png, RenderOptions};
+use ratex_types::math_style::MathStyle;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -46,7 +47,9 @@ fn main() {
         device_pixel_ratio,
     };
 
-    let layout_opts = LayoutOptions::default();
+    let inline = args.contains(&"--inline".to_string());
+    let style = if inline { MathStyle::Text } else { MathStyle::Display };
+    let layout_opts = LayoutOptions::default().with_style(style);
 
     let stdin = io::stdin();
     let mut idx = 0;

@@ -63,9 +63,9 @@ RaTeX 是同一个 KaTeX 兼容的数学引擎，但编译到一个可移植的 
 | **Android** | JNI + Kotlin + Canvas · AAR | 开箱即用 |
 | **Flutter** | Dart FFI + `CustomPainter` | 开箱即用 |
 | **React Native** | C ABI Native 模块 · iOS/Android 原生视图 | 开箱即用 |
-| **Web** | WASM → Canvas 2D · `<ratex-formula>` Web 组件 | 可用 |
-| **服务端 / CI** | tiny-skia → PNG 光栅化 | 可用 |
-| **SVG** | `ratex-svg` → 自包含矢量 SVG 导出 | 可用 |
+| **Web** | WASM → Canvas 2D · `<ratex-formula>` Web 组件 | 开箱即用 |
+| **服务端 / CI** | tiny-skia → PNG 光栅化 | 开箱即用 |
+| **SVG** | `ratex-svg` → 自包含矢量 SVG 导出 | 开箱即用 |
 
 ### 截图
 
@@ -188,6 +188,16 @@ npm install ratex-wasm
 ```bash
 cargo test --all
 ```
+
+---
+
+## 公式编号与 `\tag`
+
+RaTeX 以 KaTeX 兼容为目标，当前 **不实现自动公式编号**：
+
+- `equation` / `align` / `gather` / `alignat` 等**不带星号**的环境，渲染效果与对应的带星号版本一致（即不会自动生成编号）。
+- 如需显示编号/标签，请在每行末尾使用显式 `\tag{...}` 或 `\tag*{...}`（遵循 amsmath 语义）。
+- 在未实现自动编号时，`\notag` / `\nonumber` 视为无效果（no-op）。
 
 ---
 
