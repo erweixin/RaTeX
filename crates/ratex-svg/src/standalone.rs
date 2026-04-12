@@ -55,9 +55,9 @@ pub(crate) fn load_all_fonts(font_dir: &str) -> Result<HashMap<FontId, Vec<u8>>,
     #[cfg(feature = "embed-fonts")]
     {
         for (id, filename) in &font_map {
-            if let Some(font) = Fonts::get(filename) {
-                data.insert(*id, font.data.to_vec());
-            }
+            let font = Fonts::get(filename)
+                .ok_or_else(|| format!("Failed to get embeded font {filename}"))?;
+            data.insert(*id, font.data.to_vec());
         }
     }
 
