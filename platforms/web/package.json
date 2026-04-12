@@ -1,6 +1,6 @@
 {
   "name": "ratex-wasm",
-  "version": "0.0.16",
+  "version": "0.1.0",
   "description": "RaTeX browser integration: WASM + Canvas 2D web-render",
   "type": "module",
   "repository": {

@@ -21,7 +21,7 @@ CustomPaint Widget
 
 ## Out of the box
 
-1. **Add dependency** — add `ratex_flutter: ^0.0.16` to `pubspec.yaml`, then run `flutter pub get`. No native build required — the published package includes prebuilt Android `.so` and iOS XCFramework.
+1. **Add dependency** — add `ratex_flutter: ^0.1.0` to `pubspec.yaml`, then run `flutter pub get`. No native build required — the published package includes prebuilt Android `.so` and iOS XCFramework.
 2. **Register fonts** — Flutter does not auto-register plugin fonts for the host app. Copy the [KaTeX font declarations](#font-setup) into your `pubspec.yaml` (see Installation below).
 3. **Use** — Use `RaTeXWidget`:
    ```dart
@@ -42,7 +42,7 @@ Add to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  ratex_flutter: ^0.0.16
+  ratex_flutter: ^0.1.0
 ```
 
 Then run `flutter pub get`. No native build required — the published package includes prebuilt Android `.so` and iOS `RaTeX.xcframework`.

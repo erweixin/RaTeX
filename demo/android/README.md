@@ -67,7 +67,7 @@ To depend on the library as a Maven artifact instead of the local project:
    ./gradlew :ratex-android:publishReleasePublicationToMavenLocal
    ```
 2. In `settings.gradle.kts`, add `mavenLocal()` to `repositories`.
-3. In `app/build.gradle.kts`, replace `implementation(project(":ratex-android"))` with `implementation("io.github.erweixin:ratex-android:0.0.16")` and remove the `include(":ratex-android")` / `project(":ratex-android").projectDir` from `settings.gradle.kts`.
+3. In `app/build.gradle.kts`, replace `implementation(project(":ratex-android"))` with `implementation("io.github.erweixin:ratex-android:0.1.0")` and remove the `include(":ratex-android")` / `project(":ratex-android").projectDir` from `settings.gradle.kts`.
 
 ## Command-line build (optional)
 

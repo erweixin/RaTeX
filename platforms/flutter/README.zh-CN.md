@@ -21,7 +21,7 @@ CustomPaint Widget
 
 ## 开箱即用
 
-1. **添加依赖** — 在 `pubspec.yaml` 中：`ratex_flutter: ^0.0.16`，然后执行 `flutter pub get`。无需自行编译原生库，发布包内已含 Android `.so` 与 iOS XCFramework。
+1. **添加依赖** — 在 `pubspec.yaml` 中：`ratex_flutter: ^0.1.0`，然后执行 `flutter pub get`。无需自行编译原生库，发布包内已含 Android `.so` 与 iOS XCFramework。
 2. **注册字体** — Flutter 不会自动为宿主应用注册插件字体。请将 [KaTeX 字体声明](#字体配置) 复制到你的 `pubspec.yaml`（见下方安装说明）。
 3. **使用** — 直接使用 `RaTeXWidget`：
    ```dart
@@ -42,7 +42,7 @@ CustomPaint Widget
 
 ```yaml
 dependencies:
-  ratex_flutter: ^0.0.16
+  ratex_flutter: ^0.1.0
 ```
 
 然后执行 `flutter pub get`。无需本地构建 — 已发布包内含预编译的 Android `.so` 与 iOS `RaTeX.xcframework`。

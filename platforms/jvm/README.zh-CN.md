@@ -6,7 +6,7 @@ JVM 上原生渲染 LaTeX 数学公式（Kotlin + AWT Graphics2D），JAR 内含
 
 1. **添加依赖** — 在 `build.gradle.kts` 中：
    ```kotlin
-   implementation("io.github.erweixin:ratex-jvm:0.0.16")
+   implementation("io.github.erweixin:ratex-jvm:0.1.0")
    ```
 2. **加载字体并渲染：**
    ```kotlin
