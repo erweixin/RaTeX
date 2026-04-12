@@ -22,8 +22,8 @@ SOFTWARE.
 
 ---
 
-Bundled KaTeX fonts (lib/fonts/KaTeX_*.ttf)
---------------------------------------------
+Bundled KaTeX fonts (fonts/KaTeX_*.{woff,woff2,ttf})
+-----------------------------------------------------
 
 These fonts are unmodified binaries from the KaTeX project
 (https://github.com/KaTeX/KaTeX). They are not licensed under the MIT License
