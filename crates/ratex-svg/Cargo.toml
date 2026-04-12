@@ -23,7 +23,7 @@ ab_glyph = { version = "0.2", optional = true }
 ratex-font = { workspace = true, optional = true }
 ratex-layout = { workspace = true, optional = true }
 ratex-parser = { workspace = true, optional = true }
-rust-embed = { version = "8.11.0", features = ["debug-embed"], optional = true }
+rust-embed = { workspace = true, optional = true }
 
 [[bin]]
 name = "render-svg"
