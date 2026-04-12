@@ -10,6 +10,7 @@ use ratex_font::FontId;
 #[folder = "../../fonts/"]
 struct Fonts;
 
+#[allow(unused_variables)]
 pub(crate) fn load_all_fonts(font_dir: &str) -> Result<HashMap<FontId, Vec<u8>>, String> {
     let mut data = HashMap::new();
     let font_map = [
