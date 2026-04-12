@@ -4,6 +4,15 @@
 # Or: cp .githooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 
 set -e
+
+# Git hooks run without your shell profile (no ~/.zshrc), so GUI commits often lack rustup's PATH.
+PATH="${HOME}/.cargo/bin:$PATH"
+export PATH
+if ! command -v cargo >/dev/null 2>&1; then
+  echo "pre-commit: cargo not found. Install Rust (https://rustup.rs) or put cargo on PATH." >&2
+  exit 1
+fi
+
 echo "Running cargo clippy..."
 cargo clippy --workspace -- -D warnings
 echo "Clippy passed."

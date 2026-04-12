@@ -25,6 +25,12 @@ TMP_ERR_SVG="$(mktemp)"
 TMP_ERR_SVG_CE="$(mktemp)"
 trap 'rm -f "$TMP_ERR" "$TMP_ERR_CE" "$TMP_ERR_SVG" "$TMP_ERR_SVG_CE"' EXIT
 
+# Faster release builds for this script only. Root `Cargo.toml` keeps full LTO + codegen-units=1
+# for normal `cargo build --release` / CI; these env overrides do not change that.
+export CARGO_PROFILE_RELEASE_LTO=false
+export CARGO_PROFILE_RELEASE_CODEGEN_UNITS=128
+export CARGO_PROFILE_RELEASE_INCREMENTAL=true
+
 echo "Building ratex-render (release)..."
 cargo build --release -p ratex-render
 
