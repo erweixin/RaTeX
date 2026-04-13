@@ -18,6 +18,11 @@ ab_glyph = "0.2"
 png = "0.17"
 serde_json = "1"
 fontdb = { version = "0.23", features = ["std"] }
+rust-embed = { workspace = true, optional = true }
+
+[features]
+## Embed font source files in binary. No need for font directory with this feature.
+embed-fonts = ["dep:rust-embed"]
 
 [[bin]]
 name = "render"

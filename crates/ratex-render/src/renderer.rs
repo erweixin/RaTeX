@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::path::Path;
 
 use ab_glyph::{Font, FontRef};
 use ratex_font::FontId;
@@ -8,6 +7,11 @@ use ratex_types::display_item::{DisplayItem, DisplayList};
 use tiny_skia::{FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
 
 use crate::unicode_fallback::unicode_fallback_font_bytes;
+
+#[cfg(feature = "embed-fonts")]
+#[derive(rust_embed::Embed)]
+#[folder = "../../fonts/"]
+struct Fonts;
 
 pub struct RenderOptions {
     pub font_size: f32,
@@ -139,6 +143,7 @@ pub fn render_to_png(
 
 /// Load KaTeX TTFs from disk. Only existing paths are inserted; callers should point [RenderOptions::font_dir]
 /// at a folder that includes every face the layout may emit (e.g. repo root `fonts/`).
+#[allow(unused_variables)]
 fn load_all_fonts(font_dir: &str) -> Result<HashMap<FontId, Vec<u8>>, String> {
     let mut data = HashMap::new();
     let font_map = [
@@ -163,18 +168,30 @@ fn load_all_fonts(font_dir: &str) -> Result<HashMap<FontId, Vec<u8>>, String> {
         (FontId::Size4Regular, "KaTeX_Size4-Regular.ttf"),
     ];
 
-    let dir = Path::new(font_dir);
-    for (id, filename) in &font_map {
-        let path = dir.join(filename);
-        if path.exists() {
-            let bytes = std::fs::read(&path)
-                .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
-            data.insert(*id, bytes);
+    #[cfg(not(feature = "embed-fonts"))]
+    {
+        let dir = std::path::Path::new(font_dir);
+        for (id, filename) in &font_map {
+            let path = dir.join(filename);
+            if path.exists() {
+                let bytes = std::fs::read(&path)
+                    .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+                data.insert(*id, bytes);
+            }
+        }
+
+        if data.is_empty() {
+            return Err(format!("No fonts found in {font_dir}"));
         }
     }
 
-    if data.is_empty() {
-        return Err(format!("No fonts found in {}", font_dir));
+    #[cfg(feature = "embed-fonts")]
+    {
+        for (id, filename) in &font_map {
+            let font = Fonts::get(filename)
+                .ok_or_else(|| format!("Failed to get embeded font {filename}"))?;
+            data.insert(*id, font.data.to_vec());
+        }
     }
 
     Ok(data)

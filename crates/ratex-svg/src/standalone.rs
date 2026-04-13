@@ -1,11 +1,16 @@
 //! Glyph outlines as SVG `<path>` via `ab_glyph` (feature `standalone`).
 
 use std::collections::HashMap;
-use std::path::Path;
 
 use ab_glyph::{Font, FontRef, OutlineCurve};
 use ratex_font::FontId;
 
+#[cfg(feature = "embed-fonts")]
+#[derive(rust_embed::Embed)]
+#[folder = "../../fonts/"]
+struct Fonts;
+
+#[allow(unused_variables)]
 pub(crate) fn load_all_fonts(font_dir: &str) -> Result<HashMap<FontId, Vec<u8>>, String> {
     let mut data = HashMap::new();
     let font_map = [
@@ -30,18 +35,30 @@ pub(crate) fn load_all_fonts(font_dir: &str) -> Result<HashMap<FontId, Vec<u8>>,
         (FontId::Size4Regular, "KaTeX_Size4-Regular.ttf"),
     ];
 
-    let dir = Path::new(font_dir);
-    for (id, filename) in &font_map {
-        let path = dir.join(filename);
-        if path.exists() {
-            let bytes = std::fs::read(&path)
-                .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
-            data.insert(*id, bytes);
+    #[cfg(not(feature = "embed-fonts"))]
+    {
+        let dir = std::path::Path::new(font_dir);
+        for (id, filename) in &font_map {
+            let path = dir.join(filename);
+            if path.exists() {
+                let bytes = std::fs::read(&path)
+                    .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
+                data.insert(*id, bytes);
+            }
+        }
+
+        if data.is_empty() {
+            return Err(format!("No fonts found in {font_dir}"));
         }
     }
 
-    if data.is_empty() {
-        return Err(format!("No fonts found in {font_dir}"));
+    #[cfg(feature = "embed-fonts")]
+    {
+        for (id, filename) in &font_map {
+            let font = Fonts::get(filename)
+                .ok_or_else(|| format!("Failed to get embeded font {filename}"))?;
+            data.insert(*id, font.data.to_vec());
+        }
     }
 
     Ok(data)

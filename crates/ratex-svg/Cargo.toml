@@ -14,6 +14,8 @@ default = []
 standalone = ["dep:ab_glyph", "dep:ratex-font"]
 ## `render-svg` binary: parse + layout from stdin (needs `standalone` for outlined glyphs).
 cli = ["dep:ratex-layout", "dep:ratex-parser"]
+## Embed font source files in binary. No need for font directory with this feature. Implicitly enables 'standalone' feature.
+embed-fonts = ["standalone", "dep:rust-embed"]
 
 [dependencies]
 ratex-types = { workspace = true }
@@ -21,6 +23,7 @@ ab_glyph = { version = "0.2", optional = true }
 ratex-font = { workspace = true, optional = true }
 ratex-layout = { workspace = true, optional = true }
 ratex-parser = { workspace = true, optional = true }
+rust-embed = { workspace = true, optional = true }
 
 [[bin]]
 name = "render-svg"

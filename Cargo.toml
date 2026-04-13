@@ -33,6 +33,7 @@ phf        = { version = "0.11", features = ["macros"] }
 thiserror  = "1.0"
 serde      = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+rust-embed = { version = "8.11.0", features = ["debug-embed"] }
 
 [profile.release]
 lto = true            # Full cross-crate link-time optimization, eliminates dead code

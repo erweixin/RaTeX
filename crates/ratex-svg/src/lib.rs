@@ -57,7 +57,13 @@ impl SvgOptions {
 /// Render a display list to a standalone SVG document string.
 pub fn render_to_svg(list: &DisplayList, opts: &SvgOptions) -> String {
     #[cfg(feature = "standalone")]
-    let font_data = if opts.embed_glyphs && !opts.font_dir.is_empty() {
+    #[cfg(not(feature = "embed-fonts"))]
+    let load_fonts = opts.embed_glyphs && !opts.font_dir.is_empty();
+    #[cfg(feature = "embed-fonts")]
+    let load_fonts = opts.embed_glyphs;
+
+    #[cfg(feature = "standalone")]
+    let font_data = if load_fonts {
         standalone::load_all_fonts(&opts.font_dir).ok()
     } else {
         None

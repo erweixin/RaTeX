@@ -151,11 +151,13 @@ echo '\frac{1}{2} + \sqrt{x}' | cargo run --release -p ratex-svg --features cli
 
 # Standalone: embed glyph outlines as <path> — no external fonts needed
 echo '\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}' | \
-  cargo run --release -p ratex-svg --features cli -- \
-  --font-dir /path/to/katex/fonts --output-dir ./out
+  cargo run --release -p ratex-svg --features "cli embed-fonts" -- \
+  --output-dir ./out
 ```
 
 The `standalone` feature (enabled by `cli`) reads KaTeX TTF files and embeds glyph outlines directly into the SVG, producing a fully self-contained file that renders correctly without any CSS or web fonts.
+
+The `embed-fonts` feature (implicitly enables `standalone`) includes the font files in the binary. So no font directory needs to be specified.
 
 ### Browser (WASM)
 
