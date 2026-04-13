@@ -40,6 +40,7 @@ sealed class DisplayItem {
         val width: Double,
         val thickness: Double,
         val color: RaTeXColor,
+        val dashed: Boolean = false,
     ) : DisplayItem()
 
     @Serializable @SerialName("Rect")
@@ -76,7 +77,7 @@ sealed class PathCommand {
         val x1: Double, val y1: Double,
         val x: Double,  val y: Double,
     ) : PathCommand()
-    @Serializable @SerialName("Close")   object Close : PathCommand()
+    @Serializable @SerialName("Close")   data object Close : PathCommand()
 }
 
 // MARK: - Color

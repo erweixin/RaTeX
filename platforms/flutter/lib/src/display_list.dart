@@ -75,16 +75,18 @@ class GlyphPathItem extends DisplayItem {
 class LineItem extends DisplayItem {
   final double x, y, width, thickness;
   final RaTeXColor color;
+  final bool dashed;
 
   const LineItem({required this.x, required this.y,
                   required this.width, required this.thickness,
-                  required this.color});
+                  required this.color, this.dashed = false});
 
   factory LineItem.fromJson(Map<String, dynamic> j) => LineItem(
         x: (j['x'] as num).toDouble(), y: (j['y'] as num).toDouble(),
         width: (j['width'] as num).toDouble(),
         thickness: (j['thickness'] as num).toDouble(),
         color: RaTeXColor.fromJson(j['color'] as Map<String, dynamic>),
+        dashed: j['dashed'] as bool? ?? false,
       );
 }
 

@@ -124,9 +124,29 @@ class RaTeXPainter extends CustomPainter {
   void _drawLine(Canvas canvas, LineItem l) {
     final t = math.max(0.5, _em(l.thickness));
     final halfT = t / 2;
-    canvas.drawRect(
-      Rect.fromLTWH(_em(l.x), _em(l.y) - halfT, _em(l.width), t),
-      _paint(l.color));
+    if (l.dashed) {
+      final paint = _paint(l.color)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = t
+        ..strokeCap = StrokeCap.butt;
+      final dashLen = t * 3;
+      final path = ui.Path();
+      final x0 = _em(l.x);
+      final y0 = _em(l.y);
+      final endX = x0 + _em(l.width);
+      var cx = x0;
+      while (cx < endX) {
+        path.moveTo(cx, y0);
+        final nx = math.min(cx + dashLen, endX);
+        path.lineTo(nx, y0);
+        cx += dashLen * 2;
+      }
+      canvas.drawPath(path, paint);
+    } else {
+      canvas.drawRect(
+        Rect.fromLTWH(_em(l.x), _em(l.y) - halfT, _em(l.width), t),
+        _paint(l.color));
+    }
   }
 
   void _drawRect(Canvas canvas, RectItem r) {
