@@ -110,8 +110,8 @@ pub fn render_to_svg(list: &DisplayList, opts: &SvgOptions) -> String {
                 width,
                 thickness,
                 color,
-                ..
-            } => emit_line(&mut body, *x, *y, *width, *thickness, color, opts),
+                dashed,
+            } => emit_line(&mut body, *x, *y, *width, *thickness, color, *dashed, opts),
             DisplayItem::Rect {
                 x,
                 y,
@@ -136,10 +136,7 @@ fn wrap_svg(vb_w: f64, vb_h: f64, body: &str) -> String {
     let w = fmt_num(vb_w);
     let h = fmt_num(vb_h);
     format!(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">{body}</svg>"#,
-        w = w,
-        h = h,
-        body = body,
+        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">{body}</svg>"#
     )
 }
 
@@ -263,6 +260,7 @@ fn emit_glyph_text(out: &mut String, g: GlyphEmit<'_>, opts: &SvgOptions) {
     );
 }
 
+#[allow(clippy::too_many_arguments)]
 fn emit_line(
     out: &mut String,
     x: f64,
@@ -270,24 +268,37 @@ fn emit_line(
     width: f64,
     thickness: f64,
     color: &Color,
+    dashed: bool,
     opts: &SvgOptions,
 ) {
     let em = opts.em_px();
     let x0 = tx(x, opts);
     let yc = ty(y, opts);
     let t = (thickness * em).max(1e-6);
-    let y0 = yc - t / 2.0;
     let w = width * em;
-    let fill = color_to_svg(color);
-    let x0s = fmt_num(x0);
-    let y0s = fmt_num(y0);
-    let ws = fmt_num(w);
-    let hs = fmt_num(t);
+    let stroke = color_to_svg(color);
     use std::fmt::Write;
-    let _ = write!(
-        out,
-        r#"<rect x="{x0s}" y="{y0s}" width="{ws}" height="{hs}" fill="{fill}"/>"#
-    );
+    if dashed {
+        let x0s = fmt_num(x0);
+        let ycs = fmt_num(yc);
+        let x1s = fmt_num(x0 + w);
+        let ts = fmt_num(t);
+        let dash = fmt_num(t * 3.0);
+        let _ = write!(
+            out,
+            r#"<line x1="{x0s}" y1="{ycs}" x2="{x1s}" y2="{ycs}" stroke="{stroke}" stroke-width="{ts}" stroke-dasharray="{dash} {dash}"/>"#
+        );
+    } else {
+        let y0 = yc - t / 2.0;
+        let x0s = fmt_num(x0);
+        let y0s = fmt_num(y0);
+        let ws = fmt_num(w);
+        let hs = fmt_num(t);
+        let _ = write!(
+            out,
+            r#"<rect x="{x0s}" y="{y0s}" width="{ws}" height="{hs}" fill="{stroke}"/>"#
+        );
+    }
 }
 
 fn emit_rect(

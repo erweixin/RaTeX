@@ -90,14 +90,28 @@ class RaTeXRenderer(
     }
 
     private fun drawLine(canvas: Canvas, l: DisplayItem.Line) {
-        val halfT = (l.thickness * fontSize / 2).toFloat()
+        val t = maxOf(0.5f, (l.thickness * fontSize).toFloat())
+        val halfT = t / 2f
         val left   = l.x.em()
         val top    = l.y.em() - halfT
         val right  = (l.x + l.width).em()
         val bottom = l.y.em() + halfT
-        paint.style = Paint.Style.FILL
         paint.applyColor(l.color)
-        canvas.drawRect(left, top, right, bottom, paint)
+        if (l.dashed) {
+            val dashLen = t * 3f
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = t
+            paint.strokeCap = Paint.Cap.BUTT
+            paint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(dashLen, dashLen), 0f)
+            val path = android.graphics.Path()
+            path.moveTo(left, l.y.em())
+            path.lineTo(right, l.y.em())
+            canvas.drawPath(path, paint)
+            paint.pathEffect = null
+        } else {
+            paint.style = Paint.Style.FILL
+            canvas.drawRect(left, top, right, bottom, paint)
+        }
     }
 
     private fun drawRect(canvas: Canvas, r: DisplayItem.Rect) {

@@ -105,10 +105,22 @@ public struct RaTeXRenderer {
 
     private func drawLine(_ l: LineData, in ctx: CGContext) {
         ctx.saveGState()
-        ctx.setFillColor(cgColor(l.color))
-        let halfT = pt(l.thickness) / 2
-        ctx.fill(CGRect(x: pt(l.x), y: pt(l.y) - halfT,
-                        width: pt(l.width), height: pt(l.thickness)))
+        let t = max(0.5, pt(l.thickness))
+        let halfT = t / 2
+        if l.dashed {
+            ctx.setStrokeColor(cgColor(l.color))
+            ctx.setLineWidth(t)
+            ctx.setLineCap(.butt)
+            let dashLen = t * 3
+            ctx.setLineDash(phase: 0, lengths: [dashLen, dashLen])
+            ctx.move(to: CGPoint(x: pt(l.x), y: pt(l.y)))
+            ctx.addLine(to: CGPoint(x: pt(l.x) + pt(l.width), y: pt(l.y)))
+            ctx.strokePath()
+        } else {
+            ctx.setFillColor(cgColor(l.color))
+            ctx.fill(CGRect(x: pt(l.x), y: pt(l.y) - halfT,
+                            width: pt(l.width), height: t))
+        }
         ctx.restoreGState()
     }
 

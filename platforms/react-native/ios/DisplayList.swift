@@ -92,6 +92,17 @@ public struct LineData: Codable {
     public let width: Double
     public let thickness: Double
     public let color: RaTeXColor
+    public let dashed: Bool
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        x         = try c.decode(Double.self, forKey: .x)
+        y         = try c.decode(Double.self, forKey: .y)
+        width     = try c.decode(Double.self, forKey: .width)
+        thickness = try c.decode(Double.self, forKey: .thickness)
+        color     = try c.decode(RaTeXColor.self, forKey: .color)
+        dashed    = try c.decodeIfPresent(Bool.self, forKey: .dashed) ?? false
+    }
 }
 
 public struct RectData: Codable {
