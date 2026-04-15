@@ -1,0 +1,24 @@
+{
+  "name": "react-native-expo",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start --dev-client",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "prebuild": "expo prebuild"
+  },
+  "dependencies": {
+    "expo": "~55.0.0",
+    "expo-status-bar": "~55.0.5",
+    "ratex-react-native": "file:../../platforms/react-native",
+    "react": "19.2.0",
+    "react-native": "0.83.0"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.0",
+    "typescript": "~5.9.2"
+  },
+  "private": true
+}
