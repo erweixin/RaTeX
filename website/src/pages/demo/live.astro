@@ -14,7 +14,7 @@ const defaultFormula = String.raw`\frac{-b \pm \sqrt{b^2-4ac}}{2a}`;
 
 <BaseLayout
   title="RaTeX — Live comparison (WASM vs KaTeX)"
-  description="Compare RaTeX WASM canvas output with KaTeX 0.16.9 side by side: edit LaTeX, status, and example snippets."
+  description="Compare RaTeX WASM canvas output with KaTeX 0.16.45 side by side: edit LaTeX, status, and example snippets."
   active="demo"
   lang={lang}
   copyright={t.footer.copyright}
@@ -22,13 +22,13 @@ const defaultFormula = String.raw`\frac{-b \pm \sqrt{b^2-4ac}}{2a}`;
   <link
     slot="head"
     rel="stylesheet"
-    href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+    href="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.css"
     crossorigin="anonymous"
   />
   <script
     slot="head"
     defer
-    src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
+    src="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.js"
     crossorigin="anonymous"
     id="katex-script"></script>
   <script slot="head" src={`${base}katex-fonts-link.js`}></script>

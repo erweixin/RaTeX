@@ -20,7 +20,7 @@ const filterIdle =
 
 <BaseLayout
   title="RaTeX — Formula support table"
-  description={`1058 golden formulas (incl. mhchem \\ce / \\pu): RaTeX WASM vs KaTeX 0.16.9, ink IoU vs reference PNGs (batch mean ≈ ${offlineScoreMean} on scored rows). Live RaTeX column in your browser.`}
+  description={`1058 golden formulas (incl. mhchem \\ce / \\pu): RaTeX WASM vs KaTeX 0.16.45, ink IoU vs reference PNGs (batch mean ≈ ${offlineScoreMean} on scored rows). Live RaTeX column in your browser.`}
   active="demo"
   lang={lang}
   copyright={t.footer.copyright}
@@ -28,19 +28,19 @@ const filterIdle =
   <link
     slot="head"
     rel="stylesheet"
-    href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+    href="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.css"
     crossorigin="anonymous"
   />
   <script
     slot="head"
     defer
-    src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
+    src="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/katex.min.js"
     crossorigin="anonymous"
     id="katex-script"></script>
   <script
     slot="head"
     defer
-    src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/mhchem.min.js"
+    src="https://cdn.jsdelivr.net/npm/katex@0.16.45/dist/contrib/mhchem.min.js"
     crossorigin="anonymous"
     id="mhchem-script"></script>
   <script slot="head" src={`${base}katex-fonts-link.js`}></script>

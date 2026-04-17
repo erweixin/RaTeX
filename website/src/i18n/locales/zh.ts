@@ -172,7 +172,7 @@ export const zh: TranslationDict = {
   demo: {
     eyebrow: "立即体验",
     heading: "演示与基准测试",
-    intro: "与生产构建相同的 RaTeX WASM；KaTeX 0.16.9 是这些页面的参考渲染器。",
+    intro: "与生产构建相同的 RaTeX WASM；KaTeX 0.16.45 是这些页面的参考渲染器。",
     suggestedOrderLabel: "建议顺序",
     suggestedOrderDescPrefix: "从",
     suggestedOrderLiveLink: "实时对比",
@@ -181,17 +181,17 @@ export const zh: TranslationDict = {
     suggestedOrderDescSuffix: "扫描全部 1058 行，最后在需要分类浏览时使用图库。",
     howItLoadsLabel: "加载方式：",
     howItLoadsDesc:
-      "KaTeX 0.16.9 CSS/JS 来自 jsDelivr。RaTeX 使用本站的 platforms/web/（WASM + 字体）。在 GitHub Pages 上会随部署一起发布；本地请构建 WASM 并使用开发服务器——见",
+      "KaTeX 0.16.45 CSS/JS 来自 jsDelivr。RaTeX 使用本站的 platforms/web/（WASM + 字体）。在 GitHub Pages 上会随部署一起发布；本地请构建 WASM 并使用开发服务器——见",
     howItLoadsGetStartedLink: "快速上手 → Web",
     liveComparisonTitle: "实时对比",
-    liveComparisonSubtitle: "RaTeX WASM vs KaTeX 0.16.9",
+    liveComparisonSubtitle: "RaTeX WASM vs KaTeX 0.16.45",
     liveComparisonBody:
       "编辑一行 LaTeX 并并排比较 RaTeX Canvas 输出与 KaTeX——状态、错误以及与图库相同的 WASM 包。",
     liveComparisonCta: "打开交互演示",
     supportTableTitle: "支持表",
     supportTableSubtitle: "1058 个基准公式",
     supportTableBody:
-      "打开全页基准测试：每个基准测试套件行与 KaTeX 0.16.9 对比，批量 IoU 分数以及浏览器中实时的 RaTeX 列——最适合覆盖率和回归分类。",
+      "打开全页基准测试：每个基准测试套件行与 KaTeX 0.16.45 对比，批量 IoU 分数以及浏览器中实时的 RaTeX 列——最适合覆盖率和回归分类。",
     supportTableCta: "打开完整支持表",
     galleriesEyebrow: "相同 WASM · 不同界面",
     galleriesHeading: "基准测试套件图库",
@@ -227,7 +227,7 @@ export const zh: TranslationDict = {
   supportTable: {
     eyebrow: "基准测试",
     heading: "公式支持表",
-    desc: "RaTeX（Rust + WASM）与 KaTeX 0.16.9 对比 1058 个基准测试套件行（含 mhchem \\ce / \\pu）。离线格使用预计算的墨水 IoU 与 KaTeX 参考 PNG 对比；RaTeX 列由您浏览器中加载的 WASM 实时计算。",
+    desc: "RaTeX（Rust + WASM）与 KaTeX 0.16.45 对比 1058 个基准测试套件行（含 mhchem \\ce / \\pu）。离线格使用预计算的墨水 IoU 与 KaTeX 参考 PNG 对比；RaTeX 列由您浏览器中加载的 WASM 实时计算。",
     dataSourceLabel: "数据来源",
     dataSourceDescPrefix:
       "批量离线分数和聚合计数在 CI 运行中重新生成，可能比最新的",

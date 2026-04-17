@@ -172,7 +172,7 @@ export const en = {
     eyebrow: "Try it",
     heading: "Demos & benchmarks",
     intro:
-      "Same RaTeX WASM as production builds; KaTeX 0.16.9 is the reference renderer on these pages.",
+      "Same RaTeX WASM as production builds; KaTeX 0.16.45 is the reference renderer on these pages.",
     suggestedOrderLabel: "Suggested order",
     suggestedOrderDescPrefix: "Start with",
     suggestedOrderLiveLink: "live comparison",
@@ -182,17 +182,17 @@ export const en = {
       "to scan all 1058 lines, then use galleries when you want categorized scrolling.",
     howItLoadsLabel: "How it loads:",
     howItLoadsDesc:
-      "KaTeX 0.16.9 CSS/JS from jsDelivr. RaTeX uses this site\u2019s platforms/web/ (WASM + fonts). On GitHub Pages that ships with the deployment; locally, build WASM and use the dev server\u2014see",
+      "KaTeX 0.16.45 CSS/JS from jsDelivr. RaTeX uses this site\u2019s platforms/web/ (WASM + fonts). On GitHub Pages that ships with the deployment; locally, build WASM and use the dev server\u2014see",
     howItLoadsGetStartedLink: "Get started \u2192 Web",
     liveComparisonTitle: "Live comparison",
-    liveComparisonSubtitle: "RaTeX WASM vs KaTeX 0.16.9",
+    liveComparisonSubtitle: "RaTeX WASM vs KaTeX 0.16.45",
     liveComparisonBody:
       "Edit one LaTeX line and compare RaTeX canvas output with KaTeX side by side\u2014status, errors, and the same WASM bundle as the galleries.",
     liveComparisonCta: "Open interactive demo",
     supportTableTitle: "Support table",
     supportTableSubtitle: "1058 golden formulas",
     supportTableBody:
-      "Opens the full-page benchmark: every golden-suite line vs KaTeX 0.16.9, with batch IoU scores and a live RaTeX column in your browser\u2014best for coverage and regression triage.",
+      "Opens the full-page benchmark: every golden-suite line vs KaTeX 0.16.45, with batch IoU scores and a live RaTeX column in your browser\u2014best for coverage and regression triage.",
     supportTableCta: "Open full support table",
     galleriesEyebrow: "Same WASM \u00b7 different UI",
     galleriesHeading: "Golden-suite galleries",
@@ -228,7 +228,7 @@ export const en = {
   supportTable: {
     eyebrow: "Benchmarks",
     heading: "Formula support table",
-    desc: "RaTeX (Rust + WASM) vs KaTeX 0.16.9 across 1058 golden-suite lines (includes mhchem \\ce / \\pu). Offline cells use pre-computed ink IoU vs KaTeX reference PNGs; the RaTeX column is computed live in your browser from the loaded WASM.",
+    desc: "RaTeX (Rust + WASM) vs KaTeX 0.16.45 across 1058 golden-suite lines (includes mhchem \\ce / \\pu). Offline cells use pre-computed ink IoU vs KaTeX reference PNGs; the RaTeX column is computed live in your browser from the loaded WASM.",
     dataSourceLabel: "Data source",
     dataSourceDescPrefix:
       "Batch offline scores and aggregate counts are regenerated in CI runs and may lag the latest",
