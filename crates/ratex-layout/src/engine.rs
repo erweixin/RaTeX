@@ -2457,15 +2457,15 @@ fn layout_array(
             for spec in cs {
                 match spec.align_type {
                     AlignType::Align => align_count += 1,
-                    AlignType::Separator if spec.align.as_deref() == Some("|") => {
-                        if align_count <= num_cols {
-                            seps[align_count] = Some(false);
-                        }
+                    AlignType::Separator
+                        if spec.align.as_deref() == Some("|") && align_count <= num_cols =>
+                    {
+                        seps[align_count] = Some(false);
                     }
-                    AlignType::Separator if spec.align.as_deref() == Some(":") => {
-                        if align_count <= num_cols {
-                            seps[align_count] = Some(true);
-                        }
+                    AlignType::Separator
+                        if spec.align.as_deref() == Some(":") && align_count <= num_cols =>
+                    {
+                        seps[align_count] = Some(true);
                     }
                     _ => {}
                 }
