@@ -49,6 +49,7 @@ Then in your app: `implementation(project(":ratex-android"))`.
 binding.mathView.latex       = """\frac{-b \pm \sqrt{b^2-4ac}}{2a}"""
 binding.mathView.fontSize    = 24f     // dp — no manual density conversion needed
 binding.mathView.displayMode = true    // true = display/block (default); false = inline/text
+binding.mathView.color       = android.graphics.Color.parseColor("#1E88E5")
 ```
 
 ### Inline formula — `RaTeXSpan`
@@ -88,14 +89,20 @@ fun showInlineFormula(textView: TextView) {
 ### Low-level (Compose / custom drawing)
 
 ```kotlin
+import android.graphics.Color
+
 // display mode (default)
 val dl = RaTeXEngine.parse(latex)
 // inline mode
 val dl = RaTeXEngine.parse(latex, displayMode = false)
+// custom default color
+val blueDl = RaTeXEngine.parse(latex, color = Color.parseColor("#1E88E5"))
 
 val renderer = RaTeXRenderer(dl, fontSize) { RaTeXFontLoader.getTypeface(it) }
 renderer.draw(canvas)
 ```
+
+Explicit LaTeX colors such as `\color{...}` still take precedence over the default color.
 
 ## Demo
 

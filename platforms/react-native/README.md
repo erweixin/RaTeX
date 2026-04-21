@@ -50,6 +50,7 @@ function MathFormula() {
     <RaTeXView
       latex="\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}"
       fontSize={24}
+      color="#1E88E5"
       onError={(e) => console.warn('LaTeX error:', e.nativeEvent.error)}
     />
   );
@@ -74,6 +75,21 @@ function Paragraph() {
 
 Use `$...$` delimiters anywhere inside the `content` string. Multiple formulas in one string are supported.
 
+### Shared default color
+
+```tsx
+import { RaTeXProvider, InlineTeX, RaTeXView } from 'ratex-react-native';
+
+function Screen() {
+  return (
+    <RaTeXProvider color="#1E88E5">
+      <RaTeXView latex="x + y" />
+      <InlineTeX content="Inline math: $E = mc^2$" />
+    </RaTeXProvider>
+  );
+}
+```
+
 ## API
 
 ### `<RaTeXView />`
@@ -83,6 +99,7 @@ Use `$...$` delimiters anywhere inside the `content` string. Multiple formulas i
 | `latex` | `string` | — | LaTeX math-mode string to render (required) |
 | `fontSize` | `number` | `24` | Font size in **dp** (density-independent pixels). The rendered formula scales proportionally. |
 | `displayMode` | `boolean` | `true` | `true` = display/block style (`$$...$$`); `false` = inline/text style (`$...$`). |
+| `color` | `ColorValue` | — | Default formula color. Explicit LaTeX colors still take precedence. |
 | `style` | `StyleProp<ViewStyle>` | — | Standard React Native style. Width and height are automatically set from measured content unless overridden. |
 | `onError` | `(e: { nativeEvent: { error: string } }) => void` | — | Called when the LaTeX string fails to parse. |
 | `onContentSizeChange` | `(e: { nativeEvent: { width: number; height: number } }) => void` | — | Called after layout with the formula's **intrinsic (unscaled) content size** in dp. Useful for scroll views or dynamic containers. |
@@ -114,9 +131,14 @@ Renders a mixed string of plain text and `$...$` LaTeX formulas as a single inli
 |------|------|---------|-------------|
 | `content` | `string` | — | Text string with `$...$` markers for inline LaTeX (required). |
 | `fontSize` | `number` | `16` | Font size passed to each formula renderer (dp). |
+| `color` | `ColorValue` | — | Default color passed to each inline formula. Explicit LaTeX colors still take precedence. |
 | `textStyle` | `StyleProp<TextStyle>` | — | Style applied to plain-text segments. |
 
 > `InlineTeX` automatically passes `displayMode={false}` to every formula it renders — `$...$` is always inline style.
+
+### `<RaTeXProvider />`
+
+Provides a default formula color to descendant `RaTeXView` and `InlineTeX` components. Use a component-level `color` prop to override the inherited value.
 
 ## Architecture Support
 

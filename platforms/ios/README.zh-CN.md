@@ -89,6 +89,7 @@ let mathView = RaTeXView()
 mathView.latex       = #"\frac{-b \pm \sqrt{b^2-4ac}}{2a}"#
 mathView.fontSize    = 28
 mathView.displayMode = true   // true = 独立块（默认）；false = 行内
+mathView.color       = .systemBlue
 mathView.onError     = { print("RaTeX error:", $0) }
 
 // 自动布局
@@ -109,13 +110,17 @@ struct ContentView: View {
     var body: some View {
         RaTeXFormula(
             latex: #"\int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}"#,
-            fontSize: 24
+            fontSize: 24,
+            color: .blue
             // displayMode: true  ← 默认独立块；传 false 切换为行内样式
         )
+        .ratexColor(.primary)
         .padding()
     }
 }
 ```
+
+可使用 `.ratexColor(...)` 为一组公式设置默认颜色，也可以通过 `color:` 单独覆盖某个 `RaTeXFormula` 的颜色。
 
 ### SwiftUI — 行内公式（文字 + LaTeX 混排）
 
@@ -157,12 +162,16 @@ import RaTeX
 let displayList = try RaTeXEngine.shared.parse(#"\sum_{n=1}^\infty \frac{1}{n^2}"#)
 // 行内
 let displayList = try RaTeXEngine.shared.parse(#"\frac{1}{2}"#, displayMode: false)
+// 自定义默认颜色
+let blueDisplayList = try RaTeXEngine.shared.parse(#"x + y"#, color: .systemBlue)
 
 let renderer = RaTeXRenderer(displayList: displayList, fontSize: 20)
 
 // 在你的 UIView.draw(_:) 或 CGContext 块中：
 renderer.draw(in: UIGraphicsGetCurrentContext()!)
 ```
+
+显式 LaTeX 颜色（如 `\color{...}`）仍会覆盖外部传入的默认颜色。
 
 ---
 

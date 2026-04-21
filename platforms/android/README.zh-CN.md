@@ -49,6 +49,7 @@ project(":ratex-android").projectDir = file("path/to/RaTeX/platforms/android")
 binding.mathView.latex       = """\frac{-b \pm \sqrt{b^2-4ac}}{2a}"""
 binding.mathView.fontSize    = 24f     // dp — 无需手动换算密度
 binding.mathView.displayMode = true    // true = 独立块（默认）；false = 行内
+binding.mathView.color       = android.graphics.Color.parseColor("#1E88E5")
 ```
 
 ### 行内公式 — `RaTeXSpan`
@@ -88,14 +89,20 @@ fun showInlineFormula(textView: TextView) {
 ### 底层（Compose / 自定义绘制）
 
 ```kotlin
+import android.graphics.Color
+
 // 独立块（默认）
 val dl = RaTeXEngine.parse(latex)
 // 行内
 val dl = RaTeXEngine.parse(latex, displayMode = false)
+// 自定义默认颜色
+val blueDl = RaTeXEngine.parse(latex, color = Color.parseColor("#1E88E5"))
 
 val renderer = RaTeXRenderer(dl, fontSize) { RaTeXFontLoader.getTypeface(it) }
 renderer.draw(canvas)
 ```
+
+显式 LaTeX 颜色（如 `\color{...}`）仍然优先于外部传入的默认颜色。
 
 ## Demo
 
