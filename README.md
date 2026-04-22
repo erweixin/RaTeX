@@ -63,6 +63,7 @@ RaTeX is the same KaTeX-compatible math engine compiled to a portable Rust core,
 | **Android** | JNI + Kotlin + Canvas · AAR | Out of the box |
 | **Flutter** | Dart FFI + `CustomPainter` | Out of the box |
 | **React Native** | Native module + C ABI · iOS/Android views | Out of the box |
+| **Compose Multiplatform** | Kotlin Multiplatform + Compose Canvas · Android / iOS / JVM Desktop | Via [`RaTeX-CMP`](https://github.com/darriousliu/RaTeX-CMP) |
 | **Web** | WASM → Canvas 2D · `<ratex-formula>` Web Component | Out of the box |
 | **Server / CI** | tiny-skia → PNG rasterizer | Out of the box |
 | **SVG** | `ratex-svg` → self-contained vector SVG | Out of the box |
@@ -71,21 +72,13 @@ RaTeX is the same KaTeX-compatible math engine compiled to a portable Rust core,
 
 From the demo apps in [`demo/screenshots/`](demo/screenshots/).
 
-**iOS**
-
-![RaTeX demo on iOS](demo/screenshots/ios.png)
-
-**Android**
-
-![RaTeX demo on Android](demo/screenshots/android.png)
-
-**Flutter (iOS)**
-
-![RaTeX demo on Flutter iOS](demo/screenshots/flutter-ios.png)
-
-**React Native (iOS)**
-
-![RaTeX demo on React Native iOS](demo/screenshots/react-native-ios.png)
+| iOS | Android |
+|:---:|:---:|
+| ![RaTeX demo on iOS](demo/screenshots/ios.png) | ![RaTeX demo on Android](demo/screenshots/android.png) |
+| **Flutter (iOS)** | **React Native (iOS)** |
+| ![RaTeX demo on Flutter iOS](demo/screenshots/flutter-ios.png) | ![RaTeX demo on React Native iOS](demo/screenshots/react-native-ios.png) |
+| **Compose Multiplatform** |  |
+| ![RaTeX demo on Compose Multiplatform](demo/screenshots/compose-multiplatform.png) |  |
 
 ---
 
@@ -183,6 +176,7 @@ See [`platforms/web/README.md`](platforms/web/README.md) for the full setup.
 | Android | [`platforms/android/README.md`](platforms/android/README.md) |
 | Flutter | [`platforms/flutter/README.md`](platforms/flutter/README.md) |
 | React Native | [`platforms/react-native/README.md`](platforms/react-native/README.md) |
+| Compose Multiplatform | [`RaTeX-CMP`](https://github.com/darriousliu/RaTeX-CMP) |
 | Web | [`platforms/web/README.md`](platforms/web/README.md) |
 
 ### Run tests

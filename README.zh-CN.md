@@ -63,6 +63,7 @@ RaTeX 是同一个 KaTeX 兼容的数学引擎，但编译到一个可移植的 
 | **Android** | JNI + Kotlin + Canvas · AAR | 开箱即用 |
 | **Flutter** | Dart FFI + `CustomPainter` | 开箱即用 |
 | **React Native** | C ABI Native 模块 · iOS/Android 原生视图 | 开箱即用 |
+| **Compose Multiplatform** | Kotlin Multiplatform + Compose Canvas · Android / iOS / JVM Desktop | 通过 [`RaTeX-CMP`](https://github.com/darriousliu/RaTeX-CMP) 集成 |
 | **Web** | WASM → Canvas 2D · `<ratex-formula>` Web 组件 | 开箱即用 |
 | **服务端 / CI** | tiny-skia → PNG 光栅化 | 开箱即用 |
 | **SVG** | `ratex-svg` → 自包含矢量 SVG 导出 | 开箱即用 |
@@ -71,21 +72,13 @@ RaTeX 是同一个 KaTeX 兼容的数学引擎，但编译到一个可移植的 
 
 演示应用截图见 [`demo/screenshots/`](demo/screenshots/)。
 
-**iOS**
-
-![RaTeX iOS 演示](demo/screenshots/ios.png)
-
-**Android**
-
-![RaTeX Android 演示](demo/screenshots/android.png)
-
-**Flutter（iOS）**
-
-![RaTeX Flutter iOS 演示](demo/screenshots/flutter-ios.png)
-
-**React Native（iOS）**
-
-![RaTeX React Native iOS 演示](demo/screenshots/react-native-ios.png)
+| iOS | Android |
+|:---:|:---:|
+| ![RaTeX iOS 演示](demo/screenshots/ios.png) | ![RaTeX Android 演示](demo/screenshots/android.png) |
+| **Flutter（iOS）** | **React Native（iOS）** |
+| ![RaTeX Flutter iOS 演示](demo/screenshots/flutter-ios.png) | ![RaTeX React Native iOS 演示](demo/screenshots/react-native-ios.png) |
+| **Compose Multiplatform** |  |
+| ![RaTeX Compose Multiplatform 演示](demo/screenshots/compose-multiplatform.png) |  |
 
 ---
 
@@ -186,6 +179,7 @@ npm install ratex-wasm
 | Android | [`platforms/android/README.md`](platforms/android/README.md) |
 | Flutter | [`platforms/flutter/README.md`](platforms/flutter/README.md) |
 | React Native | [`platforms/react-native/README.md`](platforms/react-native/README.md) |
+| Compose Multiplatform | [`RaTeX-CMP`](https://github.com/darriousliu/RaTeX-CMP) |
 | Web | [`platforms/web/README.md`](platforms/web/README.md) |
 
 ### 运行测试
