@@ -129,7 +129,7 @@ packages:
       path: "../../platforms/flutter"
       relative: true
     source: path
-    version: "0.0.16"
+    version: "0.1.2"
   sky_engine:
     dependency: transitive
     description: flutter

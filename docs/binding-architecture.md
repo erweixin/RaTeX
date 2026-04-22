@@ -56,7 +56,8 @@ LaTeX string  (UTF-8)
 
 | Name | Fields | Notes |
 |------|--------|------|
-| `RatexOptions` | `size_t struct_size; int display_mode;` | Always set `struct_size = sizeof(RatexOptions)`. Fields beyond `struct_size` are ignored (forward compatibility). `display_mode`: `0` inline (`$...$`), `1` display (`$$...$$`). `opts` may be NULL (defaults to display). |
+| `RatexColor` | `float r, g, b, a;` | Normalized RGBA in \([0, 1]\). Invalid components are rejected when the color pointer is used (see `ratex.h`). |
+| `RatexOptions` | `size_t struct_size; int display_mode; const RatexColor* color;` | Always set `struct_size = sizeof(RatexOptions)`. Fields beyond `struct_size` are ignored (forward compatibility). `display_mode`: `0` inline (`$...$`), `1` display (`$$...$$`). **`color`**: pointer to a `RatexColor` written by the caller; **`NULL` means default black** (same as omitting the field for legacy callers whose `struct_size` ends before this member). `opts` may be NULL (defaults to display style and black). |
 | `RatexResult` | `char* data; int error_code;` | Success: `error_code==0`, `data` is a heap string. Error: `error_code!=0`, `data==NULL`. |
 
 ### Build artifacts

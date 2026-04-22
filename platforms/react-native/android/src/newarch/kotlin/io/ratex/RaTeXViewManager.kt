@@ -2,6 +2,7 @@
 
 package io.ratex
 
+import android.graphics.Color
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.uimanager.SimpleViewManager
@@ -58,5 +59,10 @@ class RaTeXViewManager(private val reactContext: ReactApplicationContext) :
     @ReactProp(name = "displayMode", defaultBoolean = true)
     override fun setDisplayMode(view: RaTeXView, value: Boolean) {
         view.displayMode = value
+    }
+
+    @ReactProp(name = "color", customType = "Color")
+    override fun setColor(view: RaTeXView, value: Int?) {
+        view.color = value ?: Color.BLACK
     }
 }

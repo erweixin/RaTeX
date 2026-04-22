@@ -4,6 +4,9 @@
 #import <React/RCTComponentViewProtocol.h>
 #import <React/RCTFabricComponentsPlugins.h>
 #import <React/RCTViewComponentView.h>
+// RN 0.76+ 常用预编译 React-Core：不再向 Pods 暴露 <React/Fabric/RCTConversions.h>。
+// 使用 ReactCommon 的 Color API 做 SharedColor → UIColor，避免依赖已移除/未打包的头文件。
+#import <react/renderer/graphics/Color.h>
 #import <react/renderer/components/RNRaTeXSpec/ComponentDescriptors.h>
 #import <react/renderer/components/RNRaTeXSpec/EventEmitters.h>
 #import <react/renderer/components/RNRaTeXSpec/Props.h>
@@ -23,6 +26,24 @@
 #ifdef RCT_NEW_ARCH_ENABLED
 
 using namespace facebook::react;
+
+namespace {
+
+/// Mirrors the old `RCTUIColorFromSharedColor` helper without importing RCTConversions.h
+/// (unavailable when React is consumed as a prebuilt XCFramework).
+inline UIColor *_Nullable RaTeXUIColorFromSharedColor(const SharedColor &sharedColor)
+{
+  if (!sharedColor) {
+    return nil;
+  }
+  const ColorComponents components = (*sharedColor).getColorComponents();
+  return [UIColor colorWithRed:components.red
+                         green:components.green
+                          blue:components.blue
+                         alpha:components.alpha];
+}
+
+} // namespace
 
 // Class name follows RN Fabric convention: {ComponentName}ComponentView
 // so that RCTThirdPartyComponentsProvider can resolve it via NSClassFromString.
@@ -97,6 +118,12 @@ using namespace facebook::react;
     _nativeView.displayMode = displayMode;
   }
 
+  UIColor *color = RaTeXUIColorFromSharedColor(newProps.color);
+  if ((color == nil) != (_nativeView.color == nil) ||
+      (color != nil && ![color isEqual:_nativeView.color])) {
+    _nativeView.color = color;
+  }
+
   [super updateProps:props oldProps:oldProps];
 }
 
@@ -136,6 +163,7 @@ RCT_EXPORT_MODULE(RaTeXView)
 RCT_EXPORT_VIEW_PROPERTY(latex, NSString)
 RCT_EXPORT_VIEW_PROPERTY(fontSize, CGFloat)
 RCT_EXPORT_VIEW_PROPERTY(displayMode, BOOL)
+RCT_EXPORT_VIEW_PROPERTY(color, UIColor)
 RCT_EXPORT_VIEW_PROPERTY(onError, RCTDirectEventBlock)
 RCT_EXPORT_VIEW_PROPERTY(onContentSizeChange, RCTDirectEventBlock)
 

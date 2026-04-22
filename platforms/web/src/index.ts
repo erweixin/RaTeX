@@ -11,7 +11,9 @@ import { renderToCanvas } from "./renderer.js";
 import type { DisplayList } from "./types.js";
 import type { WebRenderOptions } from "./renderer.js";
 
-let wasmModule: { renderLatex: (latex: string) => string } | null = null;
+let wasmModule: {
+  renderLatex: (latex: string, color?: string) => string;
+} | null = null;
 let _initPromise: Promise<void> | null = null;
 
 /**
@@ -28,7 +30,8 @@ export function initRatex(init?: () => Promise<{ renderLatex: (s: string) => str
 
 async function _doInit(init?: () => Promise<{ renderLatex: (s: string) => string }>): Promise<void> {
   if (init) {
-    wasmModule = await init();
+    const module = await init();
+    wasmModule = { renderLatex: module.renderLatex };
     return;
   }
   // Default: dynamic import of the wasm-pack generated pkg
@@ -43,17 +46,17 @@ async function _doInit(init?: () => Promise<{ renderLatex: (s: string) => string
  * Parse LaTeX and return the display list as a JSON string (or throw on parse error).
  * Requires initRatex() to have been called first.
  */
-export function renderLatex(latex: string): string {
+export function renderLatex(latex: string, color?: string): string {
   if (!wasmModule) throw new Error("RaTeX WASM not initialized. Call initRatex() first.");
-  return wasmModule.renderLatex(latex);
+  return wasmModule.renderLatex(latex, color);
 }
 
 /**
  * Parse LaTeX and return the display list as a DisplayList object.
  * Throws if LaTeX is invalid or WASM not initialized.
  */
-export function renderLatexToDisplayList(latex: string): DisplayList {
-  const json = renderLatex(latex);
+export function renderLatexToDisplayList(latex: string, color?: string): DisplayList {
+  const json = renderLatex(latex, color);
   try {
     return JSON.parse(json) as DisplayList;
   } catch (e) {
@@ -77,9 +80,10 @@ export function renderLatexToDisplayList(latex: string): DisplayList {
 export function renderLatexToCanvas(
   latex: string,
   canvas: HTMLCanvasElement,
-  options?: WebRenderOptions
+  options?: WebRenderOptions,
+  color?: string
 ): DisplayList {
-  const displayList = renderLatexToDisplayList(latex);
+  const displayList = renderLatexToDisplayList(latex, color);
   renderToCanvas(displayList, canvas, options);
   return displayList;
 }

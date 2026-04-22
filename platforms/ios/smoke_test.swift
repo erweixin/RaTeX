@@ -17,6 +17,14 @@ print("✓ 库加载成功:", libPath)
 @frozen struct RatexOptions {
     var struct_size: Int
     var display_mode: Int32   // 0 = inline, 1 = display
+    var color: UnsafePointer<RatexColor>?
+}
+
+@frozen struct RatexColor {
+    var r: Float
+    var g: Float
+    var b: Float
+    var a: Float
 }
 
 @frozen struct RatexResult {
@@ -37,10 +45,17 @@ let free  = unsafeBitCast(freeRaw,  to: FreeFn.self)
 let err   = unsafeBitCast(errRaw,   to: ErrFn.self)
 
 func render(_ latex: String) -> [String: Any]? {
-    var opts = RatexOptions(struct_size: MemoryLayout<RatexOptions>.size, display_mode: 1)
-    let result = latex.withCString { cstr in
-        withUnsafePointer(to: &opts) { pOpts in
-            parse(cstr, pOpts)
+    var defaultColor = RatexColor(r: 0, g: 0, b: 0, a: 1)
+    let result = withUnsafePointer(to: &defaultColor) { colorPtr in
+        var opts = RatexOptions(
+            struct_size: MemoryLayout<RatexOptions>.size,
+            display_mode: 1,
+            color: colorPtr
+        )
+        return latex.withCString { cstr in
+            withUnsafePointer(to: &opts) { pOpts in
+                parse(cstr, pOpts)
+            }
         }
     }
     guard result.error_code == 0, let ptr = result.data else {

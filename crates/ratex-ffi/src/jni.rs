@@ -5,14 +5,14 @@
 //!
 //! Compiled only when `target_os = "android"` (see lib.rs).
 
-use jni::objects::{JClass, JString};
+use jni::objects::{JClass, JString, JFloatArray};
 use jni::sys::{jboolean, jstring, jobject, JNI_TRUE};
 use jni::JNIEnv;
 
-use crate::{ratex_parse_and_layout, ratex_get_last_error, RatexOptions};
+use crate::{ratex_parse_and_layout, ratex_get_last_error, RatexOptions, RatexColor};
 use std::ffi::CString;
 
-/// JNI entry point for `RaTeXEngine.nativeParseAndLayout(latex: String, displayMode: Boolean): String?`
+/// JNI entry point for `RaTeXEngine.nativeParseAndLayout(latex: String, displayMode: Boolean, rgba: FloatArray): String?`
 ///
 /// `displayMode = true`  → display (block) style  (`$$...$$`)
 /// `displayMode = false` → inline (text) style     (`$...$`)
@@ -21,10 +21,11 @@ use std::ffi::CString;
 /// Call `nativeGetLastError()` to retrieve the error message.
 #[no_mangle]
 pub extern "system" fn Java_io_ratex_RaTeXEngine_nativeParseAndLayout(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
     latex: JString,
     display_mode: jboolean,
+    rgba: JFloatArray,
 ) -> jobject {
     let latex_str: String = match env.get_string(&latex) {
         Ok(s) => s.into(),
@@ -44,9 +45,45 @@ pub extern "system" fn Java_io_ratex_RaTeXEngine_nativeParseAndLayout(
         }
     };
 
+    let color = {
+        let len = match env.get_array_length(&rgba) {
+            Ok(value) => value,
+            Err(e) => {
+                let _ = env.throw_new(
+                    "java/lang/IllegalArgumentException",
+                    format!("invalid color array: {e}"),
+                );
+                return std::ptr::null_mut();
+            }
+        };
+        if len < 4 {
+            let _ = env.throw_new(
+                "java/lang/IllegalArgumentException",
+                "color array must contain 4 normalized RGBA floats",
+            );
+            return std::ptr::null_mut();
+        }
+
+        let mut values = [0.0f32; 4];
+        if let Err(e) = env.get_float_array_region(&rgba, 0, &mut values) {
+            let _ = env.throw_new(
+                "java/lang/IllegalArgumentException",
+                format!("failed to read color array: {e}"),
+            );
+            return std::ptr::null_mut();
+        }
+        RatexColor {
+            r: values[0],
+            g: values[1],
+            b: values[2],
+            a: values[3],
+        }
+    };
+
     let opts = RatexOptions {
         struct_size: std::mem::size_of::<RatexOptions>(),
         display_mode: if display_mode == JNI_TRUE { 1 } else { 0 },
+        color: &color,
     };
     let result = unsafe { ratex_parse_and_layout(c_latex.as_ptr(), &opts) };
 

@@ -2,6 +2,7 @@
 
 use ratex_layout::{layout, to_display_list, LayoutOptions};
 use ratex_parser::parse;
+use ratex_types::color::Color;
 use ratex_types::display_item::{DisplayItem, DisplayList};
 use ratex_types::path_command::PathCommand;
 use wasm_bindgen::prelude::*;
@@ -19,9 +20,23 @@ struct VersionedDisplayList<'a> {
 /// # Errors
 /// Returns a JS error string if parsing fails.
 #[wasm_bindgen(js_name = "renderLatex")]
-pub fn render_latex(latex: &str) -> Result<String, JsValue> {
-    let nodes = parse(latex).map_err(|e| JsValue::from_str(&e.to_string()))?;
-    let options = LayoutOptions::default();
+pub fn render_latex(latex: &str, color: Option<String>) -> Result<String, JsValue> {
+    render_latex_impl(latex, color.as_deref()).map_err(|e| JsValue::from_str(&e))
+}
+
+fn render_latex_impl(latex: &str, color: Option<&str>) -> Result<String, String> {
+    let nodes = parse(latex).map_err(|e| e.to_string())?;
+    let options = if let Some(color) = color {
+        let color = Color::parse(color).ok_or_else(|| {
+            format!(
+                "invalid color: '{}'. Expected a named color, #rgb, #rrggbb, or [MODEL]value",
+                color
+            )
+        })?;
+        LayoutOptions::default().with_color(color)
+    } else {
+        LayoutOptions::default()
+    };
     let layout_box = layout(&nodes, &options);
     let mut display_list = to_display_list(&layout_box);
     // serde_json's default f64 serializer errors on NaN/Infinity. Walk the
@@ -33,7 +48,7 @@ pub fn render_latex(latex: &str) -> Result<String, JsValue> {
         version: 1,
         display_list: &display_list,
     };
-    serde_json::to_string(&versioned).map_err(|e| JsValue::from_str(&e.to_string()))
+    serde_json::to_string(&versioned).map_err(|e| e.to_string())
 }
 
 fn sanitize_display_list(dl: &mut DisplayList) {

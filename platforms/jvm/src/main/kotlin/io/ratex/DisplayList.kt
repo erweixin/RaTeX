@@ -96,6 +96,10 @@ data class RaTeXColor(
         b.coerceIn(0f, 1f),
         a.coerceIn(0f, 1f),
     )
+
+    companion object {
+        val Black = RaTeXColor(r = 0f, g = 0f, b = 0f, a = 1f)
+    }
 }
 
 // MARK: - JSON decoder (shared instance)

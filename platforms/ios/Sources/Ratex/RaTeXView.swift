@@ -3,6 +3,30 @@
 import UIKit
 import SwiftUI
 
+private struct RaTeXColorKey: EnvironmentKey {
+    static let defaultValue: Color = .black
+}
+
+@available(iOS 14, *)
+public extension EnvironmentValues {
+    public var ratexColor: Color {
+        get { self[RaTeXColorKey.self] }
+        set { self[RaTeXColorKey.self] = newValue }
+    }
+}
+
+@available(iOS 14, *)
+public extension View {
+    public func ratexColor(_ color: Color) -> some View {
+        environment(\.ratexColor, color)
+    }
+}
+
+@available(iOS 14, *)
+private func uiColor(from color: Color) -> UIColor {
+    UIColor(color)
+}
+
 // MARK: - UIKit
 
 /// A UIView that renders a LaTeX formula using the RaTeX engine.
@@ -32,6 +56,11 @@ public class RaTeXView: UIView {
     /// `false` for inline/text style (`$...$`).
     public var displayMode: Bool = true {
         didSet { guard displayMode != oldValue else { return }; rerender() }
+    }
+
+    /// Default formula color. Explicit LaTeX colors still take precedence.
+    public var color: UIColor = .black {
+        didSet { guard !color.isEqual(oldValue) else { return }; rerender() }
     }
 
     /// Called when a render error occurs (e.g. invalid LaTeX).
@@ -96,6 +125,15 @@ public class RaTeXView: UIView {
         renderer.draw(in: ctx)
     }
 
+    public override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard let previousTraitCollection else { return }
+        guard traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) else {
+            return
+        }
+        rerender()
+    }
+
     // MARK: Private
 
     private func rerender() {
@@ -104,7 +142,12 @@ public class RaTeXView: UIView {
         // before the render completes, making cells invisible.
         RaTeXFontLoader.ensureLoaded()
         do {
-            let dl = try RaTeXEngine.shared.parse(latex, displayMode: displayMode)
+            let dl = try RaTeXEngine.shared.parse(
+                latex,
+                displayMode: displayMode,
+                color: color,
+                traitCollection: traitCollection
+            )
             renderer = RaTeXRenderer(displayList: dl, fontSize: fontSize)
             mathAscent  = renderer?.height ?? 0
             mathDescent = renderer?.depth  ?? 0
@@ -168,38 +211,52 @@ public struct RaTeXFormula: View {
     public let latex: String
     public var fontSize: CGFloat = 24
     public var displayMode: Bool = true
+    public var color: Color? = nil
     public var onError: ((Error) -> Void)? = nil
     public var onLayout: ((CGFloat, CGFloat) -> Void)? = nil
+    @Environment(\.ratexColor) private var environmentColor
 
     public init(
         latex: String,
         fontSize: CGFloat = 24,
         displayMode: Bool = true,
+        color: Color? = nil,
         onError: ((Error) -> Void)? = nil,
         onLayout: ((CGFloat, CGFloat) -> Void)? = nil
     ) {
         self.latex       = latex
         self.fontSize    = fontSize
         self.displayMode = displayMode
+        self.color       = color
         self.onError     = onError
         self.onLayout    = onLayout
+    }
+
+    private var resolvedColor: Color {
+        color ?? environmentColor
     }
 
     /// Synchronously computes the formula's ascent (top-of-view → baseline).
     /// Called in `body` so the value is available on the very first layout pass.
     /// `parse()` is < 1ms and is called internally by `RaTeXView.rerender()` anyway.
     private var ascent: CGFloat {
-        guard let dl = try? RaTeXEngine.shared.parse(latex, displayMode: displayMode) else { return 0 }
+        guard let dl = try? RaTeXEngine.shared.parse(
+            latex,
+            displayMode: displayMode,
+            color: uiColor(from: resolvedColor)
+        ) else { return 0 }
         return CGFloat(dl.height) * fontSize
     }
 
     public var body: some View {
         if #available(iOS 16, *) {
             _RaTeXRepresentable(latex: latex, fontSize: fontSize, displayMode: displayMode,
+                                color: resolvedColor,
                                 onError: onError, onLayout: onLayout)
                 .layoutValue(key: RaTeXFormulaAscentKey.self, value: ascent)
         } else {
             _RaTeXRepresentable(latex: latex, fontSize: fontSize, displayMode: displayMode,
+                                color: resolvedColor,
                                 onError: onError, onLayout: onLayout)
         }
     }
@@ -212,6 +269,7 @@ private struct _RaTeXRepresentable: UIViewRepresentable {
     let latex: String
     var fontSize: CGFloat
     var displayMode: Bool
+    var color: Color
     var onError: ((Error) -> Void)?
     var onLayout: ((CGFloat, CGFloat) -> Void)?
 
@@ -225,6 +283,7 @@ private struct _RaTeXRepresentable: UIViewRepresentable {
     func updateUIView(_ uiView: RaTeXView, context: Context) {
         uiView.fontSize    = fontSize
         uiView.displayMode = displayMode
+        uiView.color       = uiColor(from: color)
         uiView.onError     = onError
         uiView.onLayout    = onLayout
         uiView.latex       = latex

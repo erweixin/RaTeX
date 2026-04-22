@@ -1,13 +1,38 @@
-import React, {useState, useCallback, useEffect} from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from 'react';
 import {StyleSheet} from 'react-native';
-import type {StyleProp, ViewStyle} from 'react-native';
+import type {ColorValue, StyleProp, ViewStyle} from 'react-native';
 import RaTeXViewNativeComponent from './RaTeXViewNativeComponent';
+
+export const RaTeXColorContext = createContext<ColorValue | undefined>(undefined);
+
+export interface RaTeXProviderProps {
+  color?: ColorValue;
+  children: React.ReactNode;
+}
+
+export function RaTeXProvider({
+  color,
+  children,
+}: RaTeXProviderProps): React.JSX.Element {
+  return (
+    <RaTeXColorContext.Provider value={color}>
+      {children}
+    </RaTeXColorContext.Provider>
+  );
+}
 
 export interface RaTeXViewProps {
   latex: string;
   fontSize?: number;
   /** true (default) = display/block style ($$...$$); false = inline/text style ($...$). */
   displayMode?: boolean;
+  color?: ColorValue;
   style?: StyleProp<ViewStyle>;
   onError?: (e: {nativeEvent: {error: string}}) => void;
   /** Called when content size is measured (e.g. for scroll layout). */
@@ -20,20 +45,23 @@ export function RaTeXView({
   latex,
   fontSize = 24,
   displayMode = true,
+  color,
   style,
   onError,
   onContentSizeChange,
 }: RaTeXViewProps): React.JSX.Element {
+  const inheritedColor = useContext(RaTeXColorContext);
   const [contentSize, setContentSize] = useState<{
     width: number;
     height: number;
   } | null>(null);
+  const resolvedColor = color ?? inheritedColor;
 
   // When inputs change, drop the cached measurement so the view can shrink/grow
   // immediately instead of keeping a stale width/height until the next event arrives.
   useEffect(() => {
     setContentSize(null);
-  }, [latex, fontSize, displayMode]);
+  }, [latex, fontSize, displayMode, resolvedColor]);
 
   const handleContentSizeChange = useCallback(
     (e: {nativeEvent: {width: number; height: number}}) => {
@@ -67,6 +95,7 @@ export function RaTeXView({
       latex={latex}
       fontSize={fontSize}
       displayMode={displayMode}
+      color={resolvedColor}
       style={resolvedStyle}
       onError={onError}
       onContentSizeChange={handleContentSizeChange}

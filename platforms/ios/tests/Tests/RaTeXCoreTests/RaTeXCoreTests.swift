@@ -5,6 +5,29 @@ final class RaTeXCoreTests: XCTestCase {
 
     let engine = RaTeXEngine.shared
 
+    private func approxEqual(
+        _ lhs: RaTeXColor,
+        _ rhs: RaTeXColor,
+        accuracy: Float = 0.01
+    ) -> Bool {
+        abs(lhs.r - rhs.r) <= accuracy &&
+        abs(lhs.g - rhs.g) <= accuracy &&
+        abs(lhs.b - rhs.b) <= accuracy &&
+        abs(lhs.a - rhs.a) <= accuracy
+    }
+
+    private func colors(in displayList: DisplayList) -> [RaTeXColor] {
+        displayList.items.compactMap {
+            switch $0 {
+            case .glyphPath(let glyph): return glyph.color
+            case .line(let line): return line.color
+            case .rect(let rect): return rect.color
+            case .path(let path): return path.color
+            case .unknown: return nil
+            }
+        }
+    }
+
     // MARK: - 基本解析
 
     func testSimpleFraction() throws {
@@ -67,6 +90,34 @@ final class RaTeXCoreTests: XCTestCase {
         XCTAssertEqual(g.color.g, 0.0, accuracy: 0.01)
         XCTAssertEqual(g.color.b, 0.0, accuracy: 0.01)
         XCTAssertEqual(g.color.a, 1.0, accuracy: 0.01)
+    }
+
+    func testCustomColorDecoded() throws {
+        let blue = RaTeXColor(r: 0, g: 0, b: 1, a: 1)
+        let dl = try engine.parse("x", color: blue)
+        guard case .glyphPath(let g) = dl.items.first else {
+            XCTFail("应有 GlyphPath"); return
+        }
+        XCTAssertEqual(g.color.r, blue.r, accuracy: 0.01)
+        XCTAssertEqual(g.color.g, blue.g, accuracy: 0.01)
+        XCTAssertEqual(g.color.b, blue.b, accuracy: 0.01)
+        XCTAssertEqual(g.color.a, blue.a, accuracy: 0.01)
+    }
+
+    func testExplicitLatexColorOverridesDefaultColor() throws {
+        let blue = RaTeXColor(r: 0, g: 0, b: 1, a: 1)
+        let red = RaTeXColor(r: 1, g: 0, b: 0, a: 1)
+        let dl = try engine.parse(#"x + \color{red}{y}"#, color: blue)
+        let usedColors = colors(in: dl)
+
+        XCTAssertTrue(
+            usedColors.contains { approxEqual($0, blue) },
+            "默认颜色应作用到未显式着色的公式部分"
+        )
+        XCTAssertTrue(
+            usedColors.contains { approxEqual($0, red) },
+            #"显式 \color{red} 应覆盖默认颜色"#
+        )
     }
 
     // MARK: - 尺寸合理性

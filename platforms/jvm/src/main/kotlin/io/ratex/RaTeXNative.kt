@@ -6,22 +6,59 @@ import com.sun.jna.Library
 import com.sun.jna.Native
 import com.sun.jna.Pointer
 import com.sun.jna.Structure
+import java.awt.Color as AwtColor
 
 /**
  * JNA mapping of `RatexOptions` from `ratex.h`.
  *
- * Always pass `struct_size = Structure.size(RatexOptions::class.java)`.
+ * Always pass `struct_size = Native.getNativeSize(RatexOptions::class.java, null)`.
  */
-@Structure.FieldOrder("struct_size", "display_mode")
+@Structure.FieldOrder(
+    "r",
+    "g",
+    "b",
+    "a",
+)
+class RatexColorStruct() : Structure() {
+    @JvmField var r: Float = 0f
+    @JvmField var g: Float = 0f
+    @JvmField var b: Float = 0f
+    @JvmField var a: Float = 1f
+
+    constructor(color: RaTeXColor) : this() {
+        r = color.r
+        g = color.g
+        b = color.b
+        a = color.a
+    }
+
+    constructor(color: AwtColor) : this() {
+        r = color.red / 255f
+        g = color.green / 255f
+        b = color.blue / 255f
+        a = color.alpha / 255f
+    }
+}
+
+@Structure.FieldOrder(
+    "struct_size",
+    "display_mode",
+    "color",
+)
 class RatexOptions : Structure() {
     /** Must be set to the size of this struct. */
-    @JvmField var struct_size: Long = Structure.size(RatexOptions::class.java).toLong()
+    @JvmField var struct_size: Long = Native.getNativeSize(RatexOptions::class.java, null).toLong()
     /**
      * Rendering mode:
      *   0 = inline / text style  ($...$)
      *   1 = display / block style ($$...$$)
      */
     @JvmField var display_mode: Int = 1
+    /**
+     * Pointer to a [RatexColorStruct] laid out in native memory, or `null` for default black.
+     * The struct must stay alive until `ratex_parse_and_layout` returns (see [RaTeXEngine.parseBlocking]).
+     */
+    @JvmField var color: Pointer? = null
 }
 
 /**

@@ -2,6 +2,38 @@
 
 import Foundation
 import RaTeXFFI
+import UIKit
+
+private func ffiColor(from color: UIColor, traitCollection: UITraitCollection? = nil) -> RatexColor {
+    let resolved = traitCollection.map { color.resolvedColor(with: $0) } ?? color
+    var r: CGFloat = 0
+    var g: CGFloat = 0
+    var b: CGFloat = 0
+    var a: CGFloat = 0
+    if resolved.getRed(&r, green: &g, blue: &b, alpha: &a) {
+        return RatexColor(r: Float(r), g: Float(g), b: Float(b), a: Float(a))
+    }
+
+    let fallbackSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+    guard
+        let converted = resolved.cgColor.converted(
+            to: fallbackSpace,
+            intent: .defaultIntent,
+            options: nil
+        ),
+        let components = converted.components,
+        components.count >= 4
+    else {
+        return RatexColor(r: 0, g: 0, b: 0, a: 1)
+    }
+
+    return RatexColor(
+        r: Float(components[0]),
+        g: Float(components[1]),
+        b: Float(components[2]),
+        a: Float(components[3])
+    )
+}
 
 // MARK: - Error type
 
@@ -37,14 +69,37 @@ public final class RaTeXEngine {
     ///   - latex: A LaTeX math-mode string, e.g. `\frac{1}{2}`.
     ///   - displayMode: `true` (default) for display/block style (`$$...$$`);
     ///     `false` for inline/text style (`$...$`).
+    ///   - color: Default formula color. Explicit LaTeX colors still take precedence.
     /// - Returns: A `DisplayList` ready to be drawn.
     /// - Throws: `RaTeXError.parseError` on invalid LaTeX syntax.
-    public func parse(_ latex: String, displayMode: Bool = true) throws -> DisplayList {
-        var opts = RatexOptions(
-            struct_size: MemoryLayout<RatexOptions>.size,
-            display_mode: displayMode ? 1 : 0
+    public func parse(
+        _ latex: String,
+        displayMode: Bool = true,
+        color: UIColor = .black
+    ) throws -> DisplayList {
+        try parse(
+            latex,
+            displayMode: displayMode,
+            color: color,
+            traitCollection: nil
         )
-        let result = ratex_parse_and_layout(latex, &opts)
+    }
+
+    func parse(
+        _ latex: String,
+        displayMode: Bool,
+        color: UIColor,
+        traitCollection: UITraitCollection?
+    ) throws -> DisplayList {
+        var ffiDefaultColor = ffiColor(from: color, traitCollection: traitCollection)
+        let result = withUnsafePointer(to: &ffiDefaultColor) { colorPtr in
+            var opts = RatexOptions(
+                struct_size: MemoryLayout<RatexOptions>.size,
+                display_mode: displayMode ? 1 : 0,
+                color: colorPtr
+            )
+            return ratex_parse_and_layout(latex, &opts)
+        }
         guard result.error_code == 0, let ptr = result.data else {
             let msg: String
             if let errPtr = ratex_get_last_error() {

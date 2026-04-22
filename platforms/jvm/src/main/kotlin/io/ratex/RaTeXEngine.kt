@@ -4,6 +4,7 @@ package io.ratex
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.awt.Color as AwtColor
 
 // MARK: - Error type
 
@@ -32,8 +33,11 @@ object RaTeXEngine {
      * @param displayMode `true` (default) for display/block style; `false` for inline/text style.
      * @throws RaTeXException on parse or decode error.
      */
-    suspend fun parse(latex: String, displayMode: Boolean = true): DisplayList =
-        withContext(Dispatchers.Default) { parseBlocking(latex, displayMode) }
+    suspend fun parse(
+        latex: String,
+        displayMode: Boolean = true,
+        color: AwtColor = AwtColor.BLACK,
+    ): DisplayList = withContext(Dispatchers.Default) { parseBlocking(latex, displayMode, color) }
 
     /**
      * Blocking variant of [parse]. Safe to call on any thread.
@@ -41,8 +45,17 @@ object RaTeXEngine {
      * @param displayMode `true` (default) for display/block style; `false` for inline/text style.
      * @throws RaTeXException on parse or decode error.
      */
-    fun parseBlocking(latex: String, displayMode: Boolean = true): DisplayList {
-        val opts = RatexOptions().also { it.display_mode = if (displayMode) 1 else 0 }
+    fun parseBlocking(
+        latex: String,
+        displayMode: Boolean = true,
+        color: AwtColor = AwtColor.BLACK,
+    ): DisplayList {
+        val nativeColor = RatexColorStruct(color).also { it.write() }
+        val opts = RatexOptions().also {
+            it.display_mode = if (displayMode) 1 else 0
+            it.color = nativeColor.pointer
+            it.write()
+        }
         val result = native.ratex_parse_and_layout(latex, opts)
         val ptr = if (result.error_code == 0) result.data
             else throw RaTeXException(native.ratex_get_last_error() ?: "unknown error")

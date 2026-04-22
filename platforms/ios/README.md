@@ -87,6 +87,7 @@ let mathView = RaTeXView()
 mathView.latex       = #"\frac{-b \pm \sqrt{b^2-4ac}}{2a}"#
 mathView.fontSize    = 28
 mathView.displayMode = true   // true = display/block (default); false = inline/text
+mathView.color       = .systemBlue
 mathView.onError     = { print("RaTeX error:", $0) }
 
 // Auto-sizing
@@ -107,13 +108,17 @@ struct ContentView: View {
     var body: some View {
         RaTeXFormula(
             latex: #"\int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}"#,
-            fontSize: 24
+            fontSize: 24,
+            color: .blue
             // displayMode: true  ← default; pass false for inline/text style
         )
+        .ratexColor(.primary)
         .padding()
     }
 }
 ```
+
+Use `.ratexColor(...)` to set a default color for descendant formulas, and pass `color:` to override an individual `RaTeXFormula`.
 
 ### SwiftUI — inline formula (mixed text + LaTeX)
 
@@ -156,12 +161,16 @@ import RaTeX
 let displayList = try RaTeXEngine.shared.parse(#"\sum_{n=1}^\infty \frac{1}{n^2}"#)
 // inline mode
 let displayList = try RaTeXEngine.shared.parse(#"\frac{1}{2}"#, displayMode: false)
+// custom default color
+let blueDisplayList = try RaTeXEngine.shared.parse(#"x + y"#, color: .systemBlue)
 
 let renderer = RaTeXRenderer(displayList: displayList, fontSize: 20)
 
 // In your UIView.draw(_:) or CGContext block:
 renderer.draw(in: UIGraphicsGetCurrentContext()!)
 ```
+
+Explicit LaTeX colors such as `\color{...}` still override the default color for their subtree.
 
 ---
 

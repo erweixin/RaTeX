@@ -4,8 +4,10 @@ package io.ratex
 
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.util.AttributeSet
 import android.view.View
+import androidx.annotation.ColorInt
 import kotlin.math.max
 import kotlin.math.min
 import kotlinx.coroutines.CoroutineScope
@@ -30,8 +32,8 @@ import kotlinx.coroutines.withContext
  *
  * Kotlin usage:
  * ```kotlin
- * binding.mathView.latex   = """\frac{-b \pm \sqrt{b^2-4ac}}{2a}"""
- * binding.mathView.fontSize = 28f
+ * binding.mathView.latex    = """\frac{-b \pm \sqrt{b^2-4ac}}{2a}"""
+ * binding.mathView.fontSize = 28f   // dp — converted to px internally
  * ```
  */
 class RaTeXView @JvmOverloads constructor(
@@ -66,6 +68,15 @@ class RaTeXView @JvmOverloads constructor(
      * `false` for inline/text style (`$...$`). Setting this triggers an async re-render.
      */
     var displayMode: Boolean = true
+        set(value) {
+            if (field == value) return
+            field = value
+            rerender()
+        }
+
+    /** Default formula color. Explicit LaTeX colors still take precedence. */
+    @ColorInt
+    var color: Int = Color.BLACK
         set(value) {
             if (field == value) return
             field = value
@@ -155,7 +166,7 @@ class RaTeXView @JvmOverloads constructor(
         renderJob = scope.launch {
             try {
                 withContext(Dispatchers.IO) { RaTeXFontLoader.ensureLoaded(context) }
-                val dl = RaTeXEngine.parse(latex, displayMode)
+                val dl = RaTeXEngine.parse(latex, displayMode, color)
                 // RN passes logical size (dp); convert to px so physical size matches iOS points.
                 val density = context.resources.displayMetrics.density
                 val fontSizePx = fontSize * density

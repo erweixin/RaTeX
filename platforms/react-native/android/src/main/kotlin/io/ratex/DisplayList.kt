@@ -89,6 +89,10 @@ data class RaTeXColor(
     val b: Float,
     val a: Float,
 ) {
+    companion object {
+        val Black = RaTeXColor(r = 0f, g = 0f, b = 0f, a = 1f)
+    }
+
     /** Convert to an Android ARGB int (for use with Paint.color, Canvas, etc.) */
     fun toArgb(): Int {
         val ai = (a * 255).toInt().coerceIn(0, 255)

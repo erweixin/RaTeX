@@ -148,6 +148,7 @@ class MathPage extends StatelessWidget {
       child: RaTeXWidget(
         latex: r'\frac{-b \pm \sqrt{b^2-4ac}}{2a}',
         fontSize: 28,
+        color: Colors.blue,
         onError: (e) => debugPrint('RaTeX: $e'),
       ),
     ),
@@ -158,9 +159,11 @@ class MathPage extends StatelessWidget {
 ### Low-level CustomPainter
 
 ```dart
+import 'package:flutter/material.dart';
 import 'package:ratex_flutter/ratex_flutter.dart';
 
 final dl      = RaTeXEngine.instance.parseAndLayout(r'\sum_{n=1}^\infty \frac{1}{n^2}');
+final blueDl  = RaTeXEngine.instance.parseAndLayout(r'x + y', color: Colors.blue);
 final painter = RaTeXPainter(displayList: dl, fontSize: 24);
 
 // In a CustomPaint widget:
@@ -213,13 +216,15 @@ buildInlineMath(
 )
 ```
 
+If `RaTeXWidget.color` is omitted, it inherits `DefaultTextStyle.of(context).style.color` and falls back to black.
+
 ### Async (large formulas)
 
 ```dart
 import 'package:flutter/foundation.dart';
 
 final dl = await compute(
-  (latex) => RaTeXEngine.instance.parseAndLayout(latex),
+  (latex) => RaTeXEngine.instance.parseAndLayout(latex, color: Colors.blue),
   r'\prod_{n=1}^\infty \left(1 - \frac{1}{n^2}\right)',
 );
 ```

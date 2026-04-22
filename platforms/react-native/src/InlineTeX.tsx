@@ -1,6 +1,6 @@
 import React, {useMemo, useState} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
-import type {StyleProp, TextStyle} from 'react-native';
+import type {ColorValue, StyleProp, TextStyle} from 'react-native';
 import {RaTeXView} from './RaTeXView';
 
 type Segment =
@@ -29,6 +29,8 @@ export interface InlineTeXProps {
   content: string;
   /** Font size passed to each formula renderer. Defaults to 16. */
   fontSize?: number;
+  /** Default formula color. Explicit LaTeX colors still take precedence. */
+  color?: ColorValue;
   /** Style applied to plain-text segments. */
   textStyle?: StyleProp<TextStyle>;
 }
@@ -49,6 +51,7 @@ export interface InlineTeXProps {
 export function InlineTeX({
   content,
   fontSize = 16,
+  color,
   textStyle,
 }: InlineTeXProps): React.JSX.Element {
   const segments = useMemo(() => parseInlineTeX(content), [content]);
@@ -70,6 +73,7 @@ export function InlineTeX({
           latex={s.content}
           fontSize={fontSize}
           displayMode={false}
+          color={color}
           style={styles.measureView}
           onContentSizeChange={e => {
             const {width, height} = e.nativeEvent;
@@ -96,6 +100,7 @@ export function InlineTeX({
                 latex={s.content}
                 fontSize={fontSize}
                 displayMode={false}
+                color={color}
                 style={{width: sz.width, height: sz.height}}
               />
             );

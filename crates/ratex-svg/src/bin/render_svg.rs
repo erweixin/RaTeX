@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use ratex_layout::{layout, to_display_list, LayoutOptions};
 use ratex_parser::parser::parse;
 use ratex_svg::{render_to_svg, SvgOptions};
+use ratex_types::color::Color;
 use ratex_types::math_style::MathStyle;
 
 fn main() {
@@ -39,6 +40,18 @@ fn main() {
         .and_then(|s| s.parse::<f64>().ok())
         .unwrap_or(40.0);
 
+    let color = args
+        .iter()
+        .position(|a| a == "--color")
+        .and_then(|i| args.get(i + 1))
+        .map(|value| parse_color_arg(value))
+        .transpose()
+        .unwrap_or_else(|msg| {
+            eprintln!("ERR {}", msg);
+            std::process::exit(2);
+        })
+        .unwrap_or(Color::BLACK);
+
     std::fs::create_dir_all(&output_dir).expect("Failed to create output dir");
 
     let dpr = device_pixel_ratio.clamp(0.01, 16.0) as f64;
@@ -52,7 +65,7 @@ fn main() {
 
     let inline = args.contains(&"--inline".to_string());
     let style = if inline { MathStyle::Text } else { MathStyle::Display };
-    let layout_opts = LayoutOptions::default().with_style(style);
+    let layout_opts = LayoutOptions::default().with_style(style).with_color(color);
 
     let stdin = io::stdin();
     let mut idx = 0;
@@ -105,4 +118,13 @@ fn default_font_dir() -> String {
         }
     }
     "fonts".to_string()
+}
+
+fn parse_color_arg(value: &str) -> Result<Color, String> {
+    Color::parse(value).ok_or_else(|| {
+        format!(
+            "invalid --color '{}': expected a named color, #rgb, #rrggbb, or [MODEL]value",
+            value
+        )
+    })
 }

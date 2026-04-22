@@ -2,6 +2,7 @@
 
 package io.ratex
 
+import android.graphics.Color
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.WritableNativeMap
 import com.facebook.react.uimanager.SimpleViewManager
@@ -51,6 +52,11 @@ class RaTeXViewManager(private val reactContext: ReactApplicationContext) :
     @ReactProp(name = "displayMode", defaultBoolean = true)
     fun setDisplayMode(view: RaTeXView, value: Boolean) {
         view.displayMode = value
+    }
+
+    @ReactProp(name = "color", customType = "Color")
+    fun setColor(view: RaTeXView, value: Int?) {
+        view.color = value ?: Color.BLACK
     }
 
     override fun getExportedCustomDirectEventTypeConstants(): Map<String, Any> =

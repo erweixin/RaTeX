@@ -33,6 +33,11 @@ public class RaTeXView: UIView {
         didSet { guard displayMode != oldValue else { return }; rerender() }
     }
 
+    /// Default formula color. Explicit LaTeX colors still take precedence.
+    public var color: UIColor = .black {
+        didSet { guard !color.isEqual(oldValue) else { return }; rerender() }
+    }
+
     /// Called when a render error occurs (e.g. invalid LaTeX).
     public var onError: ((Error) -> Void)?
 
@@ -92,6 +97,15 @@ public class RaTeXView: UIView {
         ctx.restoreGState()
     }
 
+    public override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard let previousTraitCollection else { return }
+        guard traitCollection.hasDifferentColorAppearance(comparedTo: previousTraitCollection) else {
+            return
+        }
+        rerender()
+    }
+
     // MARK: Private
 
     private func rerender() {
@@ -100,7 +114,12 @@ public class RaTeXView: UIView {
         // before the render completes, making cells invisible.
         RaTeXFontLoader.ensureLoaded()
         do {
-            let dl = try RaTeXEngine.shared.parse(latex, displayMode: displayMode)
+            let dl = try RaTeXEngine.shared.parse(
+                latex,
+                displayMode: displayMode,
+                color: color,
+                traitCollection: traitCollection
+            )
             renderer = RaTeXRenderer(displayList: dl, fontSize: fontSize)
             invalidateIntrinsicContentSize()
             setNeedsDisplay()

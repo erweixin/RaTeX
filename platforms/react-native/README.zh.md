@@ -50,6 +50,7 @@ function MathFormula() {
     <RaTeXView
       latex="\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}"
       fontSize={24}
+      color="#1E88E5"
       onError={(e) => console.warn('LaTeX 错误:', e.nativeEvent.error)}
     />
   );
@@ -74,6 +75,21 @@ function Paragraph() {
 
 在 `content` 字符串中用 `$...$` 标记公式，支持一段文字中包含多个公式。
 
+### 共享默认颜色
+
+```tsx
+import { RaTeXProvider, InlineTeX, RaTeXView } from 'ratex-react-native';
+
+function Screen() {
+  return (
+    <RaTeXProvider color="#1E88E5">
+      <RaTeXView latex="x + y" />
+      <InlineTeX content="内联公式：$E = mc^2$" />
+    </RaTeXProvider>
+  );
+}
+```
+
 ## API
 
 ### `<RaTeXView />`
@@ -83,6 +99,7 @@ function Paragraph() {
 | `latex` | `string` | — | 要渲染的 LaTeX 数学字符串（必填） |
 | `fontSize` | `number` | `24` | 字体大小，单位为 **dp**（密度无关像素）。公式整体等比缩放。 |
 | `displayMode` | `boolean` | `true` | `true` = 独立块样式（`$$...$$`）；`false` = 行内样式（`$...$`）。 |
+| `color` | `ColorValue` | — | 默认公式颜色。显式 LaTeX 颜色仍然优先。 |
 | `style` | `StyleProp<ViewStyle>` | — | 标准 React Native 样式。宽高会自动从测量结果设置，也可手动覆盖。 |
 | `onError` | `(e: { nativeEvent: { error: string } }) => void` | — | LaTeX 字符串解析失败时调用。 |
 | `onContentSizeChange` | `(e: { nativeEvent: { width: number; height: number } }) => void` | — | 排版完成后回调，携带公式的**固有内容尺寸（未缩放）**（dp）。适用于滚动视图或动态容器。 |
@@ -114,9 +131,14 @@ function Paragraph() {
 |-----|------|--------|------|
 | `content` | `string` | — | 包含 `$...$` 标记的文字字符串（必填）。 |
 | `fontSize` | `number` | `16` | 传给每个公式渲染器的字体大小（dp）。 |
+| `color` | `ColorValue` | — | 传给每个行内公式的默认颜色。显式 LaTeX 颜色仍然优先。 |
 | `textStyle` | `StyleProp<TextStyle>` | — | 应用于纯文字片段的样式。 |
 
 > `InlineTeX` 会自动对所有公式传入 `displayMode={false}`——`$...$` 始终使用行内样式。
+
+### `<RaTeXProvider />`
+
+为后代 `RaTeXView` 和 `InlineTeX` 提供默认公式颜色。若组件自身传入 `color`，则会覆盖继承值。
 
 ## 架构支持
 

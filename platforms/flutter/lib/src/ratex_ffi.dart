@@ -18,6 +18,20 @@ import 'display_list.dart';
 /// Mirror of `RatexOptions` from ratex.h.
 ///
 /// Always set [structSize] to `sizeOf<RatexOptions>()` before use.
+final class NativeRatexColor extends Struct {
+  @Float()
+  external double r;
+
+  @Float()
+  external double g;
+
+  @Float()
+  external double b;
+
+  @Float()
+  external double a;
+}
+
 final class RatexOptions extends Struct {
   /// Must equal `sizeOf<RatexOptions>()`.
   @UintPtr()
@@ -26,6 +40,8 @@ final class RatexOptions extends Struct {
   /// `0` = inline/text style (`$...$`), `1` = display/block style (`$$...$$`).
   @Int32()
   external int displayMode;
+
+  external Pointer<NativeRatexColor> color;
 }
 
 /// Mirror of `RatexResult` from ratex.h.
@@ -97,12 +113,22 @@ class RaTeXFfi {
   /// - `false`          — inline/text style, equivalent to `$...$`
   ///
   /// Throws [RaTeXException] on parse errors.
-  DisplayList parseAndLayout(String latex, {bool displayMode = true}) {
+  DisplayList parseAndLayout(
+    String latex, {
+    bool displayMode = true,
+    RaTeXColor color = const RaTeXColor(0, 0, 0, 1),
+  }) {
     final inputPtr = latex.toNativeUtf8();
-    final optsPtr  = calloc<RatexOptions>();
+    final optsPtr = calloc<RatexOptions>();
+    final colorPtr = calloc<NativeRatexColor>();
     try {
-      optsPtr.ref.structSize   = sizeOf<RatexOptions>();
-      optsPtr.ref.displayMode  = displayMode ? 1 : 0;
+      optsPtr.ref.structSize = sizeOf<RatexOptions>();
+      optsPtr.ref.displayMode = displayMode ? 1 : 0;
+      colorPtr.ref.r = color.r;
+      colorPtr.ref.g = color.g;
+      colorPtr.ref.b = color.b;
+      colorPtr.ref.a = color.a;
+      optsPtr.ref.color = colorPtr;
 
       final result = _ffi._parseAndLayout(inputPtr, optsPtr);
       if (result.errorCode != 0) {
@@ -124,6 +150,7 @@ class RaTeXFfi {
       return DisplayList.fromJson(decoded);
     } finally {
       calloc.free(inputPtr);
+      calloc.free(colorPtr);
       calloc.free(optsPtr);
     }
   }

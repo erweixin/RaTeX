@@ -6,9 +6,9 @@
 
 ## 架构
 
-- **ratex-wasm**（`crates/ratex-wasm`）：Rust → WASM，导出 `renderLatex(latex: string) => string`，返回 DisplayList JSON。
+- **ratex-wasm**（`crates/ratex-wasm`）：Rust → WASM，导出 `renderLatex(latex: string, color?: string) => string`，返回 DisplayList JSON。
 - **web-render**（`src/renderer.ts`）：将 DisplayList 绘制到 Canvas 2D。`GlyphPath` 条目通过 Canvas `fillText` 与 `char_code` 加载的 KaTeX 字体绘制；页面需加载数学字体（随包附带的 `fonts.css` 已覆盖此需求）。
-- **入口**（`src/index.ts`）：初始化 WASM，提供 `renderLatexToCanvas(latex, canvas, options)` 一步渲染。
+- **入口**（`src/index.ts`）：初始化 WASM，提供 `renderLatexToCanvas(latex, canvas, options, color?)` 一步渲染。
 
 ## 开箱即用
 
@@ -19,9 +19,9 @@
    ```html
    <link rel="stylesheet" href="node_modules/ratex-wasm/fonts.css" />
    <script type="module" src="node_modules/ratex-wasm/dist/ratex-formula.js"></script>
-   <ratex-formula latex="\frac{-b \pm \sqrt{b^2-4ac}}{2a}" font-size="48"></ratex-formula>
+   <ratex-formula latex="\frac{-b \pm \sqrt{b^2-4ac}}{2a}" font-size="48" color="#1E88E5"></ratex-formula>
    ```
-3. 支持属性：`latex`、`font-size`、`padding`、`background-color`；也可通过 JS 设置 `element.latex = '...'`。
+3. 支持属性：`latex`、`font-size`、`padding`、`background-color`、`color`；也可通过 JS 设置 `element.latex = '...'`。
 
 ## 构建
 
@@ -50,11 +50,11 @@ npm run build # copy-fonts → build:wasm（生成 pkg/）→ build:ts
 <script type="module" src="node_modules/ratex-wasm/dist/ratex-formula.js"></script>
 
 <!-- 3. 使用 -->
-<ratex-formula latex="\frac{-b \pm \sqrt{b^2-4ac}}{2a}" font-size="48" padding="16"></ratex-formula>
+<ratex-formula latex="\frac{-b \pm \sqrt{b^2-4ac}}{2a}" font-size="48" padding="16" color="#1E88E5"></ratex-formula>
 <ratex-formula latex="x^2 + y^2 = z^2"></ratex-formula>
 ```
 
-支持的属性：`latex`、`font-size`、`padding`、`background-color`。也可通过 JS 设置 `element.latex = '...'`。
+支持的属性：`latex`、`font-size`、`padding`、`background-color`、`color`。也可通过 JS 设置 `element.latex = '...'`。
 
 **React**：直接使用 DOM 标签；React 18+ 能正确渲染自定义元素。传入字符串时建议用 `ref` 设置 `el.latex = '...'`（优于 `dangerouslySetInnerHTML`）。
 
@@ -71,7 +71,7 @@ renderLatexToCanvas('\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}', canvas, {
   fontSize: 48,
   padding: 16,
   backgroundColor: 'white',
-});
+}, '#1E88E5');
 ```
 
 **说明**：页面必须加载数学字体，否则字母和数字会显示为方框。可使用 KaTeX 的 CSS（见仓库根目录 `demo/`）或提供 Latin Modern Math。本包**自带 KaTeX 字体**（无需 CDN）：使用 `<link rel="stylesheet" href="node_modules/ratex-wasm/fonts.css" />` 或 `import 'ratex-wasm/fonts.css';`，字体从包内加载。
@@ -80,7 +80,6 @@ renderLatexToCanvas('\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}', canvas, {
 
 ```ts
 await initRatex();
-const json = renderLatex('x^2 + y^2 = z^2');
+const json = renderLatex('x^2 + y^2 = z^2', '#1E88E5');
 const displayList = JSON.parse(json);
 ```
-

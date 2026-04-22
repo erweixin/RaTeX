@@ -63,6 +63,7 @@ RaTeX is the same KaTeX-compatible math engine compiled to a portable Rust core,
 | **Android** | JNI + Kotlin + Canvas · AAR | Out of the box |
 | **Flutter** | Dart FFI + `CustomPainter` | Out of the box |
 | **React Native** | Native module + C ABI · iOS/Android views | Out of the box |
+| **Compose Multiplatform** | Kotlin Multiplatform + Compose Canvas · Android / iOS / JVM Desktop | Via [`RaTeX-CMP`](https://github.com/darriousliu/RaTeX-CMP) |
 | **Web** | WASM → Canvas 2D · `<ratex-formula>` Web Component | Out of the box |
 | **Server / CI** | tiny-skia → PNG rasterizer | Out of the box |
 | **SVG** | `ratex-svg` → self-contained vector SVG | Out of the box |
@@ -71,21 +72,30 @@ RaTeX is the same KaTeX-compatible math engine compiled to a portable Rust core,
 
 From the demo apps in [`demo/screenshots/`](demo/screenshots/).
 
-**iOS**
-
-![RaTeX demo on iOS](demo/screenshots/ios.png)
-
-**Android**
-
-![RaTeX demo on Android](demo/screenshots/android.png)
-
-**Flutter (iOS)**
-
-![RaTeX demo on Flutter iOS](demo/screenshots/flutter-ios.png)
-
-**React Native (iOS)**
-
-![RaTeX demo on React Native iOS](demo/screenshots/react-native-ios.png)
+<table>
+  <tr>
+    <th width="50%">iOS</th>
+    <th width="50%">Android</th>
+  </tr>
+  <tr>
+    <td align="center"><img alt="RaTeX demo on iOS" src="demo/screenshots/ios.png" width="100%"/></td>
+    <td align="center"><img alt="RaTeX demo on Android" src="demo/screenshots/android.png" width="100%"/></td>
+  </tr>
+  <tr>
+    <th width="50%">Flutter (iOS)</th>
+    <th width="50%">React Native (iOS)</th>
+  </tr>
+  <tr>
+    <td align="center"><img alt="RaTeX demo on Flutter iOS" src="demo/screenshots/flutter-ios.png" width="100%"/></td>
+    <td align="center"><img alt="RaTeX demo on React Native iOS" src="demo/screenshots/react-native-ios.png" width="100%"/></td>
+  </tr>
+  <tr>
+    <th colspan="2">Compose Multiplatform</th>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><img alt="RaTeX demo on Compose Multiplatform" src="demo/screenshots/compose-multiplatform.png" width="100%"/></td>
+  </tr>
+</table>
 
 ---
 
@@ -138,7 +148,7 @@ cargo build --release
 ### Render to PNG
 
 ```bash
-echo '\frac{1}{2} + \sqrt{x}' | cargo run --release -p ratex-render
+echo '\frac{1}{2} + \sqrt{x}' | cargo run --release -p ratex-render -- --color '#1E88E5'
 
 echo '\ce{H2SO4 + 2NaOH -> Na2SO4 + 2H2O}' | cargo run --release -p ratex-render
 ```
@@ -147,7 +157,7 @@ echo '\ce{H2SO4 + 2NaOH -> Na2SO4 + 2H2O}' | cargo run --release -p ratex-render
 
 ```bash
 # Default: glyphs as <text> elements (correct display requires KaTeX webfonts)
-echo '\frac{1}{2} + \sqrt{x}' | cargo run --release -p ratex-svg --features cli
+echo '\frac{1}{2} + \sqrt{x}' | cargo run --release -p ratex-svg --features cli -- --color '#1E88E5'
 
 # Standalone: embed glyph outlines as <path> — no external fonts needed
 echo '\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}' | \
@@ -169,7 +179,7 @@ npm install ratex-wasm
 <link rel="stylesheet" href="node_modules/ratex-wasm/fonts.css" />
 <script type="module" src="node_modules/ratex-wasm/dist/ratex-formula.js"></script>
 
-<ratex-formula latex="\frac{-b \pm \sqrt{b^2-4ac}}{2a}" font-size="48"></ratex-formula>
+<ratex-formula latex="\frac{-b \pm \sqrt{b^2-4ac}}{2a}" font-size="48" color="#1E88E5"></ratex-formula>
 <ratex-formula latex="\ce{CO2 + H2O <=> H2CO3}" font-size="32"></ratex-formula>
 ```
 
@@ -183,6 +193,7 @@ See [`platforms/web/README.md`](platforms/web/README.md) for the full setup.
 | Android | [`platforms/android/README.md`](platforms/android/README.md) |
 | Flutter | [`platforms/flutter/README.md`](platforms/flutter/README.md) |
 | React Native | [`platforms/react-native/README.md`](platforms/react-native/README.md) |
+| Compose Multiplatform | [`RaTeX-CMP`](https://github.com/darriousliu/RaTeX-CMP) |
 | Web | [`platforms/web/README.md`](platforms/web/README.md) |
 
 ### Run tests

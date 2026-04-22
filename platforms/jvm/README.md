@@ -59,10 +59,14 @@ Then in your app: `implementation(project(":ratex-jvm"))`.
 ### Blocking API
 
 ```kotlin
+import java.awt.Color
+
 // display mode (default)
 val dl = RaTeXEngine.parseBlocking("""\sum_{i=1}^{n} i = \frac{n(n+1)}{2}""")
 // inline mode
 val dl = RaTeXEngine.parseBlocking("""\frac{1}{2}""", displayMode = false)
+// custom default color
+val blueDl = RaTeXEngine.parseBlocking("""x + y""", color = Color(30, 136, 229))
 
 val renderer = RaTeXRenderer(dl, fontSize = 48f) { RaTeXFontLoader.getFont(it) }
 val image = renderer.renderToImage(padding = 4)
@@ -72,11 +76,17 @@ ImageIO.write(image, "png", File("formula.png"))
 ### Coroutine API
 
 ```kotlin
+import java.awt.Color
+
 // display mode (default)
 val dl = RaTeXEngine.parse("""\int_0^\infty e^{-x}\,dx = 1""")
 // inline mode
 val dl = RaTeXEngine.parse("""\frac{1}{2}""", displayMode = false)
+// custom default color
+val blueDl = RaTeXEngine.parse("""x + y""", color = Color(30, 136, 229))
 ```
+
+Explicit LaTeX colors such as `\color{...}` still take precedence over the default color.
 
 ### Drawing to Graphics2D
 

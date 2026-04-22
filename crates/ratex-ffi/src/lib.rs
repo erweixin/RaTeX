@@ -14,7 +14,8 @@
 //!
 //! # Usage (C)
 //! ```c
-//! RatexOptions opts = { sizeof(RatexOptions), 1 };  // display_mode=1 (block)
+//! RatexColor black = {0, 0, 0, 1};
+//! RatexOptions opts = { sizeof(RatexOptions), 1, &black };  // display_mode=1 (block)
 //! RatexResult result = ratex_parse_and_layout("\\frac{1}{2}", &opts);
 //! if (result.error_code == 0) {
 //!     // consume result.data ...
@@ -82,9 +83,9 @@ fn sanitize_json_numbers(v: Value) -> Value {
     }
 }
 
-fn do_layout(latex_str: &str, style: MathStyle) -> Result<String, String> {
+fn do_layout(latex_str: &str, style: MathStyle, color: ratex_types::color::Color) -> Result<String, String> {
     let nodes = parse(latex_str).map_err(|e| format!("parse error: {e}"))?;
-    let options = LayoutOptions::default().with_style(style);
+    let options = LayoutOptions::default().with_style(style).with_color(color);
     let layout_box = layout(&nodes, &options);
     let display_list = to_display_list(&layout_box);
     let value = serde_json::to_value(&display_list).map_err(|e| format!("serialization error: {e}"))?;
@@ -105,6 +106,53 @@ fn do_layout(latex_str: &str, style: MathStyle) -> Result<String, String> {
 /// Always set `struct_size = sizeof(RatexOptions)` before passing to the function.
 /// Fields beyond `struct_size` are ignored, enabling forward compatibility.
 #[repr(C)]
+#[derive(Clone, Copy)]
+pub struct RatexColor {
+    pub r: f32,
+    pub g: f32,
+    pub b: f32,
+    pub a: f32,
+}
+
+impl RatexColor {
+    pub const BLACK: Self = Self {
+        r: 0.0,
+        g: 0.0,
+        b: 0.0,
+        a: 1.0,
+    };
+}
+
+impl From<RatexColor> for ratex_types::color::Color {
+    fn from(value: RatexColor) -> Self {
+        Self::new(value.r, value.g, value.b, value.a)
+    }
+}
+
+fn validate_color(color: RatexColor) -> Result<ratex_types::color::Color, String> {
+    fn validate_component(name: &str, value: f32) -> Result<(), String> {
+        if !value.is_finite() {
+            return Err(format!(
+                "invalid color.{name}: expected a finite float in [0, 1], got {value}"
+            ));
+        }
+        if !(0.0..=1.0).contains(&value) {
+            return Err(format!(
+                "invalid color.{name}: expected a float in [0, 1], got {value}"
+            ));
+        }
+        Ok(())
+    }
+
+    validate_component("r", color.r)?;
+    validate_component("g", color.g)?;
+    validate_component("b", color.b)?;
+    validate_component("a", color.a)?;
+
+    Ok(color.into())
+}
+
+#[repr(C)]
 pub struct RatexOptions {
     /// Must be set to `sizeof(RatexOptions)` by the caller.
     pub struct_size: usize,
@@ -112,6 +160,11 @@ pub struct RatexOptions {
     /// - `0` — inline (text style, equivalent to `$...$`)
     /// - `1` — display block (display style, equivalent to `$$...$$`)
     pub display_mode: c_int,
+    /// Default formula color, in normalized RGBA.
+    ///
+    /// Explicit LaTeX color commands like `\color{...}` / `\textcolor{...}{...}`
+    /// still override this per subtree.
+    pub color: *const RatexColor,
 }
 
 /// Result returned by [`ratex_parse_and_layout`].
@@ -173,7 +226,24 @@ pub unsafe extern "C" fn ratex_parse_and_layout(
         }
     };
 
-    match do_layout(latex_str, style) {
+    let color = if opts.is_null() {
+        ratex_types::color::Color::BLACK
+    } else {
+        let opts_ref = unsafe { &*opts };
+        let color_size = std::mem::offset_of!(RatexOptions, color)
+            + std::mem::size_of::<*const RatexColor>();
+
+        if opts_ref.struct_size >= color_size && !opts_ref.color.is_null() {
+            match validate_color(unsafe { *opts_ref.color }) {
+                Ok(color) => color,
+                Err(msg) => return err_result(&msg),
+            }
+        } else {
+            ratex_types::color::Color::BLACK
+        }
+    };
+
+    match do_layout(latex_str, style, color) {
         Ok(json) => match CString::new(json) {
             Ok(cs) => RatexResult { data: cs.into_raw(), error_code: 0 },
             Err(e) => err_result(&format!("JSON contains interior null byte: {e}")),
@@ -217,13 +287,44 @@ pub extern "C" fn ratex_get_last_error() -> *const c_char {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::Value;
     use std::ffi::CString;
+
+    /// Assert the default formula color applied to the first `GlyphPath` in the protocol JSON is black.
+    ///
+    /// We key off `type == "GlyphPath"` (see `docs/DISPLAYLIST_JSON_PROTOCOL.md`) instead of “first
+    /// item with any `color`”, so fraction bars or paths cannot satisfy the assertion by accident.
+    fn assert_default_glyph_path_color_is_black(json: &str) {
+        let v: Value = serde_json::from_str(json).expect("valid display list JSON");
+        let items = v
+            .get("items")
+            .and_then(|i| i.as_array())
+            .expect("display list must have items array");
+        let glyph = items
+            .iter()
+            .find(|item| {
+                item.get("type")
+                    .and_then(|t| t.as_str())
+                    .is_some_and(|ty| ty == "GlyphPath")
+            })
+            .expect("expected at least one GlyphPath item");
+        let color = glyph
+            .get("color")
+            .expect("GlyphPath must include color per DISPLAYLIST_JSON_PROTOCOL");
+        let r = color.get("r").and_then(|x| x.as_f64());
+        let g = color.get("g").and_then(|x| x.as_f64());
+        let b = color.get("b").and_then(|x| x.as_f64());
+        let a = color.get("a").and_then(|x| x.as_f64());
+        assert_eq!((r, g, b, a), (Some(0.0), Some(0.0), Some(0.0), Some(1.0)));
+    }
 
     fn call(latex: &str, display_mode: c_int) -> Option<String> {
         let input = CString::new(latex).unwrap();
+        let black = RatexColor::BLACK;
         let opts = RatexOptions {
             struct_size: std::mem::size_of::<RatexOptions>(),
             display_mode,
+            color: &black,
         };
         let result = unsafe { ratex_parse_and_layout(input.as_ptr(), &opts) };
         if result.error_code != 0 || result.data.is_null() {
@@ -258,9 +359,11 @@ mod tests {
 
     #[test]
     fn null_latex_returns_error() {
+        let black = RatexColor::BLACK;
         let opts = RatexOptions {
             struct_size: std::mem::size_of::<RatexOptions>(),
             display_mode: 1,
+            color: &black,
         };
         let result = unsafe { ratex_parse_and_layout(std::ptr::null(), &opts) };
         assert_ne!(result.error_code, 0);
@@ -292,5 +395,111 @@ mod tests {
             let err = ratex_get_last_error();
             assert!(!err.is_null());
         }
+    }
+
+    #[test]
+    fn custom_color_applies_without_overriding_explicit_latex_color() {
+        let input = CString::new(r"x + \color{red}{y}").unwrap();
+        let blue = RatexColor {
+            r: 0.0,
+            g: 0.0,
+            b: 1.0,
+            a: 1.0,
+        };
+        let opts = RatexOptions {
+            struct_size: std::mem::size_of::<RatexOptions>(),
+            display_mode: 1,
+            color: &blue,
+        };
+        let result = unsafe { ratex_parse_and_layout(input.as_ptr(), &opts) };
+        assert_eq!(result.error_code, 0);
+        let json = unsafe { CStr::from_ptr(result.data) }
+            .to_str()
+            .unwrap()
+            .to_owned();
+        unsafe { ratex_free_display_list(result.data) };
+
+        assert!(json.contains("\"b\":1.0"));
+        assert!(json.contains("\"r\":1.0"));
+    }
+
+    #[repr(C)]
+    struct LegacyRatexOptions {
+        struct_size: usize,
+        display_mode: c_int,
+    }
+
+    #[test]
+    fn short_legacy_options_remain_binary_compatible() {
+        let input = CString::new("x").unwrap();
+        let legacy_opts = LegacyRatexOptions {
+            struct_size: std::mem::size_of::<LegacyRatexOptions>(),
+            display_mode: 1,
+        };
+
+        let result = unsafe {
+            ratex_parse_and_layout(
+                input.as_ptr(),
+                &legacy_opts as *const LegacyRatexOptions as *const RatexOptions,
+            )
+        };
+        assert_eq!(result.error_code, 0);
+        assert!(!result.data.is_null());
+
+        let json = unsafe { CStr::from_ptr(result.data) }
+            .to_str()
+            .unwrap()
+            .to_owned();
+        unsafe { ratex_free_display_list(result.data) };
+
+        // Old callers do not provide the color tail, so layout must fall back to black.
+        assert_default_glyph_path_color_is_black(&json);
+    }
+
+    #[test]
+    fn invalid_color_returns_error() {
+        let input = CString::new("x").unwrap();
+        let invalid = RatexColor {
+            r: f32::NAN,
+            g: 0.0,
+            b: 0.0,
+            a: 1.0,
+        };
+        let opts = RatexOptions {
+            struct_size: std::mem::size_of::<RatexOptions>(),
+            display_mode: 1,
+            color: &invalid,
+        };
+
+        let result = unsafe { ratex_parse_and_layout(input.as_ptr(), &opts) };
+        assert_ne!(result.error_code, 0);
+        assert!(result.data.is_null());
+
+        let err = ratex_get_last_error();
+        assert!(!err.is_null());
+        let msg = unsafe { CStr::from_ptr(err) }.to_str().unwrap();
+        assert!(msg.contains("invalid color.r"));
+    }
+
+    #[test]
+    fn null_color_pointer_defaults_to_black() {
+        let input = CString::new("x").unwrap();
+        let opts = RatexOptions {
+            struct_size: std::mem::size_of::<RatexOptions>(),
+            display_mode: 1,
+            color: std::ptr::null(),
+        };
+
+        let result = unsafe { ratex_parse_and_layout(input.as_ptr(), &opts) };
+        assert_eq!(result.error_code, 0);
+        assert!(!result.data.is_null());
+
+        let json = unsafe { CStr::from_ptr(result.data) }
+            .to_str()
+            .unwrap()
+            .to_owned();
+        unsafe { ratex_free_display_list(result.data) };
+
+        assert_default_glyph_path_color_is_black(&json);
     }
 }

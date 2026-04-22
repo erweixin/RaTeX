@@ -194,7 +194,7 @@ public enum PathCommand: Codable {
 // MARK: - Color
 
 /// RGBA color with components in [0, 1].
-public struct RaTeXColor: Codable {
+public struct RaTeXColor: Codable, Equatable {
     public let r: Float
     public let g: Float
     public let b: Float
