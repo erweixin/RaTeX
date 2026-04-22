@@ -11,6 +11,7 @@ members = [
     "crates/ratex-render",
     "crates/ratex-svg",
     "crates/ratex-wasm",
+    "crates/ratex-pdf",
 ]
 
 [workspace.package]
@@ -30,6 +31,7 @@ ratex-parser = { path = "crates/ratex-parser", version = "0.1.2" }
 ratex-layout = { path = "crates/ratex-layout", version = "0.1.2" }
 ratex-katex-fonts = { path = "crates/ratex-katex-fonts", version = "0.1.2" }
 ratex-svg    = { path = "crates/ratex-svg", version = "0.1.2" }
+ratex-pdf    = { path = "crates/ratex-pdf", version = "0.1.2" }
 
 phf        = { version = "0.11", features = ["macros"] }
 thiserror  = "1.0"

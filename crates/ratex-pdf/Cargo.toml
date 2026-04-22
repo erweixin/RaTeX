@@ -1,0 +1,35 @@
+[package]
+name = "ratex-pdf"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+description = "PDF export for RaTeX DisplayList using pdf-writer"
+
+[dependencies]
+ratex-types = { workspace = true }
+ratex-font  = { workspace = true }
+pdf-writer  = "0.14"
+subsetter   = "0.2"
+skrifa      = "0.37"
+miniz_oxide = "0.8"
+
+ratex-layout      = { workspace = true, optional = true }
+ratex-parser      = { workspace = true, optional = true }
+ratex-katex-fonts = { workspace = true, optional = true }
+
+[features]
+default = []
+embed-fonts = ["dep:ratex-katex-fonts"]
+cli = ["embed-fonts", "dep:ratex-layout", "dep:ratex-parser"]
+
+[[bin]]
+name = "render-pdf"
+path = "src/bin/render_pdf.rs"
+required-features = ["cli"]
+
+[dev-dependencies]
+ratex-layout = { workspace = true }
+ratex-parser = { workspace = true }
