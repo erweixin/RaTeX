@@ -90,12 +90,15 @@ public final class RaTeXEngine {
         color: UIColor,
         traitCollection: UITraitCollection?
     ) throws -> DisplayList {
-        var opts = RatexOptions(
-            struct_size: MemoryLayout<RatexOptions>.size,
-            display_mode: displayMode ? 1 : 0,
-            color: ffiColor(from: color, traitCollection: traitCollection)
-        )
-        let result = ratex_parse_and_layout(latex, &opts)
+        var ffiDefaultColor = ffiColor(from: color, traitCollection: traitCollection)
+        let result = withUnsafePointer(to: &ffiDefaultColor) { colorPtr in
+            var opts = RatexOptions(
+                struct_size: MemoryLayout<RatexOptions>.size,
+                display_mode: displayMode ? 1 : 0,
+                color: colorPtr
+            )
+            return ratex_parse_and_layout(latex, &opts)
+        }
         guard result.error_code == 0, let ptr = result.data else {
             let msg: String
             if let errPtr = ratex_get_last_error() {

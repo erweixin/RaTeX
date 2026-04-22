@@ -35,6 +35,8 @@ platforms/android/src/main/jniLibs/
 
 # JVM — native libs built by platforms/jvm/build-jvm.sh (do not commit)
 platforms/jvm/native/
+# JVM — IDE/Gradle output mirror under project dir (do not commit; source is src/main/kotlin)
+platforms/jvm/bin/
 
 # iOS — XCFramework built by platforms/ios/build-ios.sh (do not commit)
 platforms/ios/RaTeX.xcframework/

@@ -18,11 +18,14 @@ import 'src/ratex_painter.dart';
 export 'src/display_list.dart';
 export 'src/ratex_ffi.dart' show RaTeXException;
 
+// Use 0–255 components so this package stays compatible with older Flutter where
+// `Color.r` / `toARGB32` are unavailable. Newer SDKs deprecate these in favor of
+// float components; silenced per line below.
 RaTeXColor _toRaTeXColor(Color color) => RaTeXColor(
-  color.red / 255,
-  color.green / 255,
-  color.blue / 255,
-  color.alpha / 255,
+  color.red / 255.0, // ignore: deprecated_member_use
+  color.green / 255.0, // ignore: deprecated_member_use
+  color.blue / 255.0, // ignore: deprecated_member_use
+  color.alpha / 255.0, // ignore: deprecated_member_use
 );
 
 // MARK: - Engine
@@ -45,9 +48,16 @@ class RaTeXEngine {
   /// ```dart
   /// final dl = await compute(
   ///   ratexParseAndLayoutInIsolate,
-  ///   (latex: tex, displayMode: true, colorValue: const Color(0xFF000000).value),
+  ///   RaTeXParseAndLayoutIsolateArgs(
+  ///     latex: tex,
+  ///     displayMode: true,
+  ///     colorArgb: 0xFF000000, // 32-bit ARGB (e.g. [Color]`.value` at runtime)
+  ///   ),
   /// );
   /// ```
+  ///
+  /// [ratexParseAndLayoutInIsolate] also accepts the legacy record shape
+  /// [RaTeXParseAndLayoutArgs] (`colorValue` instead of [RaTeXParseAndLayoutIsolateArgs.colorArgb]).
   DisplayList parseAndLayout(
     String latex, {
     bool displayMode = true,
@@ -59,20 +69,58 @@ class RaTeXEngine {
   );
 }
 
-/// Arguments for [ratexParseAndLayoutInIsolate] (e.g. pass to [compute]).
+/// Legacy isolate message shape (still accepted by [ratexParseAndLayoutInIsolate]).
 typedef RaTeXParseAndLayoutArgs = ({
   String latex,
   bool displayMode,
   int colorValue,
 });
 
+/// Arguments for [ratexParseAndLayoutInIsolate] (e.g. pass to [compute]).
+@immutable
+class RaTeXParseAndLayoutIsolateArgs {
+  const RaTeXParseAndLayoutIsolateArgs({
+    required this.latex,
+    required this.displayMode,
+    this.colorArgb,
+  });
+
+  final String latex;
+  final bool displayMode;
+
+  /// 32-bit ARGB (opaque black is `0xFF000000`). If null, black is used.
+  final int? colorArgb;
+}
+
 /// Top-level isolate entry for [compute]; calls [RaTeXEngine.parseAndLayout].
-DisplayList ratexParseAndLayoutInIsolate(RaTeXParseAndLayoutArgs args) =>
-    RaTeXEngine.instance.parseAndLayout(
-      args.latex,
-      displayMode: args.displayMode,
-      color: Color(args.colorValue),
-    );
+///
+/// Accepts [RaTeXParseAndLayoutIsolateArgs] or the legacy record [RaTeXParseAndLayoutArgs]
+/// (`colorValue` is treated like non-null [RaTeXParseAndLayoutIsolateArgs.colorArgb]).
+DisplayList ratexParseAndLayoutInIsolate(Object args) {
+  final RaTeXParseAndLayoutIsolateArgs resolved = switch (args) {
+    final RaTeXParseAndLayoutIsolateArgs a => a,
+    (:final String latex, :final bool displayMode, :final int colorValue) =>
+      RaTeXParseAndLayoutIsolateArgs(
+        latex: latex,
+        displayMode: displayMode,
+        colorArgb: colorValue,
+      ),
+    _ => throw ArgumentError.value(
+        args,
+        'args',
+        'Expected RaTeXParseAndLayoutIsolateArgs or '
+            '({String latex, bool displayMode, int colorValue}).',
+      ),
+  };
+  final color = resolved.colorArgb == null
+      ? const Color(0xFF000000)
+      : Color(resolved.colorArgb!);
+  return RaTeXEngine.instance.parseAndLayout(
+    resolved.latex,
+    displayMode: resolved.displayMode,
+    color: color,
+  );
+}
 
 // MARK: - Stateful widget
 
@@ -165,10 +213,10 @@ class _RaTeXWidgetState extends State<RaTeXWidget> {
       final resolvedColor = widget.color ?? _inheritedColor;
       final dl = await compute(
         ratexParseAndLayoutInIsolate,
-        (
+        RaTeXParseAndLayoutIsolateArgs(
           latex: widget.latex,
           displayMode: widget.displayMode,
-          colorValue: resolvedColor.value,
+          colorArgb: resolvedColor.value, // ignore: deprecated_member_use
         ),
       );
       if (mounted) setState(() { _displayList = dl; _error = null; });

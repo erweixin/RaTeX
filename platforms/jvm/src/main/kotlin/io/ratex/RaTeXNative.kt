@@ -54,8 +54,11 @@ class RatexOptions : Structure() {
      *   1 = display / block style ($$...$$)
      */
     @JvmField var display_mode: Int = 1
-    /** Default formula color in normalized RGBA. */
-    @JvmField var color: RatexColorStruct = RatexColorStruct()
+    /**
+     * Pointer to a [RatexColorStruct] laid out in native memory, or `null` for default black.
+     * The struct must stay alive until `ratex_parse_and_layout` returns (see [RaTeXEngine.parseBlocking]).
+     */
+    @JvmField var color: Pointer? = null
 }
 
 /**

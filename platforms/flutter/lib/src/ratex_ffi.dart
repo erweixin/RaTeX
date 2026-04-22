@@ -41,7 +41,7 @@ final class RatexOptions extends Struct {
   @Int32()
   external int displayMode;
 
-  external NativeRatexColor color;
+  external Pointer<NativeRatexColor> color;
 }
 
 /// Mirror of `RatexResult` from ratex.h.
@@ -119,14 +119,16 @@ class RaTeXFfi {
     RaTeXColor color = const RaTeXColor(0, 0, 0, 1),
   }) {
     final inputPtr = latex.toNativeUtf8();
-    final optsPtr  = calloc<RatexOptions>();
+    final optsPtr = calloc<RatexOptions>();
+    final colorPtr = calloc<NativeRatexColor>();
     try {
-      optsPtr.ref.structSize   = sizeOf<RatexOptions>();
-      optsPtr.ref.displayMode  = displayMode ? 1 : 0;
-      optsPtr.ref.color.r = color.r;
-      optsPtr.ref.color.g = color.g;
-      optsPtr.ref.color.b = color.b;
-      optsPtr.ref.color.a = color.a;
+      optsPtr.ref.structSize = sizeOf<RatexOptions>();
+      optsPtr.ref.displayMode = displayMode ? 1 : 0;
+      colorPtr.ref.r = color.r;
+      colorPtr.ref.g = color.g;
+      colorPtr.ref.b = color.b;
+      colorPtr.ref.a = color.a;
+      optsPtr.ref.color = colorPtr;
 
       final result = _ffi._parseAndLayout(inputPtr, optsPtr);
       if (result.errorCode != 0) {
@@ -148,6 +150,7 @@ class RaTeXFfi {
       return DisplayList.fromJson(decoded);
     } finally {
       calloc.free(inputPtr);
+      calloc.free(colorPtr);
       calloc.free(optsPtr);
     }
   }

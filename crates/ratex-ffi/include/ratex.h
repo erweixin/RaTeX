@@ -4,7 +4,8 @@
  * Provides LaTeX-to-DisplayList rendering for iOS, Android, Flutter, and React Native.
  *
  * Usage:
- *   RatexOptions opts = { sizeof(RatexOptions), 1, {0, 0, 0, 1} };
+ *   RatexColor black = {0, 0, 0, 1};
+ *   RatexOptions opts = { sizeof(RatexOptions), 1, &black };
  *   RatexResult r = ratex_parse_and_layout("\\frac{1}{2}", &opts);
  *   if (r.error_code == 0) {
  *       // r.data is a heap-allocated UTF-8 JSON string
@@ -84,7 +85,7 @@ typedef struct {
 typedef struct {
     size_t struct_size;
     int display_mode; /* 0 = inline ($...$), 1 = display block ($$...$$) */
-    RatexColor color;
+    const RatexColor* color; /* NULL = default black */
 } RatexOptions;
 
 /**
