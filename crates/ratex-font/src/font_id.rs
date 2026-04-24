@@ -23,6 +23,7 @@ pub enum FontId {
     Size3Regular,
     Size4Regular,
     TypewriterRegular,
+    CjkRegular,
 }
 
 impl FontId {
@@ -47,6 +48,7 @@ impl FontId {
             Self::Size3Regular => "Size3-Regular",
             Self::Size4Regular => "Size4-Regular",
             Self::TypewriterRegular => "Typewriter-Regular",
+            Self::CjkRegular => "CJK-Regular",
         }
     }
 
@@ -71,6 +73,7 @@ impl FontId {
             "Size3-Regular" => Some(Self::Size3Regular),
             "Size4-Regular" => Some(Self::Size4Regular),
             "Typewriter-Regular" => Some(Self::TypewriterRegular),
+            "CJK-Regular" => Some(Self::CjkRegular),
             _ => None,
         }
     }
@@ -79,5 +82,72 @@ impl FontId {
 impl std::fmt::Display for FontId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::FontId;
+
+    #[test]
+    fn cjk_regular_parse() {
+        assert_eq!(FontId::parse("CJK-Regular"), Some(FontId::CjkRegular));
+    }
+
+    #[test]
+    fn cjk_regular_as_str() {
+        assert_eq!(FontId::CjkRegular.as_str(), "CJK-Regular");
+    }
+
+    #[test]
+    fn cjk_regular_display() {
+        assert_eq!(format!("{}", FontId::CjkRegular), "CJK-Regular");
+    }
+
+    #[test]
+    fn cjk_regular_roundtrip() {
+        assert_eq!(
+            FontId::parse(FontId::CjkRegular.as_str()),
+            Some(FontId::CjkRegular)
+        );
+    }
+
+    #[test]
+    fn parse_unknown_font() {
+        assert_eq!(FontId::parse("NotARealFont"), None);
+    }
+
+    #[test]
+    fn all_variants_roundtrip() {
+        let variants = [
+            FontId::AmsRegular,
+            FontId::CaligraphicRegular,
+            FontId::FrakturRegular,
+            FontId::FrakturBold,
+            FontId::MainBold,
+            FontId::MainBoldItalic,
+            FontId::MainItalic,
+            FontId::MainRegular,
+            FontId::MathBoldItalic,
+            FontId::MathItalic,
+            FontId::SansSerifBold,
+            FontId::SansSerifItalic,
+            FontId::SansSerifRegular,
+            FontId::ScriptRegular,
+            FontId::Size1Regular,
+            FontId::Size2Regular,
+            FontId::Size3Regular,
+            FontId::Size4Regular,
+            FontId::TypewriterRegular,
+            FontId::CjkRegular,
+        ];
+        for v in variants {
+            assert_eq!(
+                FontId::parse(v.as_str()),
+                Some(v),
+                "roundtrip failed for {:?}",
+                v
+            );
+        }
     }
 }

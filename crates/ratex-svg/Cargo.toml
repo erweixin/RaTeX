@@ -11,7 +11,7 @@ description = "SVG export for RaTeX DisplayList (vector output, optional KaTeX w
 [features]
 default = []
 ## Embed glyphs as `<path>` outlines (`ab_glyph`); requires [`SvgOptions::font_dir`] with KaTeX `.ttf` files.
-standalone = ["dep:ab_glyph", "dep:ratex-font"]
+standalone = ["dep:ab_glyph", "dep:ratex-font", "dep:ratex-unicode-font"]
 ## `render-svg` binary: parse + layout from stdin (needs `standalone` for outlined glyphs).
 cli = ["dep:ratex-layout", "dep:ratex-parser"]
 ## Embed font source files in binary. No need for font directory with this feature. Implicitly enables 'standalone' feature.
@@ -24,6 +24,7 @@ ratex-font = { workspace = true, optional = true }
 ratex-layout = { workspace = true, optional = true }
 ratex-parser = { workspace = true, optional = true }
 ratex-katex-fonts = { workspace = true, optional = true }
+ratex-unicode-font = { workspace = true, optional = true }
 
 [[bin]]
 name = "render-svg"

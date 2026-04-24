@@ -116,12 +116,16 @@ flowchart LR
     H[ratex-render\nPNG · tiny-skia]
     I[ratex-svg\nSVG]
     J[ratex-pdf\nPDF]
+    K[ratex-unicode-font\nCJK 回退字体加载]
     A --> B --> C --> D --> E
     E --> F
     E --> G
     E --> H
     E --> I
     E --> J
+    H -.-> K
+    I -.-> K
+    J -.-> K
 ```
 
 | Crate | 职责 |
@@ -136,6 +140,7 @@ flowchart LR
 | `ratex-render` | 服务端：DisplayList → PNG（tiny-skia） |
 | `ratex-svg` | SVG 导出：DisplayList → SVG 字符串 |
 | `ratex-pdf` | PDF 导出：DisplayList → PDF 字节流（[pdf-writer](https://docs.rs/pdf-writer)，内嵌 CID 字体） |
+| `ratex-unicode-font` | 系统 Unicode / CJK 字体发现，用于回退渲染 |
 
 ---
 
@@ -188,6 +193,25 @@ echo '\ce{H2SO4 + 2NaOH -> Na2SO4 + 2H2O}' | \
 ```
 
 `ratex-pdf` 对 stdin 的每一行非空公式输出一个 `.pdf` 文件。支持 `--output-dir`（默认 `output_pdf`）、`--font-size`、`--dpr`、以及 `--inline`（行内公式样式，而非块级 display）。`render-pdf` 可执行文件始终从 `ratex-katex-fonts` 取字形，**`--font-dir` 不会改变嵌入的字体**。若在库中关闭 `embed-fonts`，请在 `PdfOptions.font_dir` 中指定 KaTeX TTF 目录。
+
+### CJK / Unicode 回退字体
+
+默认 RaTeX 只捆绑 KaTeX 字体（19 种数学符号字形）。KaTeX 字形集之外的字符——CJK 表意文字、emoji、谚文等——通过系统 Unicode 字体自动发现并渲染：
+
+1. **`RATEX_UNICODE_FONT`** 环境变量：指定任意 `.ttf`/`.otf` 路径
+2. **硬编码系统路径**：macOS（例如 `/Library/Fonts/Supplemental/Arial Unicode.ttf`、`/System/Library/Fonts/Supplemental/Arial Unicode.ttf`）、Linux（`/usr/share/fonts/…`）、Windows（`C:\Windows\Fonts\…`）
+3. **fontdb 系统查询**：优先 SansSerif，最后暴力扫描
+
+```bash
+# 显式指定字体路径（推荐用于 CI / 服务器环境）
+RATEX_UNICODE_FONT=/path/to/NotoSansSC-Regular.ttf \
+  echo '\text{你好世界}' | cargo run --release -p ratex-render
+
+# 自动发现：macOS 找到 Arial Unicode，Linux 找到 DejaVu Sans，等等
+echo '\text{你好世界}' | cargo run --release -p ratex-render
+```
+
+三个渲染器（PNG、SVG、PDF）使用同一个发现 crate（`ratex-unicode-font`），字体找到后各格式输出一致。PNG 和自包含 SVG 将字形轮廓嵌入为路径；PDF 将检测到的 CJK 字形子集化并作为 CIDFontType2 字体嵌入。
 
 ### 在浏览器中使用（WASM）
 

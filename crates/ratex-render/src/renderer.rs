@@ -6,8 +6,6 @@ use ratex_types::color::Color;
 use ratex_types::display_item::{DisplayItem, DisplayList};
 use tiny_skia::{FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
 
-use crate::unicode_fallback::unicode_fallback_font_bytes;
-
 pub struct RenderOptions {
     pub font_size: f32,
     pub padding: f32,
@@ -189,6 +187,12 @@ fn load_all_fonts(font_dir: &str) -> Result<HashMap<FontId, Vec<u8>>, String> {
         }
     }
 
+    // Load system Unicode font for CJK/fallback glyphs.
+    if let Some(cjk_bytes) = ratex_unicode_font::load_unicode_font() {
+        data.entry(FontId::CjkRegular)
+            .or_insert_with(|| cjk_bytes.to_vec());
+    }
+
     Ok(data)
 }
 
@@ -233,13 +237,11 @@ fn render_glyph(
             }
         }
         // KaTeX TTFs omit many BMP symbols (e.g. U+263A from `\char`). Browsers use system fonts;
-        // load one Unicode-capable face via `RATEX_UNICODE_FONT` or fontdb / common paths.
-        if let Some(bytes) = unicode_fallback_font_bytes() {
-            if let Ok(fb) = FontRef::try_from_slice(bytes) {
-                let fid = fb.glyph_id(ch);
-                if fid.0 != 0 {
-                    return render_glyph_with_font(pixmap, px, py, &fb, fid, color, em);
-                }
+        // `CjkRegular` is filled by `ratex_unicode_font::load_unicode_font()` (env / paths / fontdb).
+        if let Some(cjk_font) = font_cache.get(&FontId::CjkRegular) {
+            let fid = cjk_font.glyph_id(ch);
+            if fid.0 != 0 {
+                return render_glyph_with_font(pixmap, px, py, cjk_font, fid, color, em);
             }
         }
         return;
@@ -350,7 +352,7 @@ fn render_glyph_with_font(
         pixmap.fill_path(
             &path,
             &paint,
-            tiny_skia::FillRule::EvenOdd,
+            tiny_skia::FillRule::Winding,
             Transform::identity(),
             None,
         );

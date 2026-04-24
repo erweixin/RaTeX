@@ -212,6 +212,7 @@ fn katex_face(font: &str) -> (&'static str, &'static str, &'static str) {
         "Size2-Regular" => ("KaTeX_Size2", "normal", "normal"),
         "Size3-Regular" => ("KaTeX_Size3", "normal", "normal"),
         "Size4-Regular" => ("KaTeX_Size4", "normal", "normal"),
+        "CJK-Regular" => ("sans-serif", "normal", "normal"),
         _ => ("KaTeX_Main", "normal", "normal"),
     }
 }
@@ -235,7 +236,7 @@ fn emit_glyph(
                 use std::fmt::Write;
                 let _ = write!(
                     out,
-                    r#"<path d="{d}" fill="{fill}" fill-rule="evenodd" stroke="none"/>"#
+                    r#"<path d="{d}" fill="{fill}" fill-rule="nonzero" stroke="none"/>"#
                 );
                 return;
             }
@@ -555,7 +556,7 @@ mod tests {
             },
         );
         assert!(svg.contains("<path"));
-        assert!(svg.contains("fill-rule=\"evenodd\""));
+        assert!(svg.contains("fill-rule=\"nonzero\""));
         assert!(!svg.contains("<text"));
     }
 }

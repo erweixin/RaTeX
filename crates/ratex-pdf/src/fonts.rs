@@ -64,6 +64,12 @@ pub(crate) fn load_all_fonts(font_dir: &str) -> Result<RawFontData, String> {
         }
     }
 
+    // Load system Unicode font for CJK/fallback glyphs.
+    if let Some(cjk_bytes) = ratex_unicode_font::load_unicode_font() {
+        data.entry(FontId::CjkRegular)
+            .or_insert_with(|| cjk_bytes.to_vec());
+    }
+
     Ok(data)
 }
 

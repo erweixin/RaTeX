@@ -15,6 +15,7 @@ pdf-writer  = "0.14"
 subsetter   = "0.2"
 skrifa      = "0.42"
 miniz_oxide = "0.9"
+ratex-unicode-font = { workspace = true }
 
 ratex-layout      = { workspace = true, optional = true }
 ratex-parser      = { workspace = true, optional = true }

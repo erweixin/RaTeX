@@ -17,8 +17,8 @@ tiny-skia = "0.11"
 ab_glyph = "0.2"
 png = "0.17"
 serde_json = "1"
-fontdb = { version = "0.23", features = ["std"] }
 ratex-katex-fonts = { workspace = true, optional = true }
+ratex-unicode-font = { workspace = true }
 
 [features]
 ## Embed font source files in binary. No need for font directory with this feature.

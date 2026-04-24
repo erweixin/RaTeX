@@ -56,6 +56,13 @@ pub(crate) fn load_all_fonts(font_dir: &str) -> Result<HashMap<FontId, Vec<u8>>,
         }
     }
 
+    // Load system Unicode font for CJK/fallback glyphs.
+    if let Some(cjk_bytes) = ratex_unicode_font::load_unicode_font() {
+        if !data.contains_key(&FontId::CjkRegular) {
+            data.insert(FontId::CjkRegular, cjk_bytes.to_vec());
+        }
+    }
+
     Ok(data)
 }
 
@@ -92,10 +99,17 @@ pub(crate) fn glyph_svg_path(
     if glyph_id.0 == 0 {
         let fallback = font_cache.get(&FontId::MainRegular)?;
         let fid = fallback.glyph_id(ch);
-        if fid.0 == 0 {
-            return None;
+        if fid.0 != 0 {
+            return outline_to_d(px, py, glyph_em, fallback, fid);
         }
-        return outline_to_d(px, py, glyph_em, fallback, fid);
+        // Try CJK system font as last resort fallback.
+        if let Some(cjk) = font_cache.get(&FontId::CjkRegular) {
+            let cid = cjk.glyph_id(ch);
+            if cid.0 != 0 {
+                return outline_to_d(px, py, glyph_em, cjk, cid);
+            }
+        }
+        return None;
     }
 
     outline_to_d(px, py, glyph_em, font, glyph_id)

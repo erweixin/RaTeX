@@ -592,6 +592,10 @@ fn missing_glyph_width_em(ch: char) -> f64 {
         0x1F000..=0x1FAFF => 1.0,
         // Dingbats (many BMP emoji / ornaments lack bundled TeX metrics)
         0x2700..=0x27BF => 1.0,
+        // Miscellaneous Symbols (★ ☆ ☎ ☑ ☒ etc.)
+        0x2600..=0x26FF => 1.0,
+        // Miscellaneous Symbols and Arrows (⭐ ⬛ ⬜ etc.)
+        0x2B00..=0x2BFF => 1.0,
         _ => 0.5,
     }
 }
@@ -694,6 +698,12 @@ fn layout_symbol(text: &str, mode: Mode, options: &LayoutOptions) -> LayoutBox {
     } else {
         missing_glyph_metrics_fallback(ch, options)
     };
+
+    // If the glyph has no KaTeX metrics and is a wide fallback character (CJK, emoji, etc.),
+    // switch font_id to CjkRegular so renderers can load it from a system Unicode font.
+    if metrics.is_none() && missing_glyph_width_em(ch) >= 0.99 {
+        font_id = FontId::CjkRegular;
+    }
 
     LayoutBox {
         width,
@@ -4569,7 +4579,71 @@ mod missing_glyph_width_em_tests {
     }
 
     #[test]
+    fn miscellaneous_symbols_is_one_em() {
+        assert_eq!(missing_glyph_width_em('\u{2605}'), 1.0); // ★ BLACK STAR
+        assert_eq!(missing_glyph_width_em('\u{2615}'), 1.0); // ☕ HOT BEVERAGE
+    }
+
+    #[test]
+    fn misc_symbols_and_arrows_is_one_em() {
+        assert_eq!(missing_glyph_width_em('\u{2B50}'), 1.0); // ⭐ WHITE MEDIUM STAR
+        assert_eq!(missing_glyph_width_em('\u{2B1B}'), 1.0); // ⬛ BLACK LARGE SQUARE
+    }
+
+    #[test]
     fn latin_without_metrics_stays_half_em() {
         assert_eq!(missing_glyph_width_em('z'), 0.5);
+    }
+}
+
+#[cfg(test)]
+mod cjk_font_switching_tests {
+    use super::super::to_display::to_display_list;
+    use super::*;
+    use ratex_parser::parser::parse;
+    use ratex_types::display_item::DisplayItem;
+
+    fn first_glyph_font_name(latex: &str) -> Option<String> {
+        let ast = parse(latex).ok()?;
+        let lbox = layout(&ast, &LayoutOptions::default());
+        let dl = to_display_list(&lbox);
+        for item in &dl.items {
+            if let DisplayItem::GlyphPath { font, .. } = item {
+                return Some(font.clone());
+            }
+        }
+        None
+    }
+
+    #[test]
+    fn cjk_in_text_uses_cjk_regular() {
+        assert_eq!(
+            first_glyph_font_name(r"\text{中}").as_deref(),
+            Some("CJK-Regular")
+        );
+    }
+
+    #[test]
+    fn emoji_in_text_uses_cjk_regular() {
+        assert_eq!(
+            first_glyph_font_name(r"\text{😊}").as_deref(),
+            Some("CJK-Regular")
+        );
+    }
+
+    #[test]
+    fn latin_in_text_is_not_cjk() {
+        assert_ne!(
+            first_glyph_font_name(r"\text{a}").as_deref(),
+            Some("CJK-Regular")
+        );
+    }
+
+    #[test]
+    fn hiragana_in_text_uses_cjk_regular() {
+        assert_eq!(
+            first_glyph_font_name(r"\text{あ}").as_deref(),
+            Some("CJK-Regular")
+        );
     }
 }

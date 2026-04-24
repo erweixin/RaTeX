@@ -116,12 +116,16 @@ flowchart LR
     H[ratex-render\nPNG · tiny-skia]
     I[ratex-svg\nSVG]
     J[ratex-pdf\nPDF]
+    K[ratex-unicode-font\nCJK fallback loader]
     A --> B --> C --> D --> E
     E --> F
     E --> G
     E --> H
     E --> I
     E --> J
+    H -.-> K
+    I -.-> K
+    J -.-> K
 ```
 
 | Crate | Role |
@@ -136,6 +140,7 @@ flowchart LR
 | `ratex-render` | Server-side: DisplayList → PNG (tiny-skia) |
 | `ratex-svg` | SVG export: DisplayList → SVG string |
 | `ratex-pdf` | PDF export: DisplayList → PDF bytes ([pdf-writer](https://docs.rs/pdf-writer), embedded CID fonts) |
+| `ratex-unicode-font` | System Unicode / CJK font discovery for fallback rendering |
 
 ---
 
@@ -185,6 +190,25 @@ echo '\ce{H2SO4 + 2NaOH -> Na2SO4 + 2H2O}' | \
 ```
 
 The `ratex-pdf` crate writes one `.pdf` per non-empty line from stdin. Options include `--output-dir` (default `output_pdf`), `--font-size`, `--dpr`, and `--inline` (text style instead of display). The `render-pdf` binary always loads fonts from `ratex-katex-fonts`, so `--font-dir` does not change embedding. For library use without `embed-fonts`, set `PdfOptions.font_dir` to your KaTeX TTF directory instead.
+
+### CJK / Unicode fallback
+
+By default RaTeX bundles only KaTeX fonts (19 faces for math symbols). Characters outside the KaTeX glyph set — CJK ideographs, emoji, Hangul, etc. — are rendered via a system Unicode font discovered automatically:
+
+1. **`RATEX_UNICODE_FONT`** env var — explicit path to any `.ttf`/`.otf`
+2. **Hard-coded system paths** — macOS (e.g. `/Library/Fonts/Supplemental/Arial Unicode.ttf`, `/System/Library/Fonts/Supplemental/Arial Unicode.ttf`), Linux (`/usr/share/fonts/…`), Windows (`C:\Windows\Fonts\…`)
+3. **fontdb system query** — SansSerif scan, then brute-force
+
+```bash
+# Explicit font path (recommended for CI / server environments)
+RATEX_UNICODE_FONT=/path/to/NotoSansSC-Regular.ttf \
+  echo '\text{你好世界}' | cargo run --release -p ratex-render
+
+# Auto-discovery finds Arial Unicode on macOS, DejaVu Sans on Linux, etc.
+echo '\text{你好世界}' | cargo run --release -p ratex-render
+```
+
+All three renderers (PNG, SVG, PDF) use the same discovery crate (`ratex-unicode-font`), so once a font is found the output is consistent across all formats. For PNG and standalone SVG, glyph outlines are embedded as paths. For PDF, the detected CJK glyphs are subsetted and embedded as a CIDFontType2 font.
 
 ### Browser (WASM)
 

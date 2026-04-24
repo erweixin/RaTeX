@@ -31,7 +31,8 @@ RaTeX/
 │   ├── ratex-render/             # DisplayList → PNG (tiny-skia, server-side)
 │   ├── ratex-wasm/               # WASM: LaTeX → DisplayList JSON (browser)
 │   ├── ratex-svg/                # SVG export: DisplayList → SVG string (vector output)
-│   └── ratex-pdf/                # PDF export: DisplayList → PDF (pdf-writer, embedded fonts)
+│   ├── ratex-pdf/                # PDF export: DisplayList → PDF (pdf-writer, embedded fonts)
+│   └── ratex-unicode-font/       # System Unicode / CJK font discovery for fallback rendering
 │
 ├── platforms/
 │   ├── ios/                      # Swift + XCFramework + CoreGraphics
@@ -88,6 +89,7 @@ members = [
     "crates/ratex-svg",
     "crates/ratex-wasm",
     "crates/ratex-pdf",
+    "crates/ratex-unicode-font",
 ]
 
 [workspace.package]
@@ -128,6 +130,7 @@ serde_json = "1.0"
 | **ratex-wasm** | WASM: parse + layout → DisplayList JSON for browser |
 | **ratex-svg** | SVG export: DisplayList → SVG string; `standalone` reads TTF from `font_dir`; `embed-fonts` uses `ratex-katex-fonts`; `cli` adds `render-svg` binary |
 | **ratex-pdf** | PDF export: DisplayList → PDF via [pdf-writer](https://docs.rs/pdf-writer) + font subsetting; `embed-fonts` uses `ratex-katex-fonts`; `cli` adds `render-pdf` binary |
+| **ratex-unicode-font** | System Unicode / CJK font discovery; used by `ratex-render`, `ratex-svg`, `ratex-pdf` for fallback rendering of CJK / emoji / other glyphs absent from KaTeX font set |
 
 ---
 
@@ -267,11 +270,11 @@ ratex-parser
     ↑
 ratex-layout
     ↑
-    ├── ratex-ffi    (C ABI for native)
-    ├── ratex-render (PNG)
-    ├── ratex-wasm   (browser JSON)
-    ├── ratex-svg    (SVG vector output)
-    └── ratex-pdf    (PDF)
+    ├── ratex-ffi          (C ABI for native)
+    ├── ratex-render ─┐    (PNG)
+    ├── ratex-wasm    │    (browser JSON)
+    ├── ratex-svg     ├── ratex-unicode-font (CJK fallback loader)
+    └── ratex-pdf     ┘    (PDF)
     ↑
 platforms/ (ios, android, flutter, react-native, web)
 ```
