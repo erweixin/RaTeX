@@ -247,11 +247,64 @@ cargo test --all
 
 ## Equation numbering and `\tag`
 
-RaTeX aims for KaTeX-compatible rendering. **Automatic equation numbering is not implemented**:
+RaTeX supports **automatic equation numbering** for AMS display environments:
 
-- **No auto-numbering** for `equation`, `align`, `gather`, `alignat`, etc. (their non-starred forms render the same as the starred forms).
-- To display a number/label, use **explicit** `\tag{...}` or `\tag*{...}` at the end of a row (amsmath semantics).
-- `\notag` / `\nonumber` are treated as no-ops when auto-numbering is not present.
+- Non-starred environments (`equation`, `align`, `gather`, `alignat`) auto-generate numbers in the tag column.
+- Starred forms (`equation*`, `align*`, etc.) and inner environments (`aligned`, `split`, `gathered`, `alignedat`) do not generate numbers.
+- Explicit `\tag{...}` / `\tag*{...}` can be used to override or add custom tags.
+- `\notag` / `\nonumber` suppress auto-numbering on a specific row.
+- `\label{name}` associates the current equation number with a label.
+- `\ref{name}` renders the equation number for a label (requires `external_labels` from a prior render pass).
+- `\eqref{name}` renders the equation number wrapped in parentheses.
+
+### Equation state
+
+Auto-numbering requires an `EquationState` passed via `LayoutOptions`:
+
+```rust
+use std::cell::RefCell;
+use std::rc::Rc;
+use ratex_layout::{layout, EquationState, LayoutOptions};
+
+let eq_state = Rc::new(RefCell::new(EquationState::default()));
+let opts = LayoutOptions {
+    equation_state: Some(eq_state.clone()),
+    ..LayoutOptions::default()
+};
+let lbox = layout(&parse("\\begin{equation} E=mc^2 \\end{equation}").unwrap(), &opts);
+
+// Counter was incremented
+let s = eq_state.borrow();
+assert_eq!(s.counter, 2);  // started at 1, was 1 after first numbered row
+```
+
+When `LayoutOptions::default()` is used (no `equation_state`), auto-numbering is silently skipped — the formula renders without equation numbers.
+
+### Two-pass rendering for `\label` / `\ref`
+
+`\ref` and `\eqref` resolve labels from `EquationState::external_labels`. A typical two-pass workflow:
+
+```rust
+// Pass 1: render and collect labels
+let state = Rc::new(RefCell::new(EquationState::default()));
+let opts = LayoutOptions {
+    equation_state: Some(state.clone()),
+    ..Default::default()
+};
+layout(&parse("\\begin{equation} a=1 \\label{eq:a} \\end{equation}").unwrap(), &opts);
+let labels: HashMap<String, usize> = state.borrow().labels.clone();
+
+// Pass 2: resolve \ref using collected labels
+let state2 = Rc::new(RefCell::new(EquationState {
+    external_labels: labels,
+    ..EquationState::default()
+}));
+let opts2 = LayoutOptions {
+    equation_state: Some(state2.clone()),
+    ..Default::default()
+};
+layout(&parse("\\ref{eq:a} + \\eqref{eq:a}").unwrap(), &opts2);
+```
 
 ---
 

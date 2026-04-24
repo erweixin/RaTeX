@@ -443,6 +443,8 @@ pub enum ParseNode {
         #[serde(skip_serializing_if = "Option::is_none")]
         leqno: Option<bool>,
         #[serde(skip_serializing_if = "Option::is_none")]
+        labels: Option<Vec<Option<String>>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         #[serde(rename = "isCD")]
         is_cd: Option<bool>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -622,6 +624,37 @@ pub enum ParseNode {
         loc: Option<SourceLocation>,
     },
 
+    #[serde(rename = "label")]
+    Label {
+        mode: Mode,
+        label: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        loc: Option<SourceLocation>,
+    },
+
+    #[serde(rename = "ref")]
+    Ref {
+        mode: Mode,
+        label: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        loc: Option<SourceLocation>,
+    },
+
+    #[serde(rename = "eqref")]
+    EqRef {
+        mode: Mode,
+        label: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        loc: Option<SourceLocation>,
+    },
+
+    #[serde(rename = "notag")]
+    NoTag {
+        mode: Mode,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        loc: Option<SourceLocation>,
+    },
+
     #[serde(rename = "html")]
     Html {
         mode: Mode,
@@ -691,12 +724,13 @@ fn default_arraystretch() -> f64 {
     1.0
 }
 
-/// Tag variant for array rows: either auto-numbered (bool) or explicit tag.
+/// Tag variant for array rows: auto-numbered (bool), explicit tag, or suppressed (\notag).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum ArrayTag {
     Auto(bool),
     Explicit(Vec<ParseNode>),
+    Suppressed,
 }
 
 // ── Helper methods ──────────────────────────────────────────────────────────
@@ -756,6 +790,10 @@ impl ParseNode {
             | Self::XArrow { mode, .. }
             | Self::Pmb { mode, .. }
             | Self::Tag { mode, .. }
+            | Self::Label { mode, .. }
+            | Self::Ref { mode, .. }
+            | Self::EqRef { mode, .. }
+            | Self::NoTag { mode, .. }
             | Self::Html { mode, .. }
             | Self::HtmlMathMl { mode, .. }
             | Self::IncludeGraphics { mode, .. }
@@ -819,6 +857,10 @@ impl ParseNode {
             Self::XArrow { .. } => "xArrow",
             Self::Pmb { .. } => "pmb",
             Self::Tag { .. } => "tag",
+            Self::Label { .. } => "label",
+            Self::Ref { .. } => "ref",
+            Self::EqRef { .. } => "eqref",
+            Self::NoTag { .. } => "notag",
             Self::Html { .. } => "html",
             Self::HtmlMathMl { .. } => "htmlmathml",
             Self::IncludeGraphics { .. } => "includegraphics",

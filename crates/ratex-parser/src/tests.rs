@@ -906,4 +906,156 @@ mod environments {
             panic!("Expected LeftRight node");
         }
     }
+
+    // ── Auto-numbering tests ────────────────────────────────
+
+    #[test]
+    fn equation_environment_sets_auto_tag() {
+        use crate::parse_node::ArrayTag;
+        let ast = parse("\\begin{equation} x=1 \\end{equation}").unwrap();
+        assert_eq!(ast[0].type_name(), "array");
+        if let ParseNode::Array { tags, .. } = &ast[0] {
+            let tags = tags.as_ref().expect("expected auto tags");
+            assert_eq!(tags.len(), 1);
+            assert!(matches!(&tags[0], ArrayTag::Auto(true)));
+        } else {
+            panic!("Expected Array node");
+        }
+    }
+
+    #[test]
+    fn equation_star_has_no_auto_tag() {
+        let ast = parse("\\begin{equation*} x=1 \\end{equation*}").unwrap();
+        if let ParseNode::Array { tags, .. } = &ast[0] {
+            assert!(tags.is_none(), "starred equation should not have tags");
+        } else {
+            panic!("Expected Array node");
+        }
+    }
+
+    #[test]
+    fn align_environment_sets_auto_tags() {
+        use crate::parse_node::ArrayTag;
+        let ast = parse("\\begin{align} x &= 1 \\\\ y &= 2 \\end{align}").unwrap();
+        if let ParseNode::Array { tags, .. } = &ast[0] {
+            let tags = tags.as_ref().expect("expected auto tags");
+            assert_eq!(tags.len(), 2);
+            assert!(matches!(&tags[0], ArrayTag::Auto(true)));
+            assert!(matches!(&tags[1], ArrayTag::Auto(true)));
+        } else {
+            panic!("Expected Array node");
+        }
+    }
+
+    #[test]
+    fn align_star_has_no_auto_tags() {
+        let ast = parse("\\begin{align*} x &= 1 \\\\ y &= 2 \\end{align*}").unwrap();
+        if let ParseNode::Array { tags, .. } = &ast[0] {
+            assert!(tags.is_none(), "starred align should not have tags");
+        } else {
+            panic!("Expected Array node");
+        }
+    }
+
+    #[test]
+    fn gather_environment_sets_auto_tags() {
+        use crate::parse_node::ArrayTag;
+        let ast = parse("\\begin{gather} x \\\\ y \\end{gather}").unwrap();
+        if let ParseNode::Array { tags, .. } = &ast[0] {
+            let tags = tags.as_ref().expect("expected auto tags");
+            assert_eq!(tags.len(), 2);
+            assert!(matches!(&tags[0], ArrayTag::Auto(true)));
+            assert!(matches!(&tags[1], ArrayTag::Auto(true)));
+        } else {
+            panic!("Expected Array node");
+        }
+    }
+
+    #[test]
+    fn aligned_inner_has_no_auto_tags() {
+        let ast = parse("\\begin{aligned} x &= 1 \\end{aligned}").unwrap();
+        if let ParseNode::Array { tags, .. } = &ast[0] {
+            assert!(tags.is_none(), "aligned should not have auto tags");
+        } else {
+            panic!("Expected Array node");
+        }
+    }
+
+    #[test]
+    fn equation_with_label_sets_labels_field() {
+        let ast =
+            parse("\\begin{equation} x=1 \\label{eq:one} \\end{equation}").unwrap();
+        if let ParseNode::Array { labels, .. } = &ast[0] {
+            let labels = labels.as_ref().expect("expected labels");
+            assert_eq!(labels.len(), 1);
+            assert_eq!(labels[0], Some("eq:one".to_string()));
+        } else {
+            panic!("Expected Array node");
+        }
+    }
+
+    #[test]
+    fn notag_suppresses_numbering() {
+        use crate::parse_node::ArrayTag;
+        let ast =
+            parse("\\begin{align} x &= 1 \\notag \\\\ y &= 2 \\end{align}").unwrap();
+        if let ParseNode::Array { tags, .. } = &ast[0] {
+            let tags = tags.as_ref().expect("expected tags");
+            assert_eq!(tags.len(), 2);
+            assert!(matches!(&tags[0], ArrayTag::Suppressed));
+            assert!(matches!(&tags[1], ArrayTag::Auto(true)));
+        } else {
+            panic!("Expected Array node");
+        }
+    }
+
+    #[test]
+    fn ref_parses_to_ref_node() {
+        let ast = parse("\\ref{eq:one}").unwrap();
+        assert_eq!(ast.len(), 1);
+        assert_eq!(ast[0].type_name(), "ref");
+        if let ParseNode::Ref { label, .. } = &ast[0] {
+            assert_eq!(label, "eq:one");
+        } else {
+            panic!("Expected Ref node");
+        }
+    }
+
+    #[test]
+    fn eqref_parses_to_eqref_node() {
+        let ast = parse("\\eqref{eq:one}").unwrap();
+        assert_eq!(ast.len(), 1);
+        assert_eq!(ast[0].type_name(), "eqref");
+        if let ParseNode::EqRef { label, .. } = &ast[0] {
+            assert_eq!(label, "eq:one");
+        } else {
+            panic!("Expected EqRef node");
+        }
+    }
+
+    #[test]
+    fn label_parses_to_label_node() {
+        let ast = parse("\\label{eq:one}").unwrap();
+        assert_eq!(ast.len(), 1);
+        assert_eq!(ast[0].type_name(), "label");
+        if let ParseNode::Label { label, .. } = &ast[0] {
+            assert_eq!(label, "eq:one");
+        } else {
+            panic!("Expected Label node");
+        }
+    }
+
+    #[test]
+    fn notag_parses_to_notag_node() {
+        let ast = parse("\\notag").unwrap();
+        assert_eq!(ast.len(), 1);
+        assert_eq!(ast[0].type_name(), "notag");
+    }
+
+    #[test]
+    fn nonumber_parses_to_notag_node() {
+        let ast = parse("\\nonumber").unwrap();
+        assert_eq!(ast.len(), 1);
+        assert_eq!(ast[0].type_name(), "notag");
+    }
 }

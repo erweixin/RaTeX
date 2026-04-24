@@ -465,9 +465,7 @@ impl<'a> MacroExpander<'a> {
             ("\\set", "\\bra@set{\\{\\,}{\\mid}{}{\\,\\}}"),
             ("\\Set", "\\bra@set{\\left\\{\\:}{\\;\\middle\\vert\\;}{\\;\\middle\\Vert\\;}{\\:\\right\\}}"),
 
-            // ── equation numbering (display math; no-op in parser) ──
-            ("\\nonumber", "\\relax"),
-            ("\\notag", "\\relax"),
+            // ── equation numbering (handled by function handler) ──
 
             // ── KaTeX mhchem (\\tripledash for \\bond ~ forms) ──
             (

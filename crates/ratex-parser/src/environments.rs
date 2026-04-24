@@ -56,12 +56,14 @@ pub struct ArrayConfig {
     pub empty_single_row: bool,
     pub max_num_cols: Option<usize>,
     pub leqno: Option<bool>,
+    pub auto_numbered: bool,
 }
 
 
 // ── parseArray ───────────────────────────────────────────────────────────
 
 /// Pull a trailing `\\tag{…}` off the last cell of a row (amsmath semantics).
+/// Also detects `\\notag`/`\\nonumber` → `ArrayTag::Suppressed`.
 fn extract_trailing_tag_from_last_cell(row: &mut [ParseNode]) -> ParseResult<ArrayTag> {
     let Some(last) = row.last_mut() else {
         return Ok(ArrayTag::Auto(false));
@@ -81,6 +83,12 @@ fn extract_trailing_tag_from_last_cell(row: &mut [ParseNode]) -> ParseResult<Arr
         ParseNode::OrdGroup { body, .. } => body,
         _ => return Ok(ArrayTag::Auto(false)),
     };
+
+    // Check for \notag / \nonumber at the end of the cell
+    if let Some(ParseNode::NoTag { .. }) = obody.last() {
+        obody.pop();
+        return Ok(ArrayTag::Suppressed);
+    }
 
     let tag_indices: Vec<usize> = obody
         .iter()
@@ -112,6 +120,24 @@ fn extract_trailing_tag_from_last_cell(row: &mut [ParseNode]) -> ParseResult<Arr
         }
         _ => Ok(ArrayTag::Auto(false)),
     }
+}
+
+/// Extract a trailing `\\label{…}` from the last cell of a row.
+fn extract_label_from_last_cell(row: &[ParseNode]) -> Option<String> {
+    let last = row.last()?;
+    let inner = match last {
+        ParseNode::Styling { body, .. } => body.last()?,
+        other => other,
+    };
+    let obody = match inner {
+        ParseNode::OrdGroup { body, .. } => body,
+        _ => return None,
+    };
+    // Find the last Label node in the cell
+    obody.iter().rev().find_map(|n| match n {
+        ParseNode::Label { label, .. } => Some(label.clone()),
+        _ => None,
+    })
 }
 
 fn get_hlines(parser: &mut Parser) -> ParseResult<Vec<bool>> {
@@ -287,8 +313,31 @@ pub fn parse_array(
 
     let tags = if row_tags.iter().any(|t| {
         matches!(t, ArrayTag::Explicit(nodes) if !nodes.is_empty())
-    }) {
-        Some(row_tags)
+    }) || config.auto_numbered
+    {
+        // For auto-numbered environments, convert Auto(false) → Auto(true) for rows
+        // that don't have explicit tags or suppression. (Auto(false) is the default
+        // returned by extract_trailing_tag_from_last_cell when there's no tag info.)
+        let tags: Vec<ArrayTag> = if config.auto_numbered {
+            row_tags
+                .into_iter()
+                .map(|t| match t {
+                    ArrayTag::Auto(false) => ArrayTag::Auto(true),
+                    other => other,
+                })
+                .collect()
+        } else {
+            row_tags
+        };
+        Some(tags)
+    } else {
+        None
+    };
+
+    // Extract labels from each row's last cell
+    let has_any_label = body.iter().any(|row| extract_label_from_last_cell(row).is_some());
+    let labels = if has_any_label {
+        Some(body.iter().map(|row| extract_label_from_last_cell(row)).collect())
     } else {
         None
     };
@@ -304,6 +353,7 @@ pub fn parse_array(
         add_jot: config.add_jot,
         arraystretch,
         tags,
+        labels,
         leqno: config.leqno,
         is_cd: None,
         loc: None,
@@ -554,11 +604,15 @@ fn handle_aligned(
         let is_alignat = ctx.env_name.contains("at");
         let sep_type = if is_alignat { "alignat" } else { "align" };
 
+        // Only non-starred standalone align/alignat auto-number (not aligned/split/align*)
+        let auto_numbered = ctx.env_name == "align" || ctx.env_name == "alignat";
+
         let config = ArrayConfig {
             add_jot: Some(true),
             empty_single_row: true,
             col_separation_type: Some(sep_type.to_string()),
             max_num_cols: if is_split { Some(2) } else { None },
+            auto_numbered,
             ..Default::default()
         };
 
@@ -702,6 +756,7 @@ fn register_gathered(map: &mut HashMap<&'static str, EnvSpec>) {
             add_jot: Some(true),
             col_separation_type: Some("gather".to_string()),
             empty_single_row: true,
+            auto_numbered: ctx.env_name == "gather",
             ..Default::default()
         };
         parse_array(ctx.parser, config, Some(StyleStr::Display))
@@ -731,6 +786,7 @@ fn register_equation(map: &mut HashMap<&'static str, EnvSpec>) {
             empty_single_row: true,
             single_row: true,
             max_num_cols: Some(1),
+            auto_numbered: !ctx.env_name.ends_with('*'),
             ..Default::default()
         };
         parse_array(ctx.parser, config, Some(StyleStr::Display))
@@ -852,6 +908,7 @@ fn register_cd(map: &mut HashMap<&'static str, EnvSpec>) {
             add_jot: None,
             arraystretch: 1.0,
             tags: None,
+            labels: None,
             leqno: None,
             is_cd: Some(true),
             loc: None,

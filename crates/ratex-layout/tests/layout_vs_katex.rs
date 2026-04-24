@@ -381,3 +381,150 @@ fn mathrm_mm_squared_both_m_upright() {
         "both m should be MainRegular, got {m_fonts:?}"
     );
 }
+
+// ============================================================================
+// Auto-numbering integration tests
+// ============================================================================
+
+#[cfg(test)]
+mod auto_numbering {
+    use std::cell::RefCell;
+    use std::collections::HashMap;
+    use std::rc::Rc;
+
+    use ratex_layout::{layout, EquationState, LayoutOptions};
+    use ratex_parser::parser::parse;
+
+    #[test]
+    fn equation_auto_numbers() {
+        let ast =
+            parse("\\begin{equation} x=1 \\end{equation}").expect("parse");
+        let eq_state = Rc::new(RefCell::new(EquationState::default()));
+        let options = LayoutOptions {
+            equation_state: Some(eq_state.clone()),
+            ..LayoutOptions::default()
+        };
+        let lbox = layout(&ast, &options);
+
+        // The tag column should exist (width > 0), meaning a number was generated.
+        assert!(
+            lbox.width > 0.0,
+            "auto-numbered equation should have width > 0"
+        );
+
+        let s = eq_state.borrow();
+        assert_eq!(s.counter, 2, "counter should have been incremented to 2");
+    }
+
+    #[test]
+    fn equation_star_no_number() {
+        let ast =
+            parse("\\begin{equation*} x=1 \\end{equation*}").expect("parse");
+        let eq_state = Rc::new(RefCell::new(EquationState::default()));
+        let options = LayoutOptions {
+            equation_state: Some(eq_state.clone()),
+            ..LayoutOptions::default()
+        };
+        let _lbox = layout(&ast, &options);
+        let s = eq_state.borrow();
+        assert_eq!(s.counter, 1, "counter should NOT have been incremented");
+    }
+
+    #[test]
+    fn label_stores_mapping() {
+        let ast = parse("\\begin{equation} x=1 \\label{eq:one} \\end{equation}")
+            .expect("parse");
+        let eq_state = Rc::new(RefCell::new(EquationState::default()));
+        let options = LayoutOptions {
+            equation_state: Some(eq_state.clone()),
+            ..LayoutOptions::default()
+        };
+        let _lbox = layout(&ast, &options);
+        let s = eq_state.borrow();
+        assert_eq!(s.labels.get("eq:one"), Some(&1));
+    }
+
+    #[test]
+    fn ref_resolves_via_external_labels() {
+        // Set up equation state with a pre-defined label mapping.
+        let external = HashMap::from([("eq:one".to_string(), 42)]);
+        let eq_state = Rc::new(RefCell::new(EquationState {
+            external_labels: external,
+            ..EquationState::default()
+        }));
+        let options = LayoutOptions {
+            equation_state: Some(eq_state.clone()),
+            ..LayoutOptions::default()
+        };
+
+        // \ref should resolve eq:one → 42 and lay it out as text.
+        let ast = parse("\\ref{eq:one}").expect("parse");
+        let lbox = layout(&ast, &options);
+        assert!(lbox.width > 0.0, "\\ref result should have width > 0");
+    }
+
+    #[test]
+    fn align_multiple_auto_numbers() {
+        let ast = parse(
+            "\\begin{align} x &= 1 \\\\ y &= 2 \\end{align}",
+        )
+        .expect("parse");
+        let eq_state = Rc::new(RefCell::new(EquationState::default()));
+        let options = LayoutOptions {
+            equation_state: Some(eq_state.clone()),
+            ..LayoutOptions::default()
+        };
+        let _lbox = layout(&ast, &options);
+        let s = eq_state.borrow();
+        assert_eq!(s.counter, 3, "counter should be 3 after two auto-numbered rows");
+    }
+
+    #[test]
+    fn notag_suppresses_row_numbering() {
+        let ast = parse(
+            "\\begin{align} x &= 1 \\notag \\\\ y &= 2 \\end{align}",
+        )
+        .expect("parse");
+        let eq_state = Rc::new(RefCell::new(EquationState::default()));
+        let options = LayoutOptions {
+            equation_state: Some(eq_state.clone()),
+            ..LayoutOptions::default()
+        };
+        let _lbox = layout(&ast, &options);
+        let s = eq_state.borrow();
+        assert_eq!(s.counter, 2, "counter should be 2 after one auto-numbered row");
+    }
+
+    #[test]
+    fn two_pass_label_ref_workflow() {
+        // Simulate a two-pass workflow:
+        // Pass 1: render equation with \label, collect label→number mapping
+        let pass1_ast = parse(
+            "\\begin{equation} E = mc^2 \\label{eq:einstein} \\end{equation}",
+        )
+        .expect("parse pass1");
+        let eq_state = Rc::new(RefCell::new(EquationState::default()));
+        let options = LayoutOptions {
+            equation_state: Some(eq_state.clone()),
+            ..LayoutOptions::default()
+        };
+        let _lbox1 = layout(&pass1_ast, &options);
+
+        // Collect labels from pass 1
+        let labels: HashMap<String, usize> = eq_state.borrow().labels.clone();
+        assert_eq!(labels.get("eq:einstein"), Some(&1));
+
+        // Pass 2: render \ref using the collected labels
+        let pass2_ast = parse("\\ref{eq:einstein}").expect("parse pass2");
+        let eq_state2 = Rc::new(RefCell::new(EquationState {
+            external_labels: labels,
+            ..EquationState::default()
+        }));
+        let options2 = LayoutOptions {
+            equation_state: Some(eq_state2.clone()),
+            ..LayoutOptions::default()
+        };
+        let lbox2 = layout(&pass2_ast, &options2);
+        assert!(lbox2.width > 0.0, "\\ref should render visible content");
+    }
+}

@@ -361,6 +361,7 @@ fn layout_node(node: &ParseNode, options: &LayoutOptions) -> LayoutBox {
             hskip_before_and_after,
             is_cd,
             tags,
+            labels,
             leqno,
             ..
         } => {
@@ -377,6 +378,7 @@ fn layout_node(node: &ParseNode, options: &LayoutOptions) -> LayoutBox {
                     col_separation_type.as_deref(),
                     hskip_before_and_after.unwrap_or(false),
                     tags.as_deref(),
+                    labels.as_deref(),
                     leqno.unwrap_or(false),
                     options,
                 )
@@ -563,9 +565,48 @@ fn layout_node(node: &ParseNode, options: &LayoutOptions) -> LayoutBox {
             layout_expression(tag, &text_opts, true)
         },
 
+        ParseNode::Label { .. } | ParseNode::NoTag { .. } => {
+            // Metadata / no-op: produce nothing.
+            LayoutBox::new_empty()
+        },
+
+        ParseNode::Ref { label, .. } => {
+            layout_ref(label, false, options)
+        },
+
+        ParseNode::EqRef { label, .. } => {
+            layout_ref(label, true, options)
+        },
+
         // Fallback for unhandled node types: produce empty box
         _ => LayoutBox::new_empty(),
     }
+}
+
+/// Lay out a `\ref{label}` or `\eqref{label}` node.
+/// When `parens` is true (eqref), wraps the number in parentheses.
+fn layout_ref(label: &str, parens: bool, options: &LayoutOptions) -> LayoutBox {
+    let num = options
+        .equation_state
+        .as_ref()
+        .and_then(|s| s.borrow().external_labels.get(label).copied())
+        .unwrap_or(0);
+    let text = if parens {
+        format!("({})", num)
+    } else {
+        format!("{}", num)
+    };
+    // Break into individual TextOrd nodes so each character renders as a glyph.
+    let num_nodes: Vec<ParseNode> = text
+        .chars()
+        .map(|c| ParseNode::TextOrd {
+            mode: ratex_parser::parse_node::Mode::Math,
+            text: c.to_string(),
+            loc: None,
+        })
+        .collect();
+    let text_opts = options.with_style(options.style.text());
+    layout_expression(&num_nodes, &text_opts, true)
 }
 
 // ============================================================================
@@ -2416,6 +2457,7 @@ fn layout_array(
     col_sep_type: Option<&str>,
     hskip: bool,
     tags: Option<&[ArrayTag]>,
+    labels: Option<&[Option<String>]>,
     _leqno: bool,
     options: &LayoutOptions,
 ) -> LayoutBox {
@@ -2600,18 +2642,50 @@ fn layout_array(
         + col_gap * (num_cols.saturating_sub(1)) as f64
         + 2.0 * content_x_offset;
 
+    // Build tag boxes for each row (explicit `\tag{…}`, auto-numbered, or suppressed).
     let mut row_tag_boxes: Vec<Option<LayoutBox>> = (0..num_rows).map(|_| None).collect();
     let mut tag_col_width = 0.0_f64;
     let text_opts = options.with_style(options.style.text());
+    let eq_state = options.equation_state.as_ref();
+
     if let Some(tag_slice) = tags {
         if tag_slice.len() == num_rows {
             for (r, t) in tag_slice.iter().enumerate() {
-                if let ArrayTag::Explicit(nodes) = t {
-                    if !nodes.is_empty() {
+                match t {
+                    ArrayTag::Explicit(nodes) if !nodes.is_empty() => {
                         let tb = layout_expression(nodes, &text_opts, true);
                         tag_col_width = tag_col_width.max(tb.width);
                         row_tag_boxes[r] = Some(tb);
                     }
+                    ArrayTag::Auto(true) => {
+                        // Auto-number this row: increment counter and lay out the number.
+                        if let Some(state) = eq_state {
+                            let mut s = state.borrow_mut();
+                            let num = s.counter;
+                            s.counter += 1;
+
+                            // Store label→number mapping if this row has a label.
+                            if let Some(lbl) = labels.and_then(|ls| ls.get(r).and_then(|l| l.as_ref())) {
+                                s.labels.insert(lbl.clone(), num);
+                            }
+
+                            // Break "(N)" into individual TextOrd nodes so each
+                            // character ("(", digit(s), ")") renders as a glyph.
+                            let num_str = format!("({})", num);
+                            let num_nodes: Vec<ParseNode> = num_str
+                                .chars()
+                                .map(|c| ParseNode::TextOrd {
+                                    mode: ratex_parser::parse_node::Mode::Math,
+                                    text: c.to_string(),
+                                    loc: None,
+                                })
+                                .collect();
+                            let tag_box = layout_expression(&num_nodes, &text_opts, true);
+                            tag_col_width = tag_col_width.max(tag_box.width);
+                            row_tag_boxes[r] = Some(tag_box);
+                        }
+                    }
+                    _ => {} // Auto(false) and Suppressed → no tag for this row
                 }
             }
         }

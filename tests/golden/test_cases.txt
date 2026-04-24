@@ -987,3 +987,9 @@ f^{(n)}(x) = \dfrac{\mathrm{d}^n f}{\mathrm{d}x^n}
 \tilde{\tilde{x}}
 \text{你好世界}
 \text{😊🎉✅⭐}
+\begin{equation} E = mc^2 \end{equation}
+\begin{align} x &= 1 \\ y &= 2 \\ z &= 3 \end{align}
+\begin{gather} a = b \\ c = d \end{gather}
+\begin{align} x &= 1 \notag \\ y &= 2 \end{align}
+\begin{equation} a^2 + b^2 = c^2 \label{eq:pythag} \end{equation}
+\begin{alignat}{2} 10&x+ &3&y = 2 \\ 3&x+ &13&y = 4 \end{alignat}

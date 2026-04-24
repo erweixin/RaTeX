@@ -2,9 +2,11 @@
 ///
 /// Uses ink-based comparison: crop to content, normalize size, compute IoU.
 /// This ensures blank/broken renders are correctly identified as failures.
+use std::cell::RefCell;
 use std::path::PathBuf;
+use std::rc::Rc;
 
-use ratex_layout::{layout, to_display_list, LayoutOptions};
+use ratex_layout::{layout, to_display_list, EquationState, LayoutOptions};
 use ratex_parser::parser::parse;
 use ratex_render::{render_to_png, RenderOptions};
 
@@ -171,6 +173,7 @@ fn run_golden_suite(
     fixtures_dir: &std::path::Path,
     min_pass_rate: f64,
     device_pixel_ratio: f32,
+    layout_opts: &LayoutOptions,
 ) {
     if !tc_path.exists() || !fixtures_dir.exists() {
         eprintln!("Skipping {label}: path missing");
@@ -184,8 +187,6 @@ fn run_golden_suite(
         font_dir,
         device_pixel_ratio,
     };
-    let layout_opts = LayoutOptions::default();
-
     let lines: Vec<String> = std::fs::read_to_string(tc_path).unwrap()
         .lines()
         .filter(|l| !l.trim().is_empty() && !l.trim().starts_with('#'))
@@ -202,7 +203,7 @@ fn run_golden_suite(
         if !ref_path.exists() { skipped += 1; continue; }
 
         let ast = match parse(expr) { Ok(a) => a, Err(_) => { skipped += 1; continue; } };
-        let lbox = layout(&ast, &layout_opts);
+        let lbox = layout(&ast, layout_opts);
         let dl = to_display_list(&lbox);
         let png_bytes = match render_to_png(&dl, &render_opts) { Ok(d) => d, Err(_) => { skipped += 1; continue; } };
 
@@ -248,12 +249,18 @@ fn run_golden_suite(
 #[test]
 fn golden_test_pass_rate() {
     let root = project_root();
+    let eq_state = Rc::new(RefCell::new(EquationState::default()));
+    let layout_opts = LayoutOptions {
+        equation_state: Some(eq_state),
+        ..LayoutOptions::default()
+    };
     run_golden_suite(
         "Golden (main)",
         &root.join("tests/golden/test_cases.txt"),
         &root.join("tests/golden/fixtures"),
         75.0,
         1.0,
+        &layout_opts,
     );
 }
 
@@ -346,13 +353,14 @@ fn cjk_smoke_non_blank_rendering() {
 #[test]
 fn golden_mhchem_pass_rate() {
     let root = project_root();
-    // 2.0 matches legacy fixtures_ce (Puppeteer DPR 2); use 1.0 if refs were regenerated with DPR 1.
+    // mhchem test cases don't use auto-numbering; pass default LayoutOptions.
     run_golden_suite(
         "Golden (mhchem)",
         &root.join("tests/golden/test_case_ce.txt"),
         &root.join("tests/golden/fixtures_ce"),
         50.0,
         2.0,
+        &LayoutOptions::default(),
     );
 }
 

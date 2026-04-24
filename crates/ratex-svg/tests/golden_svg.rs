@@ -1,9 +1,11 @@
 //! Rasterize standalone SVG (path glyphs) with resvg and compare to KaTeX PNG fixtures.
 //! Mirrors `ratex-render/tests/golden_test.rs` ink-based scoring.
 
+use std::cell::RefCell;
 use std::path::PathBuf;
+use std::rc::Rc;
 
-use ratex_layout::{layout, to_display_list, LayoutOptions};
+use ratex_layout::{layout, to_display_list, EquationState, LayoutOptions};
 use ratex_parser::parser::parse;
 use ratex_svg::{render_to_svg, SvgOptions};
 use resvg::{tiny_skia, usvg};
@@ -216,6 +218,7 @@ fn run_golden_svg_suite(
     fixtures_dir: &std::path::Path,
     min_pass_rate: f64,
     dpr: f64,
+    layout_opts: &LayoutOptions,
 ) {
     if !tc_path.exists() || !fixtures_dir.exists() {
         eprintln!("Skipping {label}: path missing");
@@ -230,8 +233,6 @@ fn run_golden_svg_suite(
         embed_glyphs: true,
         font_dir: fd,
     };
-    let layout_opts = LayoutOptions::default();
-
     let lines: Vec<String> = std::fs::read_to_string(tc_path)
         .unwrap()
         .lines()
@@ -258,7 +259,7 @@ fn run_golden_svg_suite(
                 continue;
             }
         };
-        let lbox = layout(&ast, &layout_opts);
+        let lbox = layout(&ast, layout_opts);
         let dl = to_display_list(&lbox);
         let svg = render_to_svg(&dl, &svg_opts);
 
@@ -322,12 +323,18 @@ fn run_golden_svg_suite(
 #[test]
 fn golden_svg_main_pass_rate() {
     let root = project_root();
+    let eq_state = Rc::new(RefCell::new(EquationState::default()));
+    let layout_opts = LayoutOptions {
+        equation_state: Some(eq_state),
+        ..LayoutOptions::default()
+    };
     run_golden_svg_suite(
         "Golden SVG (main)",
         &root.join("tests/golden/test_cases.txt"),
         &root.join("tests/golden/fixtures"),
         75.0,
         1.0,
+        &layout_opts,
     );
 }
 
@@ -340,6 +347,7 @@ fn golden_svg_mhchem_pass_rate() {
         &root.join("tests/golden/fixtures_ce"),
         50.0,
         2.0,
+        &LayoutOptions::default(),
     );
 }
 

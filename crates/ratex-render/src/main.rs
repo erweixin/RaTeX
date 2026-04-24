@@ -1,7 +1,9 @@
+use std::cell::RefCell;
 use std::io::{self, BufRead};
 use std::path::PathBuf;
+use std::rc::Rc;
 
-use ratex_layout::{layout, LayoutOptions};
+use ratex_layout::{layout, EquationState, LayoutOptions};
 use ratex_layout::to_display_list;
 use ratex_parser::parser::parse;
 use ratex_render::{render_to_png, RenderOptions};
@@ -62,7 +64,13 @@ fn main() {
 
     let inline = args.contains(&"--inline".to_string());
     let style = if inline { MathStyle::Text } else { MathStyle::Display };
-    let layout_opts = LayoutOptions::default().with_style(style).with_color(color);
+    let eq_state = Rc::new(RefCell::new(EquationState::default()));
+    let layout_opts = LayoutOptions {
+        equation_state: Some(eq_state),
+        style,
+        color,
+        ..LayoutOptions::default()
+    };
 
     let stdin = io::stdin();
     let mut idx = 0;
