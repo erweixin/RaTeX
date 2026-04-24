@@ -56,21 +56,25 @@ pub struct ArrayConfig {
     pub empty_single_row: bool,
     pub max_num_cols: Option<usize>,
     pub leqno: Option<bool>,
+    pub auto_number: bool,
 }
 
 
 // ── parseArray ───────────────────────────────────────────────────────────
 
-/// Pull a trailing `\\tag{…}` off the last cell of a row (amsmath semantics).
-fn extract_trailing_tag_from_last_cell(row: &mut [ParseNode]) -> ParseResult<ArrayTag> {
+/// Pull a trailing `\\tag{…}` or `\\nonumber`/`\\notag` off the last cell of a row.
+/// Returns `Auto(true)` when the row is eligible for auto-numbering.
+/// The `auto_number` parameter controls the default when no marker is found.
+fn extract_trailing_tag_from_last_cell(row: &mut [ParseNode], auto_number: bool) -> ParseResult<ArrayTag> {
+    let default_tag = if auto_number { ArrayTag::Auto(true) } else { ArrayTag::Auto(false) };
     let Some(last) = row.last_mut() else {
-        return Ok(ArrayTag::Auto(false));
+        return Ok(default_tag);
     };
 
     let inner: &mut ParseNode = match last {
         ParseNode::Styling { body, .. } => {
             if body.len() != 1 {
-                return Ok(ArrayTag::Auto(false));
+                return Ok(default_tag);
             }
             &mut body[0]
         }
@@ -79,9 +83,10 @@ fn extract_trailing_tag_from_last_cell(row: &mut [ParseNode]) -> ParseResult<Arr
 
     let obody = match inner {
         ParseNode::OrdGroup { body, .. } => body,
-        _ => return Ok(ArrayTag::Auto(false)),
+        _ => return Ok(default_tag),
     };
 
+    // Look for \\tag
     let tag_indices: Vec<usize> = obody
         .iter()
         .enumerate()
@@ -89,28 +94,58 @@ fn extract_trailing_tag_from_last_cell(row: &mut [ParseNode]) -> ParseResult<Arr
         .map(|(i, _)| i)
         .collect();
 
-    if tag_indices.is_empty() {
-        return Ok(ArrayTag::Auto(false));
-    }
-    if tag_indices.len() > 1 {
-        return Err(ParseError::msg("Multiple \\tag in a row"));
-    }
-    let idx = tag_indices[0];
-    if idx != obody.len() - 1 {
+    // Look for \\nonumber / \\notag
+    let nonumber_indices: Vec<usize> = obody
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| matches!(n, ParseNode::NoNumber { .. }))
+        .map(|(i, _)| i)
+        .collect();
+
+    // Can't have both \\tag and \\nonumber in the same row
+    if !tag_indices.is_empty() && !nonumber_indices.is_empty() {
         return Err(ParseError::msg(
-            "\\tag must appear at the end of the row after the equation body",
+            "Cannot use both \\tag and \\nonumber in the same row",
         ));
     }
 
-    match obody.pop() {
-        Some(ParseNode::Tag { tag, .. }) => {
-            if tag.is_empty() {
-                Ok(ArrayTag::Auto(false))
-            } else {
-                Ok(ArrayTag::Explicit(tag))
-            }
+    // Handle \\tag
+    if !tag_indices.is_empty() {
+        if tag_indices.len() > 1 {
+            return Err(ParseError::msg("Multiple \\tag in a row"));
         }
-        _ => Ok(ArrayTag::Auto(false)),
+        let idx = tag_indices[0];
+        if idx != obody.len() - 1 {
+            return Err(ParseError::msg(
+                "\\tag must appear at the end of the row after the equation body",
+            ));
+        }
+        match obody.pop() {
+            Some(ParseNode::Tag { tag, .. }) => {
+                if tag.is_empty() {
+                    Ok(ArrayTag::Auto(false))
+                } else {
+                    Ok(ArrayTag::Explicit(tag))
+                }
+            }
+            _ => Ok(default_tag),
+        }
+    } else if !nonumber_indices.is_empty() {
+        // Handle \\nonumber / \\notag
+        if nonumber_indices.len() > 1 {
+            return Err(ParseError::msg("Multiple \\nonumber in a row"));
+        }
+        let idx = nonumber_indices[0];
+        if idx != obody.len() - 1 {
+            return Err(ParseError::msg(
+                "\\nonumber must appear at the end of the row",
+            ));
+        }
+        obody.pop(); // discard the NoNumber node
+        Ok(ArrayTag::Auto(false))
+    } else {
+        // Neither \\tag nor \\nonumber
+        Ok(default_tag)
     }
 }
 
@@ -238,7 +273,7 @@ pub fn parse_array(
                 false
             };
 
-            let row_tag = extract_trailing_tag_from_last_cell(&mut row)?;
+            let row_tag = extract_trailing_tag_from_last_cell(&mut row, config.auto_number)?;
             row_tags.push(row_tag);
             body.push(row);
 
@@ -269,7 +304,7 @@ pub fn parse_array(
             });
             row_gaps.push(gap);
 
-            let row_tag = extract_trailing_tag_from_last_cell(&mut row)?;
+            let row_tag = extract_trailing_tag_from_last_cell(&mut row, config.auto_number)?;
             row_tags.push(row_tag);
             body.push(row);
             hlines_before_row.push(get_hlines(parser)?);
@@ -285,12 +320,62 @@ pub fn parse_array(
     parser.gullet.end_group();
     parser.gullet.end_group();
 
-    let tags = if row_tags.iter().any(|t| {
-        matches!(t, ArrayTag::Explicit(nodes) if !nodes.is_empty())
-    }) {
-        Some(row_tags)
+    // Post-process row tags for auto-numbering
+    let tags = if config.auto_number {
+        let mut processed: Vec<ArrayTag> = Vec::with_capacity(row_tags.len());
+        let mut any_visible = false;
+        for raw_tag in &row_tags {
+            match raw_tag {
+                ArrayTag::Explicit(nodes) if !nodes.is_empty() => {
+                    // Explicit \\tag{...}: step counter, keep tag content as-is
+                    parser.equation_counter += 1;
+                    processed.push(ArrayTag::Explicit(nodes.clone()));
+                    any_visible = true;
+                }
+                ArrayTag::Explicit(_) => {
+                    // Empty \\tag{}: treat as suppressed
+                    processed.push(ArrayTag::Auto(false));
+                }
+                ArrayTag::Auto(true) => {
+                    // Auto-number this row: step counter, generate "(N)"
+                    parser.equation_counter += 1;
+                    let num_str = parser.equation_counter.to_string();
+                    let tag_nodes = vec![
+                        ParseNode::MathOrd {
+                            mode: Mode::Math,
+                            text: "(".to_string(),
+                            loc: None,
+                        },
+                        ParseNode::MathOrd {
+                            mode: Mode::Math,
+                            text: num_str,
+                            loc: None,
+                        },
+                        ParseNode::MathOrd {
+                            mode: Mode::Math,
+                            text: ")".to_string(),
+                            loc: None,
+                        },
+                    ];
+                    processed.push(ArrayTag::Explicit(tag_nodes));
+                    any_visible = true;
+                }
+                ArrayTag::Auto(false) => {
+                    // Suppressed by \\nonumber or empty \\tag{}: no counter step, no tag
+                    processed.push(ArrayTag::Auto(false));
+                }
+            }
+        }
+        if any_visible { Some(processed) } else { None }
     } else {
-        None
+        // Not an auto-numbering environment: keep original behavior
+        if row_tags.iter().any(|t| {
+            matches!(t, ArrayTag::Explicit(nodes) if !nodes.is_empty())
+        }) {
+            Some(row_tags)
+        } else {
+            None
+        }
     };
 
     Ok(ParseNode::Array {
@@ -553,12 +638,17 @@ fn handle_aligned(
         let is_split = ctx.env_name == "split";
         let is_alignat = ctx.env_name.contains("at");
         let sep_type = if is_alignat { "alignat" } else { "align" };
+        let auto_number = !ctx.env_name.ends_with('*')
+            && !is_split
+            && ctx.env_name != "aligned"
+            && ctx.env_name != "alignedat";
 
         let config = ArrayConfig {
             add_jot: Some(true),
             empty_single_row: true,
             col_separation_type: Some(sep_type.to_string()),
             max_num_cols: if is_split { Some(2) } else { None },
+            auto_number,
             ..Default::default()
         };
 
@@ -692,6 +782,7 @@ fn register_gathered(map: &mut HashMap<&'static str, EnvSpec>) {
         _args: Vec<ParseNode>,
         _opt_args: Vec<Option<ParseNode>>,
     ) -> ParseResult<ParseNode> {
+        let auto_number = !ctx.env_name.ends_with('*') && ctx.env_name != "gathered";
         let config = ArrayConfig {
             cols: Some(vec![AlignSpec {
                 align_type: AlignType::Align,
@@ -702,6 +793,7 @@ fn register_gathered(map: &mut HashMap<&'static str, EnvSpec>) {
             add_jot: Some(true),
             col_separation_type: Some("gather".to_string()),
             empty_single_row: true,
+            auto_number,
             ..Default::default()
         };
         parse_array(ctx.parser, config, Some(StyleStr::Display))
@@ -727,10 +819,12 @@ fn register_equation(map: &mut HashMap<&'static str, EnvSpec>) {
         _args: Vec<ParseNode>,
         _opt_args: Vec<Option<ParseNode>>,
     ) -> ParseResult<ParseNode> {
+        let auto_number = !ctx.env_name.ends_with('*');
         let config = ArrayConfig {
             empty_single_row: true,
             single_row: true,
             max_num_cols: Some(1),
+            auto_number,
             ..Default::default()
         };
         parse_array(ctx.parser, config, Some(StyleStr::Display))

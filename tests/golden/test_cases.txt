@@ -987,3 +987,9 @@ f^{(n)}(x) = \dfrac{\mathrm{d}^n f}{\mathrm{d}x^n}
 \tilde{\tilde{x}}
 \text{你好世界}
 \text{😊🎉✅⭐}
+\begin{equation*} E=mc^2 \end{equation*}
+\begin{equation} E=mc^2 \end{equation}
+\begin{align} x &= 1 \\ y &= 2 \end{align}
+\begin{gather} a=b \\ c=d \end{gather}
+\begin{align} x &= 1 \nonumber \\ y &= 2 \end{align}
+\begin{align} x &= 1 \tag{custom} \\ y &= 2 \end{align}
