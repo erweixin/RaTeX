@@ -20,3 +20,10 @@
 !ios/RaTeX.xcframework/**
 !android/src/main/jniLibs/
 !android/src/main/jniLibs/**
+
+# Ship CI-built desktop native artifacts (negate repo-root ignore patterns).
+!macos/Libraries/
+!macos/Libraries/**
+!windows/ratex_ffi.dll
+!linux/lib/
+!linux/lib/**

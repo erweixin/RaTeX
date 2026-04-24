@@ -46,6 +46,11 @@ platforms/ios/RaTeX.xcframework/
 platforms/flutter/ios/RaTeX.xcframework/
 platforms/flutter/android/src/main/jniLibs/
 
+# Flutter desktop — native libs built by platforms/flutter/build-desktop.sh (do not commit)
+platforms/flutter/macos/Libraries/
+platforms/flutter/windows/ratex_ffi.dll
+platforms/flutter/linux/lib/
+
 # React Native — native binaries built by CI, not committed
 platforms/react-native/android/src/main/jniLibs/
 platforms/react-native/ios/RaTeX.xcframework/

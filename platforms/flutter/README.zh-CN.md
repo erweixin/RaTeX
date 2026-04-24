@@ -21,7 +21,7 @@ CustomPaint Widget
 
 ## 开箱即用
 
-1. **添加依赖** — 在 `pubspec.yaml` 中：`ratex_flutter: ^0.1.2`，然后执行 `flutter pub get`。无需自行编译原生库，发布包内已含 Android `.so` 与 iOS XCFramework。
+1. **添加依赖** — 在 `pubspec.yaml` 中：`ratex_flutter: ^0.1.2`，然后执行 `flutter pub get`。无需自行编译原生库，发布包内已含 Android `.so`、iOS XCFramework、macOS `.dylib`、Windows `.dll`、Linux `.so`。
 2. **注册字体** — Flutter 不会自动为宿主应用注册插件字体。请将 [KaTeX 字体声明](#字体配置) 复制到你的 `pubspec.yaml`（见下方安装说明）。
 3. **使用** — 直接使用 `RaTeXWidget`：
    ```dart
@@ -45,7 +45,7 @@ dependencies:
   ratex_flutter: ^0.1.2
 ```
 
-然后执行 `flutter pub get`。无需本地构建 — 已发布包内含预编译的 Android `.so` 与 iOS `RaTeX.xcframework`。
+然后执行 `flutter pub get`。无需本地构建 — 已发布包内含预编译的 Android `.so`、iOS `RaTeX.xcframework`、macOS `.dylib`、Windows `.dll`、Linux `.so`。
 
 #### 字体配置
 
@@ -129,6 +129,21 @@ dependencies:
 |------|------|
 | iOS | `bash platforms/ios/build-ios.sh`（生成 `RaTeX.xcframework`） |
 | Android | `bash platforms/android/build-android.sh`（生成 `.so` 文件） |
+| macOS | `bash platforms/flutter/build-desktop.sh`（生成 universal `.dylib`） |
+| Windows | `bash platforms/flutter/build-desktop.sh --all`（从 macOS/Linux 交叉编译 `.dll`，需 zigbuild） |
+| Linux | `bash platforms/flutter/build-desktop.sh --all`（从 macOS/Linux 交叉编译 `.so`，需 zigbuild） |
+
+也可直接在目标平台构建：
+```bash
+# macOS（构建 universal dylib）
+bash platforms/flutter/build-desktop.sh
+
+# Linux（构建当前架构的 .so）
+bash platforms/flutter/build-desktop.sh
+
+# Windows（需 Git Bash / WSL；构建 .dll）
+bash platforms/flutter/build-desktop.sh
+```
 
 **从源码构建的环境要求**：Flutter 3.10+、Dart 3.0+、Rust 1.75+。
 
@@ -243,6 +258,9 @@ final dl = await compute(
 | `pubspec.yaml` | Flutter 插件清单 |
 | `ios/` | iOS 插件（podspec + RaTeXPlugin.swift）；链接 RaTeX.xcframework |
 | `android/` | Android 插件（RaTeXPlugin.kt）；使用包内 `jniLibs` 中的 `libratex_ffi.so` |
+| `macos/` | macOS 插件（podspec + RaTeXPlugin.swift）；链接 universal `.dylib` |
+| `windows/` | Windows 插件（CMake + C++ 桩）；包含 `ratex_ffi.dll` |
+| `linux/` | Linux 插件（CMake + GObject 桩）；包含按架构区分的 `libratex_ffi.so` |
 | `lib/ratex_flutter.dart` | 对外 API：`RaTeXEngine`、`RaTeXWidget` |
 | `lib/src/display_list.dart` | Dart JSON 类型（DisplayList、DisplayItem 等） |
 | `lib/src/ratex_ffi.dart` | 对 `libratex_ffi` 的 Dart FFI 绑定 |
@@ -270,11 +288,17 @@ final dl = await compute(
    cp -R platforms/ios/RaTeX.xcframework platforms/flutter/ios/
    ```
 
-3. **校验并发布**：
+3. **桌面平台** — 构建并注入各平台原生库：
+   ```bash
+   # 在仓库根目录 — 交叉编译所有桌面目标（需 zig + cargo-zigbuild）
+   ./platforms/flutter/build-desktop.sh --all
+   ```
+
+4. **校验并发布**：
    ```bash
    cd platforms/flutter
    dart pub publish --dry-run
    dart pub publish
    ```
 
-   **CI**：推送版本 tag（如 `v{VERSION}`）会触发 [release-flutter.yml](https://github.com/erweixin/RaTeX/blob/main/.github/workflows/release-flutter.yml)：构建 Android 与 iOS 原生库、注入本包并执行 `dart pub publish`。请确保 tag 与 `pubspec.yaml` 中的 `version` 一致。仓库需配置 Secret：`PUB_DEV_TOKEN`（在 https://pub.dev/settings/tokens 创建）。
+   **CI**：推送版本 tag（如 `v{VERSION}`）会触发 [release-flutter.yml](https://github.com/erweixin/RaTeX/blob/main/.github/workflows/release-flutter.yml)：构建 Android、iOS 与桌面原生库、注入本包并执行 `dart pub publish`。请确保 tag 与 `pubspec.yaml` 中的 `version` 一致。仓库需配置 Secret：`PUB_DEV_TOKEN`（在 https://pub.dev/settings/tokens 创建）。

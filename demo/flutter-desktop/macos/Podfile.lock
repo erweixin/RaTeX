@@ -1,0 +1,22 @@
+PODS:
+  - FlutterMacOS (1.0.0)
+  - ratex_flutter (0.1.2):
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - FlutterMacOS (from `Flutter/ephemeral`)
+  - ratex_flutter (from `Flutter/ephemeral/.symlinks/plugins/ratex_flutter/macos`)
+
+EXTERNAL SOURCES:
+  FlutterMacOS:
+    :path: Flutter/ephemeral
+  ratex_flutter:
+    :path: Flutter/ephemeral/.symlinks/plugins/ratex_flutter/macos
+
+SPEC CHECKSUMS:
+  FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
+  ratex_flutter: 864bccb1c55ef1b1f20148f797d278cc09ae7b7c
+
+PODFILE CHECKSUM: 346bfb2deb41d4a6ebd6f6799f92188bde2d246f
+
+COCOAPODS: 1.16.2

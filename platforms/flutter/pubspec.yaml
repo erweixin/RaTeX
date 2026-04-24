@@ -35,6 +35,12 @@ flutter:
       android:
         package: io.ratex
         pluginClass: RaTeXPlugin
+      macos:
+        pluginClass: RaTeXPlugin
+      windows:
+        pluginClass: RatexFlutterPluginCApi
+      linux:
+        pluginClass: RatexFlutterPlugin
 
   # KaTeX fonts bundled with the plugin.
   # GlyphPath items in the DisplayList carry a font ID (e.g. "Math-Italic")
