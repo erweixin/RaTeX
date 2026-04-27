@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use pdf_writer::{Content, Filter, Finish, Name, Pdf, Rect, Ref, Str};
+use pdf_writer::{types::ProcSet, Content, Filter, Finish, Name, Pdf, Rect, Ref, Str};
 use ratex_font::FontId;
 use ratex_types::color::Color;
 use ratex_types::display_item::{DisplayItem, DisplayList};
@@ -80,8 +80,8 @@ pub fn render_to_pdf(
     // Load raw font data.
     let font_data = fonts::load_all_fonts(&options.font_dir).map_err(PdfError::Font)?;
 
-    // Pass 1: collect glyph usage.
-    let usages = fonts::collect_glyph_usage(&display_list.items, &font_data);
+    // Pass 1: collect glyph usage (emoji → raster XObjects; other faces → subset fonts).
+    let collected = fonts::collect_glyph_usage(&display_list.items, &font_data, em);
 
     // Build the PDF.
     let mut pdf = Pdf::new();
@@ -92,10 +92,13 @@ pub fn render_to_pdf(
     let page_ref = alloc.bump();
     let content_ref = alloc.bump();
 
-    // Pass 2: embed fonts.
-    let embedded = fonts::embed_fonts(&mut pdf, &mut alloc, &usages, &font_data)
+    // Pass 2: embed fonts (no Type0 for color emoji — those use images below).
+    let embedded = fonts::embed_fonts(&mut pdf, &mut alloc, &collected.font_usages, &font_data)
         .map_err(PdfError::Font)?;
 
+    let emoji_embedded =
+        fonts::embed_emoji_rasters(&mut pdf, &mut alloc, &collected.emoji_rasters)
+            .map_err(PdfError::Font)?;
 
     // Build lookup: FontId → EmbeddedFont index.
     let font_index: HashMap<FontId, usize> = embedded
@@ -104,12 +107,20 @@ pub fn render_to_pdf(
         .map(|(i, ef)| (ef.font_id, i))
         .collect();
 
+    let emoji_ix: HashMap<u32, usize> = emoji_embedded
+        .iter()
+        .enumerate()
+        .map(|(i, e)| (e.char_code, i))
+        .collect();
+
     // Generate content stream.
     let content_bytes = build_content_stream(
         &display_list.items,
         &embedded,
         &font_index,
         &font_data,
+        &emoji_embedded,
+        &emoji_ix,
         em,
         pad,
         page_h,
@@ -133,11 +144,28 @@ pub fn render_to_pdf(
 
     // Page Resources: font dictionary.
     let mut resources = page.resources();
+    if !emoji_embedded.is_empty() {
+        // Color images via `Do` — include ImageC for older print/PDF pipelines that omit it.
+        resources.proc_sets([
+            ProcSet::Pdf,
+            ProcSet::Text,
+            ProcSet::ImageGrayscale,
+            ProcSet::ImageColor,
+            ProcSet::ImageIndexed,
+        ]);
+    }
     let mut font_dict = resources.fonts();
     for ef in &embedded {
         font_dict.pair(Name(ef.res_name.as_bytes()), ef.type0_ref);
     }
     font_dict.finish();
+    if !emoji_embedded.is_empty() {
+        let mut xobjects = resources.x_objects();
+        for e in &emoji_embedded {
+            xobjects.pair(Name(e.res_name.as_bytes()), e.image_ref);
+        }
+        xobjects.finish();
+    }
     resources.finish();
     page.finish();
 
@@ -163,6 +191,8 @@ fn build_content_stream(
     embedded: &[EmbeddedFont],
     font_index: &HashMap<FontId, usize>,
     font_data: &fonts::RawFontData,
+    emoji_assets: &[fonts::EmbeddedEmojiImage],
+    emoji_ix: &HashMap<u32, usize>,
     em: f64,
     pad: f64,
     page_h: f64,
@@ -194,6 +224,8 @@ fn build_content_stream(
                     embedded,
                     font_index,
                     font_data,
+                    emoji_assets,
+                    emoji_ix,
                 );
             }
             DisplayItem::Line {
@@ -269,6 +301,48 @@ fn flip_y(y: f64, page_h: f64) -> f32 {
 // Glyph
 // ---------------------------------------------------------------------------
 
+/// Color emoji via sbix PNG and image XObject (placement matches `ratex-render::try_blit_raster_glyph`).
+fn emit_emoji_raster(
+    content: &mut Content,
+    px: f64,
+    py: f64,
+    glyph_em: f64,
+    page_h: f64,
+    asset: &fonts::EmbeddedEmojiImage,
+) {
+    let ppm = f64::from(asset.pixels_per_em.max(1));
+    let s = glyph_em / ppm;
+    let disp_w = f64::from(asset.width_px) * s;
+    let disp_h = f64::from(asset.height_px) * s;
+    let top_x = px + f64::from(asset.strike_x) * s;
+    let mut top_y = py - (f64::from(asset.strike_y) + f64::from(asset.height_px)) * s;
+    let center_strike =
+        (f64::from(asset.strike_y) + f64::from(asset.height_px) / 2.0) / ppm;
+    let axis = ratex_font::get_global_metrics(0).axis_height;
+    top_y += (center_strike - axis) * glyph_em;
+    let mut pdf_y_bl = page_h - top_y - disp_h;
+    let pdf_y_top = pdf_y_bl + disp_h;
+    // Many viewers clip XObjects strictly to MediaBox. If sbix placement + axis nudge pushes the
+    // bitmap fully above y=page_h or fully below y=0, nothing paints ("invisible" emoji).
+    if pdf_y_top > page_h {
+        pdf_y_bl = page_h - disp_h;
+    }
+    if pdf_y_bl < 0.0 {
+        pdf_y_bl = 0.0;
+    }
+    content.save_state();
+    content.transform([
+        disp_w as f32,
+        0.0,
+        0.0,
+        disp_h as f32,
+        top_x as f32,
+        pdf_y_bl as f32,
+    ]);
+    content.x_object(Name(asset.res_name.as_bytes()));
+    content.restore_state();
+}
+
 #[allow(clippy::too_many_arguments)]
 fn emit_glyph(
     content: &mut Content,
@@ -283,23 +357,19 @@ fn emit_glyph(
     embedded: &[EmbeddedFont],
     font_index: &HashMap<FontId, usize>,
     font_data: &fonts::RawFontData,
+    emoji_assets: &[fonts::EmbeddedEmojiImage],
+    emoji_ix: &HashMap<u32, usize>,
 ) {
-    let font_id = FontId::parse(font_name).unwrap_or(FontId::MainRegular);
+    // Color emoji: collect/embed keyed only by char_code; draw whenever we embedded an XObject,
+    // without re-resolving (must match [`fonts::collect_glyph_usage`] prefer-color path).
+    if let Some(&ix) = emoji_ix.get(&char_code) {
+        let asset = &emoji_assets[ix];
+        emit_emoji_raster(content, px, py, scale * em, page_h, asset);
+        return;
+    }
 
-    // Resolve the actual font (with fallback to MainRegular).
-    let actual_fid = if font_data.contains_key(&font_id) {
-        font_id
-    } else {
-        FontId::MainRegular
-    };
-
-    let bytes = match font_data.get(&actual_fid) {
-        Some(b) => b,
-        None => return,
-    };
-
-    let gid = match fonts::resolve_glyph_id(bytes, font_id, char_code) {
-        Some(g) => g,
+    let (actual_fid, gid) = match fonts::resolve_pdf_glyph(font_data, font_name, char_code) {
+        Some(p) => p,
         None => return,
     };
 

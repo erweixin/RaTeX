@@ -152,6 +152,8 @@ fn get_metrics_table(font_id: FontId) -> &'static [MetricsEntry] {
         FontId::Size4Regular => metrics_data::SIZE4_REGULAR,
         FontId::TypewriterRegular => metrics_data::TYPEWRITER_REGULAR,
         FontId::CjkRegular => &[],
+        FontId::CjkFallback => &[],
+        FontId::EmojiFallback => &[],
     }
 }
 

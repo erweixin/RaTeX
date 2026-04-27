@@ -24,6 +24,11 @@ pub enum FontId {
     Size4Regular,
     TypewriterRegular,
     CjkRegular,
+    /// System font fallback for characters not present in the primary CJK font
+    /// (e.g. emoji when RATEX_UNICODE_FONT points to a CJK-only font).
+    CjkFallback,
+    /// Color / outline emoji face (e.g. Apple Color Emoji) when `CjkFallback` still has no glyph.
+    EmojiFallback,
 }
 
 impl FontId {
@@ -49,6 +54,8 @@ impl FontId {
             Self::Size4Regular => "Size4-Regular",
             Self::TypewriterRegular => "Typewriter-Regular",
             Self::CjkRegular => "CJK-Regular",
+            Self::CjkFallback => "CJK-Fallback",
+            Self::EmojiFallback => "Emoji-Fallback",
         }
     }
 
@@ -74,6 +81,8 @@ impl FontId {
             "Size4-Regular" => Some(Self::Size4Regular),
             "Typewriter-Regular" => Some(Self::TypewriterRegular),
             "CJK-Regular" => Some(Self::CjkRegular),
+            "CJK-Fallback" => Some(Self::CjkFallback),
+            "Emoji-Fallback" => Some(Self::EmojiFallback),
             _ => None,
         }
     }
@@ -113,6 +122,22 @@ mod tests {
     }
 
     #[test]
+    fn cjk_fallback_roundtrip() {
+        assert_eq!(
+            FontId::parse(FontId::CjkFallback.as_str()),
+            Some(FontId::CjkFallback)
+        );
+    }
+
+    #[test]
+    fn emoji_fallback_roundtrip() {
+        assert_eq!(
+            FontId::parse(FontId::EmojiFallback.as_str()),
+            Some(FontId::EmojiFallback)
+        );
+    }
+
+    #[test]
     fn parse_unknown_font() {
         assert_eq!(FontId::parse("NotARealFont"), None);
     }
@@ -140,6 +165,8 @@ mod tests {
             FontId::Size4Regular,
             FontId::TypewriterRegular,
             FontId::CjkRegular,
+            FontId::CjkFallback,
+            FontId::EmojiFallback,
         ];
         for v in variants {
             assert_eq!(

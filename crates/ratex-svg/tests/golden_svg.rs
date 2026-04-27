@@ -342,3 +342,36 @@ fn golden_svg_mhchem_pass_rate() {
         2.0,
     );
 }
+
+/// Standalone SVG: color emoji embedded as `data:image/png;base64` (Apple Color Emoji sbix).
+#[cfg(target_os = "macos")]
+mod macos_emoji_svg {
+    use ratex_layout::to_display_list;
+    use ratex_layout::{layout, LayoutOptions};
+    use ratex_parser::parser::parse;
+    use ratex_svg::{render_to_svg, SvgOptions};
+
+    #[test]
+    fn formula12_standalone_svg_has_png_data_url_for_emoji() {
+        std::env::set_var(
+            "RATEX_UNICODE_FONT",
+            "/System/Library/Fonts/Supplemental/AppleGothic.ttf",
+        );
+        let ast = parse(r"\text{😀} \quad x").unwrap();
+        let lbox = layout(&ast, &LayoutOptions::default());
+        let dl = to_display_list(&lbox);
+        let opts = SvgOptions {
+            font_size: 40.0,
+            padding: 10.0,
+            stroke_width: 1.5,
+            embed_glyphs: true,
+            font_dir: concat!(env!("CARGO_MANIFEST_DIR"), "/../../fonts").to_string(),
+        };
+        let svg = render_to_svg(&dl, &opts);
+        assert!(
+            svg.contains("data:image/png;base64,"),
+            "expected embedded PNG for emoji, got snippet: {}",
+            &svg[..svg.len().min(500)]
+        );
+    }
+}

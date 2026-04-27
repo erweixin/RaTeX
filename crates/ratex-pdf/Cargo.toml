@@ -14,7 +14,9 @@ ratex-font  = { workspace = true }
 pdf-writer  = "0.14"
 subsetter   = "0.2"
 skrifa      = "0.42"
+ab_glyph    = "0.2"
 miniz_oxide = "0.9"
+png = "0.17"
 ratex-unicode-font = { workspace = true }
 
 ratex-layout      = { workspace = true, optional = true }
@@ -34,3 +36,7 @@ required-features = ["cli"]
 [dev-dependencies]
 ratex-layout = { workspace = true }
 ratex-parser = { workspace = true }
+
+[[test]]
+name = "emoji_pdf_macos"
+path = "tests/emoji_pdf_macos.rs"

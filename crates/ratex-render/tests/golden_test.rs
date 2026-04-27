@@ -356,3 +356,35 @@ fn golden_mhchem_pass_rate() {
     );
 }
 
+/// macOS: AppleGothic vs Arial Unicode cmap probes for mhchem CJK fallbacks.
+#[cfg(target_os = "macos")]
+mod macos_font_cjk_cmap {
+    use ab_glyph::Font as _;
+
+    #[test]
+    fn apple_gothic_missing_hanzi_is_glyph_zero() {
+        let bytes =
+            std::fs::read("/System/Library/Fonts/Supplemental/AppleGothic.ttf").expect("AppleGothic");
+        let font = ab_glyph::FontRef::try_from_slice(&bytes).expect("parse");
+        for ch in ['氧', '碳'] {
+            let gid = font.glyph_id(ch);
+            assert_eq!(gid.0, 0, "{ch:?} should be unmapped in AppleGothic");
+        }
+        for ch in ['二', '化'] {
+            let gid = font.glyph_id(ch);
+            assert_ne!(gid.0, 0, "{ch:?} should exist in AppleGothic");
+        }
+    }
+
+    #[test]
+    fn arial_unicode_maps_fallback_hanzi() {
+        let bytes =
+            std::fs::read("/System/Library/Fonts/Supplemental/Arial Unicode.ttf").expect("Arial");
+        let font = ab_glyph::FontRef::try_from_slice(&bytes).expect("parse");
+        for ch in ['氧', '碳', '二', '化'] {
+            let gid = font.glyph_id(ch);
+            assert_ne!(gid.0, 0, "{ch:?} should map in Arial Unicode");
+        }
+    }
+}
+
