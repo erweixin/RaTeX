@@ -85,7 +85,8 @@ Authoritative protocol: see [`docs/DISPLAYLIST_JSON_PROTOCOL.md`](DISPLAYLIST_JS
   "items": [
     // ---- GlyphPath: a glyph rendered via bundled KaTeX font ----
     // Internally-tagged: "type" key is at the same level as other fields.
-    // "font" is a short ID like "Main-Regular", "Math-Italic", "Size1-Regular";
+    // "font" is a short ID like "Main-Regular", "Math-Italic", "Size1-Regular", "CJK-Regular";
+    // "CJK-Regular" denotes a system Unicode font for glyphs outside the KaTeX set (CJK ideographs, emoji, etc.).
     // platform renderers prepend "KaTeX_" to map to the font family name.
     {
       "type": "GlyphPath",

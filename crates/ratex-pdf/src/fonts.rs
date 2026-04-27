@@ -131,7 +131,7 @@ pub(crate) fn collect_glyph_usage(
         }
     }
 
-    usage_map
+    let mut usages: Vec<FontUsage> = usage_map
         .into_iter()
         .map(|(font_id, set)| {
             let mut glyphs = BTreeMap::new();
@@ -140,7 +140,11 @@ pub(crate) fn collect_glyph_usage(
             }
             FontUsage { font_id, glyphs }
         })
-        .collect()
+        .collect();
+    // Sort by font name string for deterministic ordering across runs.
+    // HashMap iteration order varies per process due to random hash seeds.
+    usages.sort_by_key(|u| u.font_id.as_str().to_string());
+    usages
 }
 
 /// Result of embedding one font into the PDF.
