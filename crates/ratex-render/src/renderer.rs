@@ -207,16 +207,20 @@ fn load_all_fonts(font_dir: &str) -> Result<HashMap<FontId, Vec<u8>>, String> {
     Ok(data)
 }
 
+fn sfnt_collection_index(id: FontId) -> u32 {
+    match id {
+        FontId::EmojiFallback => ratex_unicode_font::emoji_font_face_index().unwrap_or(0),
+        FontId::CjkRegular => ratex_unicode_font::unicode_font_face_index().unwrap_or(0),
+        FontId::CjkFallback => ratex_unicode_font::fallback_font_face_index().unwrap_or(0),
+        _ => 0,
+    }
+}
+
 fn build_font_cache(data: &HashMap<FontId, Vec<u8>>) -> Result<HashMap<FontId, FontRef<'_>>, String> {
     let mut cache = HashMap::new();
-    let emoji_idx = ratex_unicode_font::emoji_font_face_index().unwrap_or(0);
     for (id, bytes) in data {
-        let font = if *id == FontId::EmojiFallback {
-            FontRef::try_from_slice_and_index(bytes, emoji_idx)
-        } else {
-            FontRef::try_from_slice(bytes)
-        }
-        .map_err(|e| format!("Failed to parse font {:?}: {}", id, e))?;
+        let font = FontRef::try_from_slice_and_index(bytes, sfnt_collection_index(*id))
+            .map_err(|e| format!("Failed to parse font {:?}: {}", id, e))?;
         cache.insert(*id, font);
     }
     Ok(cache)

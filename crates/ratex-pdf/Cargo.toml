@@ -36,7 +36,3 @@ required-features = ["cli"]
 [dev-dependencies]
 ratex-layout = { workspace = true }
 ratex-parser = { workspace = true }
-
-[[test]]
-name = "emoji_pdf_macos"
-path = "tests/emoji_pdf_macos.rs"

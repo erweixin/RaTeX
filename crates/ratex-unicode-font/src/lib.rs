@@ -7,6 +7,8 @@
 //!   missing from a CJK-only `RATEX_UNICODE_FONT`).
 //! - `load_emoji_font()` — color / emoji faces (e.g. Apple Color Emoji) when `CjkFallback` still
 //!   has no usable outline for a codepoint (common with Arial Unicode + BMP emoji).
+//! - `unicode_font_face_index` / `fallback_font_face_index` / `emoji_font_face_index` — TTC face
+//!   indices for `FontRef::try_from_slice_and_index` when discovery returns a font collection.
 //!
 //! Each result is cached in a `OnceLock` and computed at most once per process.
 
@@ -16,8 +18,9 @@ pub use emoji_raster::{emoji_png_raster_for_char, emoji_raster_for_char, EmojiRa
 
 use std::sync::OnceLock;
 
-static UNICODE_FONT: OnceLock<Option<Vec<u8>>> = OnceLock::new();
-static SYSTEM_FALLBACK_FONT: OnceLock<Option<Vec<u8>>> = OnceLock::new();
+/// `(full font file bytes, face index within TTC or 0 for single-font / unknown collection face)`.
+static UNICODE_FONT: OnceLock<Option<(Vec<u8>, u32)>> = OnceLock::new();
+static SYSTEM_FALLBACK_FONT: OnceLock<Option<(Vec<u8>, u32)>> = OnceLock::new();
 /// `(full font file bytes, face index within TTC or 0 for single font)`.
 static EMOJI_FONT: OnceLock<Option<(Vec<u8>, u32)>> = OnceLock::new();
 
@@ -30,10 +33,21 @@ static EMOJI_FONT: OnceLock<Option<(Vec<u8>, u32)>> = OnceLock::new();
 ///
 /// The result is cached after the first call.
 pub fn load_unicode_font() -> Option<&'static [u8]> {
+    load_unicode_font_with_index().map(|(b, _)| b)
+}
+
+/// Same as [`load_unicode_font`], plus OpenType **collection** index for `Face::parse` /
+/// `FontRef::try_from_slice_and_index` when the bytes are a `.ttc`.
+pub fn load_unicode_font_with_index() -> Option<(&'static [u8], u32)> {
     UNICODE_FONT
         .get_or_init(load_unicode_fallback_font)
         .as_ref()
-        .map(|v| v.as_slice())
+        .map(|(v, i)| (v.as_slice(), *i))
+}
+
+/// Collection index for the cached primary Unicode face (`0` when not a collection).
+pub fn unicode_font_face_index() -> Option<u32> {
+    load_unicode_font_with_index().map(|(_, i)| i)
 }
 
 /// System fallback font for characters not covered by the primary unicode font.
@@ -44,10 +58,18 @@ pub fn load_unicode_font() -> Option<&'static [u8]> {
 ///
 /// The result is cached after the first call.
 pub fn load_fallback_font() -> Option<&'static [u8]> {
+    load_fallback_font_with_index().map(|(b, _)| b)
+}
+
+pub fn load_fallback_font_with_index() -> Option<(&'static [u8], u32)> {
     SYSTEM_FALLBACK_FONT
         .get_or_init(discover_system_font)
         .as_ref()
-        .map(|v| v.as_slice())
+        .map(|(v, i)| (v.as_slice(), *i))
+}
+
+pub fn fallback_font_face_index() -> Option<u32> {
+    load_fallback_font_with_index().map(|(_, i)| i)
 }
 
 /// Raw font bytes for a system emoji face (color font), or `None` if none was found.
@@ -94,12 +116,13 @@ fn is_sfnt_container(bytes: &[u8]) -> bool {
     is_sfnt_single_font(bytes) || bytes.get(0..4) == Some(b"ttcf")
 }
 
-fn load_unicode_fallback_font() -> Option<Vec<u8>> {
+fn load_unicode_fallback_font() -> Option<(Vec<u8>, u32)> {
     // 1. User-specified font via RATEX_UNICODE_FONT
     if let Ok(p) = std::env::var("RATEX_UNICODE_FONT") {
         if let Ok(bytes) = std::fs::read(std::path::Path::new(&p)) {
             if is_sfnt_container(&bytes) {
-                return Some(bytes);
+                // Default face 0; multi-face `.ttc` can be targeted via fontdb discovery without env.
+                return Some((bytes, 0));
             }
         }
     }
@@ -112,7 +135,7 @@ fn load_unicode_fallback_font() -> Option<Vec<u8>> {
 ///
 /// Prioritizes fonts with broad Unicode coverage (emoji, symbols, CJK) so that the fallback
 /// is useful even when the primary font (e.g. a narrow Korean font) lacks many glyphs.
-fn discover_system_font() -> Option<Vec<u8>> {
+fn discover_system_font() -> Option<(Vec<u8>, u32)> {
     // 1. Typical system paths with broad Unicode coverage
     #[rustfmt::skip]
     let candidates: &[&str] = &[
@@ -135,7 +158,7 @@ fn discover_system_font() -> Option<Vec<u8>> {
     for path in candidates {
         if let Ok(bytes) = std::fs::read(std::path::Path::new(path)) {
             if is_valid_font(&bytes) {
-                return Some(bytes);
+                return Some((bytes, 0));
             }
         }
     }
@@ -182,13 +205,13 @@ fn discover_system_font() -> Option<Vec<u8>> {
             style: fontdb::Style::Normal,
         };
         if let Some(id) = db.query(&query) {
-            if let Some((bytes, _)) = db
+            if let Some(pair) = db
                 .with_face_data(id, |data, index| {
                     is_sfnt_container(data).then(|| (data.to_vec(), index))
                 })
                 .flatten()
             {
-                return Some(bytes);
+                return Some(pair);
             }
         }
     }
@@ -201,29 +224,49 @@ fn discover_system_font() -> Option<Vec<u8>> {
         style: fontdb::Style::Normal,
     };
     if let Some(id) = db.query(&query) {
-        if let Some((bytes, _)) = db
+        if let Some(pair) = db
             .with_face_data(id, |data, index| {
                 is_sfnt_container(data).then(|| (data.to_vec(), index))
             })
             .flatten()
         {
-            return Some(bytes);
+            return Some(pair);
         }
     }
 
-    // 4. Brute-force fontdb scan (last resort).
-    for face in db.faces() {
-        if let Some((bytes, _)) = db
+    // 4. Brute-force fontdb scan (last resort): deterministic order + skip color-emoji bitmap faces
+    // (they lack CJK coverage and vary widely across installs).
+    let mut faces: Vec<&fontdb::FaceInfo> = db.faces().collect();
+    faces.retain(|f| !is_likely_color_bitmap_emoji_face(f));
+    faces.sort_by(|a, b| {
+        a.post_script_name
+            .cmp(&b.post_script_name)
+            .then_with(|| a.index.cmp(&b.index))
+            .then_with(|| a.id.cmp(&b.id))
+    });
+    for face in faces {
+        if let Some(pair) = db
             .with_face_data(face.id, |data, index| {
                 is_sfnt_container(data).then(|| (data.to_vec(), index))
             })
             .flatten()
         {
-            return Some(bytes);
+            return Some(pair);
         }
     }
 
     None
+}
+
+/// Color / bitmap emoji families are poor universal text fallbacks and ordering differs by OS.
+#[inline]
+fn is_likely_color_bitmap_emoji_face(face: &fontdb::FaceInfo) -> bool {
+    let scan = |s: &str| {
+        let l = s.to_ascii_lowercase();
+        (l.contains("color") && l.contains("emoji")) || l.ends_with(" ui emoji")
+    };
+    scan(face.post_script_name.as_str())
+        || face.families.iter().any(|(name, _)| scan(name.as_str()))
 }
 
 fn discover_emoji_font() -> Option<(Vec<u8>, u32)> {

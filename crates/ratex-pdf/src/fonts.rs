@@ -90,12 +90,8 @@ pub(crate) fn load_all_fonts(font_dir: &str) -> Result<RawFontData, String> {
 /// `ab_glyph` / OpenType cmap (same stack as PNG/SVG).
 fn resolve_glyph_id_abglyph(raw_bytes: &[u8], font_id: FontId, char_code: u32) -> Option<u16> {
     let ch = ratex_font::katex_ttf_glyph_char(font_id, char_code);
-    let font = if font_id == FontId::EmojiFallback {
-        let idx = ratex_unicode_font::emoji_font_face_index().unwrap_or(0);
-        ab_glyph::FontRef::try_from_slice_and_index(raw_bytes, idx).ok()?
-    } else {
-        ab_glyph::FontRef::try_from_slice(raw_bytes).ok()?
-    };
+    let idx = skrifa_collection_index(font_id);
+    let font = ab_glyph::FontRef::try_from_slice_and_index(raw_bytes, idx).ok()?;
     let gid = font.glyph_id(ch);
     if gid.0 == 0 {
         None
@@ -106,10 +102,11 @@ fn resolve_glyph_id_abglyph(raw_bytes: &[u8], font_id: FontId, char_code: u32) -
 
 #[inline]
 fn skrifa_collection_index(face_id: FontId) -> u32 {
-    if face_id == FontId::EmojiFallback {
-        ratex_unicode_font::emoji_font_face_index().unwrap_or(0)
-    } else {
-        0
+    match face_id {
+        FontId::EmojiFallback => ratex_unicode_font::emoji_font_face_index().unwrap_or(0),
+        FontId::CjkRegular => ratex_unicode_font::unicode_font_face_index().unwrap_or(0),
+        FontId::CjkFallback => ratex_unicode_font::fallback_font_face_index().unwrap_or(0),
+        _ => 0,
     }
 }
 
@@ -122,7 +119,7 @@ fn resolve_glyph_id_for_face(raw_bytes: &[u8], font_id: FontId, char_code: u32) 
     resolve_glyph_id_abglyph(raw_bytes, font_id, char_code)
 }
 
-/// True if drawing the glyph emits at least one path command (matches PNG/SVG empty-outline rules).
+/// True if the glyph has drawable outline segments (not just a lone `move_to` / empty COLR mask).
 pub(crate) fn glyph_has_nonempty_outline(raw_bytes: &[u8], face_id: FontId, gid: u16) -> bool {
     let font = match SfFontRef::from_index(raw_bytes, skrifa_collection_index(face_id)) {
         Ok(f) => f,
@@ -133,25 +130,26 @@ pub(crate) fn glyph_has_nonempty_outline(raw_bytes: &[u8], face_id: FontId, gid:
         return false;
     };
     #[derive(Default)]
-    struct CmdCount(usize);
-    impl OutlinePen for CmdCount {
-        fn move_to(&mut self, _: f32, _: f32) {
-            self.0 += 1;
-        }
+    struct PenStats {
+        /// `line_to` / `quad_to` / `curve_to` only — excludes `move_to` and `close`.
+        draws: usize,
+    }
+    impl OutlinePen for PenStats {
+        fn move_to(&mut self, _: f32, _: f32) {}
         fn line_to(&mut self, _: f32, _: f32) {
-            self.0 += 1;
+            self.draws += 1;
         }
         fn quad_to(&mut self, _: f32, _: f32, _: f32, _: f32) {
-            self.0 += 1;
+            self.draws += 1;
         }
         fn curve_to(&mut self, _: f32, _: f32, _: f32, _: f32, _: f32, _: f32) {
-            self.0 += 1;
+            self.draws += 1;
         }
         fn close(&mut self) {}
     }
-    let mut pen = CmdCount::default();
+    let mut pen = PenStats::default();
     let settings = DrawSettings::unhinted(Size::new(16.0), LocationRef::default());
-    glyph.draw(settings, &mut pen).is_ok() && pen.0 > 0
+    glyph.draw(settings, &mut pen).is_ok() && pen.draws > 0
 }
 
 /// Codepoints that must use sbix PNG rasters in PDF (not vector subset), when a color emoji
@@ -459,7 +457,7 @@ pub(crate) fn embed_fonts(
         }
 
         // Subset the font.
-        let subsetted = subsetter::subset(raw, 0, &remapper)
+        let subsetted = subsetter::subset(raw, skrifa_collection_index(usage.font_id), &remapper)
             .map_err(|e| format!("Subset error for {:?}: {e}", usage.font_id))?;
 
         // Compress the subset.
