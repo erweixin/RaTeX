@@ -94,6 +94,9 @@ class _DemoPageState extends State<DemoPage> {
     (name: 'Middle delimiter',     latex: r'\left( \frac{a}{b} \middle| \frac{c}{d} \right)'),
     (name: 'FTC',                  latex: r'\frac{d}{dx}\left[\int_a^x f(t)\,dt\right] = f(x)'),
     (name: "Stokes' theorem",      latex: r'\oint_{\partial\Sigma} \mathbf{F}\cdot d\mathbf{r} = \iint_\Sigma (\nabla\times\mathbf{F})\cdot d\mathbf{S}'),
+    (name: 'CJK · 勾股定理',       latex: r'\text{勾股定理：} a^2+b^2=c^2'),
+    (name: 'CJK · mhchem + 二氧化碳', latex: r'\ce{CO2 + C -> 2 CO} \quad \text{二氧化碳}'),
+    (name: 'Emoji · 笑脸',         latex: r'\text{😊} \quad E=mc^2'),
   ];
 
   final _controller = TextEditingController(
@@ -333,6 +336,11 @@ class _ShowcaseCard extends StatelessWidget {
             const SizedBox(height: 6),
             buildInlineMath(
               r'If $A = \begin{pmatrix} a & b \\ c & d \end{pmatrix}$, then $\det A = ad - bc$.',
+              mathFontSize: 19,
+            ),
+            const SizedBox(height: 6),
+            buildInlineMath(
+              r'中文：$\text{勾股定理：} a^2+b^2=c^2$（毕达哥拉斯定理）。',
               mathFontSize: 19,
             ),
             // Block formulas

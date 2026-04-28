@@ -14,6 +14,9 @@ struct ContentView: View {
         ("Schrödinger equation", #"i\hbar\frac{\partial}{\partial t}\Psi(\mathbf{r},t) = \left[-\frac{\hbar^2}{2m}\nabla^2 + V(\mathbf{r},t)\right]\Psi(\mathbf{r},t)"#),
         ("Taylor series",        #"f(x) = \sum_{n=0}^{\infty}\frac{f^{(n)}(0)}{n!}x^n = f(0) + f'(0)x + \frac{f''(0)}{2!}x^2 + \frac{f'''(0)}{3!}x^3 + \cdots"#),
         ("酸碱中和",             #"\text{酸} + \text{碱} \rightarrow 盐 + 水"#),
+        ("CJK · 勾股定理",       #"\text{勾股定理：} a^2+b^2=c^2"#),
+        ("CJK · mhchem + 二氧化碳", #"\ce{CO2 + C -> 2 CO} \quad \text{二氧化碳}"#),
+        ("Emoji · 笑脸",         #"\text{😊} \quad E=mc^2"#),
     ]
 
     @State private var customLatex: String = #"\frac{d}{dx}\left[\int_a^x f(t)\,dt\right] = f(x)"#
@@ -129,6 +132,12 @@ struct ShowcaseView: View {
                     Text(", then")
                     RaTeXFormula(latex: #"\det A = ad - bc"#, fontSize: fs, onError: { _ in })
                     Text(".")
+                }
+
+                FlowLayout(horizontalSpacing: 3, lineSpacing: 6) {
+                    Text("中文：勾股定理是")
+                    RaTeXFormula(latex: #"\text{勾股定理：} a^2+b^2=c^2"#, fontSize: fs, onError: { _ in })
+                    Text("。")
                 }
             }
 

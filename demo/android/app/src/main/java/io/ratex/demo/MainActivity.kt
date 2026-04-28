@@ -32,6 +32,7 @@ class MainActivity : AppCompatActivity() {
         "A circle of radius \$r$ has area \$S = \\pi r^2$ and circumference \$C = 2\\pi r$.",
         "The golden ratio \$\\varphi = \\frac{1+\\sqrt{5}}{2}$ satisfies \$\\varphi^2 = \\varphi + 1$.",
         "If \$A = \\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}$, then \$\\det A = ad - bc$.",
+        "中文：勾股定理是 \$\text{勾股定理：} a^2+b^2=c^2$。",
     )
 
     /** Block formulas for the showcase section: (label, LaTeX). */
@@ -64,6 +65,9 @@ class MainActivity : AppCompatActivity() {
         "Bessel function"           to """J_n(x) = \frac{1}{\pi}\int_0^{\pi}\cos(n\tau - x\sin\tau)\,d\tau""",
         "Stokes' theorem"           to """\oint_{\partial\Sigma}\mathbf{F}\cdot d\mathbf{r} = \iint_{\Sigma}(\nabla\times\mathbf{F})\cdot d\mathbf{S}""",
         "Laplace transform"         to """\mathcal{L}\{f(t)\} = \int_0^{\infty} f(t)\,e^{-st}\,dt""",
+        "CJK · 勾股定理"             to """\text{勾股定理：} a^2+b^2=c^2""",
+        "CJK · mhchem + 二氧化碳"   to """\ce{CO2 + C -> 2 CO} \quad \text{二氧化碳}""",
+        "Emoji · 笑脸"               to """\text{😊} \quad E=mc^2""",
     )
 
     // ── Inline mix rows: (prefix, LaTeX, suffix) ──────────────────────────────

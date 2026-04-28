@@ -36,6 +36,12 @@ const PAGES = [
   { id: "2", latex: EXPR2 },
   { id: "3", latex: EXPR3 },
   { id: "4", latex: String.raw`E = mc^2` },
+  { id: "5", latex: String.raw`\text{勾股定理：} a^2+b^2=c^2` },
+  {
+    id: "6",
+    latex: String.raw`\ce{CO2 + C -> 2 CO} \quad \text{二氧化碳}`,
+  },
+  { id: "7", latex: String.raw`\text{😊} \quad E=mc^2` },
 ];
 
 // ─── Status indicator ────────────────────────────────────────────────

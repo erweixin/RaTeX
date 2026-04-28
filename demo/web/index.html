@@ -8,6 +8,8 @@
   <!-- KaTeX reference renderer (CDN) -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" crossorigin="anonymous" />
   <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" crossorigin="anonymous" id="katex-script"></script>
+  <!-- mhchem: \ce / \pu — load after katex.min.js so KaTeX reference matches RaTeX for chemistry demos -->
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/mhchem.min.js" crossorigin="anonymous" id="katex-mhchem-script"></script>
 
   <!-- RaTeX math fonts -->
   <link rel="stylesheet" href="../platforms/web/fonts.css" />
@@ -220,6 +222,9 @@ const EXAMPLES = [
   { label: "Determinant",           latex: "\\det(A) = \\sum_{\\sigma \\in S_n} \\text{sgn}(\\sigma) \\prod_{i=1}^n a_{i,\\sigma(i)}" },
   { label: "Stokes' theorem",       latex: "\\oint_{\\partial \\Sigma} \\mathbf{F}\\cdot d\\mathbf{r} = \\iint_{\\Sigma}(\\nabla\\times\\mathbf{F})\\cdot d\\mathbf{S}" },
   { label: "Einstein field eq.",    latex: "G_{\\mu\\nu} + \\Lambda g_{\\mu\\nu} = \\frac{8\\pi G}{c^4} T_{\\mu\\nu}" },
+  { label: "CJK · Pythagoras (中文)", latex: "\\text{勾股定理：} a^2+b^2=c^2" },
+  { label: "CJK · mhchem + 二氧化碳", latex: "\\ce{CO2 + C -> 2 CO} \\quad \\text{二氧化碳}" },
+  { label: "Emoji · smile + formula", latex: "\\text{😊} \\quad E=mc^2" },
 ];
 
 // ── font id → CSS font ──
@@ -383,12 +388,21 @@ function buildExamples() {
   }
 }
 
-// ── boot ──
-document.getElementById('katex-script').addEventListener('load', () => {
+// ── boot: wait for KaTeX core + mhchem (so \\ce previews in example cards work) ──
+let katexScriptsPending = 2;
+function onKaTeXStackReady() {
+  katexScriptsPending--;
+  if (katexScriptsPending > 0) return;
   katexReady = true;
   buildExamples();
   tryEnableButton();
   loadFontsAndWasm();
+}
+document.getElementById('katex-script').addEventListener('load', onKaTeXStackReady);
+document.getElementById('katex-mhchem-script').addEventListener('load', onKaTeXStackReady);
+document.getElementById('katex-mhchem-script').addEventListener('error', () => {
+  console.warn('mhchem failed to load — \\ce may not render in KaTeX panel');
+  onKaTeXStackReady();
 });
 
 async function loadFontsAndWasm() {

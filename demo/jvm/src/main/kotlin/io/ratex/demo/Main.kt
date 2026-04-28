@@ -40,6 +40,9 @@ private val formulas = listOf(
     "Stokes' theorem"          to """\oint_{\partial\Sigma}\mathbf{F}\cdot d\mathbf{r} = \iint_{\Sigma}(\nabla\times\mathbf{F})\cdot d\mathbf{S}""",
     "Laplace transform"        to """\mathcal{L}\{f(t)\} = \int_0^{\infty} f(t)\,e^{-st}\,dt""",
     "Taylor series"            to """f(x) = \sum_{n=0}^{\infty}\frac{f^{(n)}(0)}{n!}x^n""",
+    "CJK · 勾股定理"           to """\text{勾股定理：} a^2+b^2=c^2""",
+    "CJK · mhchem + 二氧化碳" to """\ce{CO2 + C -> 2 CO} \quad \text{二氧化碳}""",
+    "Emoji · 笑脸"             to """\text{😊} \quad E=mc^2""",
 )
 
 private const val FONT_SIZE = 32f
