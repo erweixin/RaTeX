@@ -1,6 +1,5 @@
 /// Comprehensive test suite for ratex-parser, organized by feature area.
 /// Tests are designed to validate against KaTeX's parsing behavior.
-
 #[cfg(test)]
 mod core_parsing {
     use crate::parser::parse;

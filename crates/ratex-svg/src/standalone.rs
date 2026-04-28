@@ -58,20 +58,17 @@ pub(crate) fn load_all_fonts(font_dir: &str) -> Result<HashMap<FontId, Vec<u8>>,
 
     // Load system Unicode font for CJK/fallback glyphs.
     if let Some(cjk_bytes) = ratex_unicode_font::load_unicode_font() {
-        if !data.contains_key(&FontId::CjkRegular) {
-            data.insert(FontId::CjkRegular, cjk_bytes.to_vec());
-        }
+        data.entry(FontId::CjkRegular)
+            .or_insert_with(|| cjk_bytes.to_vec());
     }
     // Secondary system fallback for characters the primary CJK font doesn't cover.
     if let Some(fb_bytes) = ratex_unicode_font::load_fallback_font() {
-        if !data.contains_key(&FontId::CjkFallback) {
-            data.insert(FontId::CjkFallback, fb_bytes.to_vec());
-        }
+        data.entry(FontId::CjkFallback)
+            .or_insert_with(|| fb_bytes.to_vec());
     }
     if let Some(emoji_bytes) = ratex_unicode_font::load_emoji_font() {
-        if !data.contains_key(&FontId::EmojiFallback) {
-            data.insert(FontId::EmojiFallback, emoji_bytes.to_vec());
-        }
+        data.entry(FontId::EmojiFallback)
+            .or_insert_with(|| emoji_bytes.to_vec());
     }
 
     Ok(data)

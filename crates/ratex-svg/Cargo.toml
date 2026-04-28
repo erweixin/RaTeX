@@ -42,8 +42,3 @@ resvg = { version = "0.47", default-features = false }
 name = "golden_svg"
 path = "tests/golden_svg.rs"
 required-features = ["standalone"]
-
-[[test]]
-name = "emoji_svg_macos"
-path = "tests/emoji_svg_macos.rs"
-required-features = ["standalone"]
