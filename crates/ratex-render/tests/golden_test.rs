@@ -257,6 +257,91 @@ fn golden_test_pass_rate() {
     );
 }
 
+fn count_ink_coverage(png_bytes: &[u8]) -> (f64, u32, u32) {
+    let decoder = png::Decoder::new(std::io::Cursor::new(png_bytes));
+    let mut reader = decoder.read_info().expect("decode PNG info");
+    let mut buf = vec![0u8; reader.output_buffer_size()];
+    let info = reader.next_frame(&mut buf).expect("decode PNG frame");
+    buf.truncate(info.buffer_size());
+
+    let total = (info.width * info.height) as usize;
+    let mut non_white = 0usize;
+    for px in buf.chunks_exact(4) {
+        if px[0] < 240 || px[1] < 240 || px[2] < 240 {
+            non_white += 1;
+        }
+    }
+    (non_white as f64 / total as f64, info.width, info.height)
+}
+
+/// End-to-end smoke: verifies CJK and emoji text produces non-blank PNG output.
+/// Skips gracefully when no system Unicode font is found.
+#[test]
+fn cjk_smoke_non_blank_rendering() {
+    if ratex_unicode_font::load_unicode_font().is_none() {
+        eprintln!("SKIP cjk_smoke: no system Unicode font found");
+        return;
+    }
+
+    let font_dir = font_dir();
+    if !std::path::Path::new(&font_dir).exists() {
+        eprintln!("SKIP cjk_smoke: font_dir missing");
+        return;
+    }
+
+    let render_opts = RenderOptions {
+        font_size: 40.0,
+        padding: 10.0,
+        font_dir,
+        device_pixel_ratio: 1.0,
+    };
+    let layout_opts = LayoutOptions::default();
+
+    // CJK text: hard assertion — must render on any system with a CJK-capable font.
+    let cjk_expr = r"\text{你好世界}";
+    let ast = parse(cjk_expr).expect("parse CJK");
+    let lbox = layout(&ast, &layout_opts);
+    let dl = to_display_list(&lbox);
+    let png_bytes = render_to_png(&dl, &render_opts).expect("render CJK");
+    let (cjk_ratio, _, _) = count_ink_coverage(&png_bytes);
+    assert!(
+        cjk_ratio > 0.005,
+        "CJK smoke '你好世界': only {:.3}% non-white pixels (expected > 0.5%)",
+        cjk_ratio * 100.0
+    );
+    eprintln!("CJK smoke '你好世界': {:.1}% ink coverage", cjk_ratio * 100.0);
+
+    // Emoji: test individual characters that may or may not be in the discovered font.
+    // Fonts like Arial Unicode have CJK but limited emoji; Android/Noto Emoji have emoji.
+    // We check each individually and report coverage; at least one must render to pass.
+    let emoji_chars = ['😊', '★', '⭐', '🎉', '✅'];
+    let mut any_emoji_rendered = false;
+    for ch in emoji_chars {
+        let expr = format!(r"\text{{{ch}}}");
+        let ast = match parse(&expr) {
+            Ok(a) => a,
+            Err(_) => continue,
+        };
+        let lbox = layout(&ast, &layout_opts);
+        let dl = to_display_list(&lbox);
+        let png_bytes = match render_to_png(&dl, &render_opts) {
+            Ok(d) => d,
+            Err(_) => continue,
+        };
+        let (ratio, _, _) = count_ink_coverage(&png_bytes);
+        if ratio > 0.001 {
+            any_emoji_rendered = true;
+            eprintln!("CJK smoke '\\text{{{ch}}}': {:.1}% ink coverage", ratio * 100.0);
+        } else {
+            eprintln!("CJK smoke '\\text{{{ch}}}': glyph not in fallback font (0% ink)");
+        }
+    }
+    assert!(
+        any_emoji_rendered,
+        "CJK smoke: no emoji/misc-symbol characters rendered — system font may lack all tested glyphs"
+    );
+}
+
 /// mhchem (`\\ce` / `\\pu`): uses [tests/golden/test_case_ce.txt](../../tests/golden/test_case_ce.txt) and `fixtures_ce/`.
 #[test]
 fn golden_mhchem_pass_rate() {
@@ -269,5 +354,37 @@ fn golden_mhchem_pass_rate() {
         50.0,
         2.0,
     );
+}
+
+/// macOS: AppleGothic vs Arial Unicode cmap probes for mhchem CJK fallbacks.
+#[cfg(target_os = "macos")]
+mod macos_font_cjk_cmap {
+    use ab_glyph::Font as _;
+
+    #[test]
+    fn apple_gothic_missing_hanzi_is_glyph_zero() {
+        let bytes =
+            std::fs::read("/System/Library/Fonts/Supplemental/AppleGothic.ttf").expect("AppleGothic");
+        let font = ab_glyph::FontRef::try_from_slice(&bytes).expect("parse");
+        for ch in ['氧', '碳'] {
+            let gid = font.glyph_id(ch);
+            assert_eq!(gid.0, 0, "{ch:?} should be unmapped in AppleGothic");
+        }
+        for ch in ['二', '化'] {
+            let gid = font.glyph_id(ch);
+            assert_ne!(gid.0, 0, "{ch:?} should exist in AppleGothic");
+        }
+    }
+
+    #[test]
+    fn arial_unicode_maps_fallback_hanzi() {
+        let bytes =
+            std::fs::read("/System/Library/Fonts/Supplemental/Arial Unicode.ttf").expect("Arial");
+        let font = ab_glyph::FontRef::try_from_slice(&bytes).expect("parse");
+        for ch in ['氧', '碳', '二', '化'] {
+            let gid = font.glyph_id(ch);
+            assert_ne!(gid.0, 0, "{ch:?} should map in Arial Unicode");
+        }
+    }
 }
 

@@ -76,7 +76,7 @@ Enums use **serde internally-tagged** format:
 }
 ```
 
-- **font**: short KaTeX-style font ID (e.g. `Main-Regular`, `Math-Italic`, `Size1-Regular`). Platform renderers map this to the actual font resource.
+- **font**: short KaTeX-style font ID (e.g. `Main-Regular`, `Math-Italic`, `Size1-Regular`, `CJK-Regular`). Platform renderers map this to the actual font resource. `CJK-Regular` indicates a system Unicode font for glyphs outside the KaTeX set (CJK ideographs, emoji, etc.).
 - **char_code**: Unicode code point.
 - **commands**: **not currently serialized** for `GlyphPath` (intentionally omitted to reduce payload). Decoders must not require it.
 

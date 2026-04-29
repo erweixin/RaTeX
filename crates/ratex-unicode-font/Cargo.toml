@@ -1,0 +1,9 @@
+[package]
+name = "ratex-unicode-font"
+version.workspace = true
+edition.workspace = true
+description = "System Unicode font discovery for RaTeX fallback rendering"
+
+[dependencies]
+fontdb = { version = "0.23", features = ["std"] }
+ttf-parser = "0.25"

@@ -12,6 +12,7 @@ members = [
     "crates/ratex-svg",
     "crates/ratex-wasm",
     "crates/ratex-pdf",
+    "crates/ratex-unicode-font",
 ]
 
 [workspace.package]
@@ -32,6 +33,7 @@ ratex-layout = { path = "crates/ratex-layout", version = "0.1.2" }
 ratex-katex-fonts = { path = "crates/ratex-katex-fonts", version = "0.1.2" }
 ratex-svg    = { path = "crates/ratex-svg", version = "0.1.2" }
 ratex-pdf    = { path = "crates/ratex-pdf", version = "0.1.2" }
+ratex-unicode-font = { path = "crates/ratex-unicode-font", version = "0.1.2" }
 
 phf        = { version = "0.11", features = ["macros"] }
 thiserror  = "1.0"

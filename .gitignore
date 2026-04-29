@@ -55,3 +55,6 @@ platforms/react-native/ios/Pods/
 
 # macOS
 .DS_Store
+
+# Downloaded CJK test fonts
+NotoSansSC-Regular.ttf

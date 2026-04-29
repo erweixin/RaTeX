@@ -1,0 +1,18 @@
+x^2 + y^2 = z^2
+\frac{1}{\sqrt{2\pi}} \int_{-\infty}^{\infty} e^{-x^2/2} dx
+\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}
+\lim_{x \to 0} \frac{\sin x}{x} = 1
+\text{你好，世界！} \quad E = mc^2
+\text{日本語テスト} \quad \alpha + \beta = \gamma
+\text{한국어 시험} \quad \int_0^1 x^2 dx
+\text{设} x \in \mathbb{R}, \text{则} x^2 \geq 0
+\text{如果} a > b > 0, \text{那么} \frac{1}{a} < \frac{1}{b}
+\text{当} n \to \infty \text{时}，a_n \to 0
+\text{★☆♠♣♥♦} \quad \text{←↑→↓↔↕}
+\text{😀🎉🚀💡✅❌} \quad x + y = z
+\ce{H2O} \quad \text{水}
+\ce{CO2 + C -> 2 CO} \quad \text{二氧化碳}
+\ce{^{227}_{90}Th+} \quad \text{衰变}
+\text{（公式一）} \quad f(x) = \ln(x) + C
+\text{日本語：} \displaystyle \sum_{k=0}^{n} \binom{n}{k} = 2^n
+\text{中文：} \displaystyle \frac{d}{dx} \left( \sin x \right) = \cos x

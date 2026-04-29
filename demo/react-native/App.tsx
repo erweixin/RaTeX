@@ -17,6 +17,7 @@ const SHOWCASE_INLINE_ROWS = [
   String.raw`A circle of radius $r$ has area $S = \pi r^2$ and circumference $C = 2\pi r$.`,
   String.raw`The golden ratio $\varphi = \frac{1+\sqrt{5}}{2}$ satisfies $\varphi^2 = \varphi + 1$.`,
   String.raw`If $A = \begin{pmatrix} a & b \\ c & d \end{pmatrix}$, then $\det A = ad - bc$.`,
+  String.raw`中文：勾股定理是 $\text{勾股定理：} a^2+b^2=c^2$。`,
 ];
 
 const SHOWCASE_BLOCKS = [
@@ -45,6 +46,12 @@ const FORMULAS = [
   {name: 'Basel problem',        latex: String.raw`\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}`},
   {name: 'Matrix',               latex: String.raw`\begin{pmatrix}a & b \\ c & d\end{pmatrix}`},
   {name: 'Maxwell',              latex: String.raw`\nabla \times \mathbf{B} = \mu_0 \mathbf{J}`},
+  {name: 'CJK · 勾股定理',       latex: String.raw`\text{勾股定理：} a^2+b^2=c^2`},
+  {
+    name: 'CJK · mhchem + 二氧化碳',
+    latex: String.raw`\ce{CO2 + C -> 2 CO} \quad \text{二氧化碳}`,
+  },
+  {name: 'Emoji · 笑脸',         latex: String.raw`\text{😊} \quad E=mc^2`},
 ];
 
 const INLINE_EXAMPLES = [

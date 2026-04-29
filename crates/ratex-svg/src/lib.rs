@@ -10,7 +10,8 @@
 //!
 //! **Self-contained SVG:** enable Cargo feature `standalone` and set [`SvgOptions::embed_glyphs`]
 //! with a KaTeX `font_dir` to emit glyph outlines as `<path>` (no webfonts), matching
-//! `ratex-render`'s `ab_glyph` geometry.
+//! `ratex-render`'s `ab_glyph` geometry. Color emoji use the same sbix PNG strikes as PNG output,
+//! embedded as `<image href="data:image/png;base64,...">` when vector fallback would be invisible.
 
 use ratex_types::color::Color;
 use ratex_types::display_item::{DisplayItem, DisplayList};
@@ -212,6 +213,14 @@ fn katex_face(font: &str) -> (&'static str, &'static str, &'static str) {
         "Size2-Regular" => ("KaTeX_Size2", "normal", "normal"),
         "Size3-Regular" => ("KaTeX_Size3", "normal", "normal"),
         "Size4-Regular" => ("KaTeX_Size4", "normal", "normal"),
+        "CJK-Regular" => ("sans-serif", "normal", "normal"),
+        "CJK-Fallback" => ("sans-serif", "normal", "normal"),
+        // Stack so SVG `<text>` fallback works across macOS / Windows / Linux.
+        "Emoji-Fallback" => (
+            r#"Apple Color Emoji, "Segoe UI Emoji", "Noto Color Emoji", sans-serif"#,
+            "normal",
+            "normal",
+        ),
         _ => ("KaTeX_Main", "normal", "normal"),
     }
 }
@@ -228,16 +237,29 @@ fn emit_glyph(
             let px = tx(g.x, opts) as f32;
             let py = ty(g.y, opts) as f32;
             let glyph_em = (g.scale * opts.em_px()) as f32;
-            if let Some(d) =
-                standalone::glyph_svg_path(px, py, glyph_em, g.font, g.char_code, cache)
-            {
-                let fill = color_to_svg(g.color);
-                use std::fmt::Write;
-                let _ = write!(
-                    out,
-                    r#"<path d="{d}" fill="{fill}" fill-rule="evenodd" stroke="none"/>"#
-                );
-                return;
+            match standalone::standalone_glyph(px, py, glyph_em, g.font, g.char_code, cache) {
+                Some(standalone::StandaloneGlyph::Path(d)) => {
+                    let fill = color_to_svg(g.color);
+                    use std::fmt::Write;
+                    let _ = write!(
+                        out,
+                        r#"<path d="{d}" fill="{fill}" fill-rule="nonzero" stroke="none"/>"#
+                    );
+                    return;
+                }
+                Some(standalone::StandaloneGlyph::Image { href, x, y, w, h }) => {
+                    use std::fmt::Write;
+                    let x_s = fmt_num(x as f64);
+                    let y_s = fmt_num(y as f64);
+                    let w_s = fmt_num(w as f64);
+                    let h_s = fmt_num(h as f64);
+                    let _ = write!(
+                        out,
+                        r#"<image href="{href}" x="{x_s}" y="{y_s}" width="{w_s}" height="{h_s}" preserveAspectRatio="none"/>"#
+                    );
+                    return;
+                }
+                None => {}
             }
         }
     }
@@ -555,7 +577,7 @@ mod tests {
             },
         );
         assert!(svg.contains("<path"));
-        assert!(svg.contains("fill-rule=\"evenodd\""));
+        assert!(svg.contains("fill-rule=\"nonzero\""));
         assert!(!svg.contains("<text"));
     }
 }

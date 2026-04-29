@@ -4,9 +4,9 @@ use ab_glyph::{Font, FontRef};
 use ratex_font::FontId;
 use ratex_types::color::Color;
 use ratex_types::display_item::{DisplayItem, DisplayList};
-use tiny_skia::{FillRule, Paint, PathBuilder, Pixmap, Stroke, Transform};
-
-use crate::unicode_fallback::unicode_fallback_font_bytes;
+use tiny_skia::{
+    FilterQuality, FillRule, Paint, PathBuilder, Pixmap, PixmapPaint, Stroke, Transform,
+};
 
 pub struct RenderOptions {
     pub font_size: f32,
@@ -189,17 +189,110 @@ fn load_all_fonts(font_dir: &str) -> Result<HashMap<FontId, Vec<u8>>, String> {
         }
     }
 
+    // Load system Unicode font for CJK/fallback glyphs.
+    if let Some(cjk_bytes) = ratex_unicode_font::load_unicode_font() {
+        data.entry(FontId::CjkRegular)
+            .or_insert_with(|| cjk_bytes.to_vec());
+    }
+    // Secondary system fallback for characters the primary CJK font doesn't cover.
+    if let Some(fb_bytes) = ratex_unicode_font::load_fallback_font() {
+        data.entry(FontId::CjkFallback)
+            .or_insert_with(|| fb_bytes.to_vec());
+    }
+    if let Some(emoji_bytes) = ratex_unicode_font::load_emoji_font() {
+        data.entry(FontId::EmojiFallback)
+            .or_insert_with(|| emoji_bytes.to_vec());
+    }
+
     Ok(data)
+}
+
+fn sfnt_collection_index(id: FontId) -> u32 {
+    match id {
+        FontId::EmojiFallback => ratex_unicode_font::emoji_font_face_index().unwrap_or(0),
+        FontId::CjkRegular => ratex_unicode_font::unicode_font_face_index().unwrap_or(0),
+        FontId::CjkFallback => ratex_unicode_font::fallback_font_face_index().unwrap_or(0),
+        _ => 0,
+    }
 }
 
 fn build_font_cache(data: &HashMap<FontId, Vec<u8>>) -> Result<HashMap<FontId, FontRef<'_>>, String> {
     let mut cache = HashMap::new();
     for (id, bytes) in data {
-        let font = FontRef::try_from_slice(bytes)
+        let font = FontRef::try_from_slice_and_index(bytes, sfnt_collection_index(*id))
             .map_err(|e| format!("Failed to parse font {:?}: {}", id, e))?;
         cache.insert(*id, font);
     }
     Ok(cache)
+}
+
+/// After `.notdef` or a cmap slot with **no drawable outline** (common for emoji in text fonts),
+/// try KaTeX Main → `CjkRegular` → **Emoji** (color font, vector + sbix bitmap) → `CjkFallback`.
+///
+/// Emoji is tried **before** the broad text fallback so supplementary-plane / color glyphs are not
+/// stuck behind Arial-style faces that often lack drawable outlines for emoji.
+///
+/// When `skip_main_regular` is `true`, skips `Main-Regular` (caller already tried that face).
+#[allow(clippy::too_many_arguments)]
+fn try_system_unicode_fallback(
+    pixmap: &mut Pixmap,
+    px: f32,
+    py: f32,
+    ch: char,
+    color: &Color,
+    em: f32,
+    font_cache: &HashMap<FontId, FontRef<'_>>,
+    skip_main_regular: bool,
+) -> bool {
+    if !skip_main_regular {
+        if let Some(fallback) = font_cache.get(&FontId::MainRegular) {
+            let fid = fallback.glyph_id(ch);
+            if fid.0 != 0 && render_glyph_with_font(pixmap, px, py, fallback, fid, color, em) {
+                return true;
+            }
+        }
+    }
+    if let Some(cjk_font) = font_cache.get(&FontId::CjkRegular) {
+        let fid = cjk_font.glyph_id(ch);
+        if fid.0 != 0 && render_glyph_with_font(pixmap, px, py, cjk_font, fid, color, em) {
+            return true;
+        }
+    }
+    if try_emoji_vector_then_bitmap(pixmap, px, py, ch, color, em, font_cache) {
+        return true;
+    }
+    if let Some(fb_font) = font_cache.get(&FontId::CjkFallback) {
+        let fid = fb_font.glyph_id(ch);
+        if fid.0 != 0 && render_glyph_with_font(pixmap, px, py, fb_font, fid, color, em) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Color fonts (e.g. Apple Color Emoji) often expose a minimal `glyf` outline for COLR masking
+/// while the visible glyph lives in `sbix` / `CBDT`. `ab_glyph` then "succeeds" with an
+/// effectively invisible path — so **raster strike first**, then outline.
+#[allow(clippy::too_many_arguments)]
+fn try_emoji_vector_then_bitmap(
+    pixmap: &mut Pixmap,
+    px: f32,
+    py: f32,
+    ch: char,
+    color: &Color,
+    em: f32,
+    font_cache: &HashMap<FontId, FontRef<'_>>,
+) -> bool {
+    if try_blit_emoji_raster_fallback(pixmap, px, py, em, ch) {
+        return true;
+    }
+    if let Some(emoji_font) = font_cache.get(&FontId::EmojiFallback) {
+        let eid = emoji_font.glyph_id(ch);
+        if eid.0 != 0 && render_glyph_with_font(pixmap, px, py, emoji_font, eid, color, em) {
+            return true;
+        }
+    }
+    false
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -226,26 +319,49 @@ fn render_glyph(
     let glyph_id = font.glyph_id(ch);
 
     if glyph_id.0 == 0 {
-        if let Some(fallback) = font_cache.get(&FontId::MainRegular) {
-            let fid = fallback.glyph_id(ch);
-            if fid.0 != 0 {
-                return render_glyph_with_font(pixmap, px, py, fallback, fid, color, em);
-            }
+        let _ = try_system_unicode_fallback(pixmap, px, py, ch, color, em, font_cache, false);
+        return;
+    }
+
+    if font_id == FontId::EmojiFallback {
+        if try_blit_emoji_raster_fallback(pixmap, px, py, em, ch) {
+            return;
         }
-        // KaTeX TTFs omit many BMP symbols (e.g. U+263A from `\char`). Browsers use system fonts;
-        // load one Unicode-capable face via `RATEX_UNICODE_FONT` or fontdb / common paths.
-        if let Some(bytes) = unicode_fallback_font_bytes() {
-            if let Ok(fb) = FontRef::try_from_slice(bytes) {
-                let fid = fb.glyph_id(ch);
-                if fid.0 != 0 {
-                    return render_glyph_with_font(pixmap, px, py, &fb, fid, color, em);
-                }
+        let _ = render_glyph_with_font(pixmap, px, py, font, glyph_id, color, em);
+        return;
+    }
+
+    // `RATEX_UNICODE_FONT` may map a codepoint to a non-.notdef glyph with no outlines; try system fallback.
+    if font_id == FontId::CjkRegular {
+        if render_glyph_with_font(pixmap, px, py, font, glyph_id, color, em) {
+            return;
+        }
+        if try_emoji_vector_then_bitmap(pixmap, px, py, ch, color, em, font_cache) {
+            return;
+        }
+        if let Some(fb_font) = font_cache.get(&FontId::CjkFallback) {
+            let fid = fb_font.glyph_id(ch);
+            if fid.0 != 0 && render_glyph_with_font(pixmap, px, py, fb_font, fid, color, em) {
+                return;
             }
         }
         return;
     }
 
-    render_glyph_with_font(pixmap, px, py, font, glyph_id, color, em);
+    if font_id == FontId::CjkFallback {
+        if render_glyph_with_font(pixmap, px, py, font, glyph_id, color, em) {
+            return;
+        }
+        let _ = try_emoji_vector_then_bitmap(pixmap, px, py, ch, color, em, font_cache);
+        return;
+    }
+
+    if render_glyph_with_font(pixmap, px, py, font, glyph_id, color, em) {
+        return;
+    }
+    // cmap had a non-zero GID but no `glyf` outline (e.g. blank text-font slot for emoji).
+    let skip_main = font_id == FontId::MainRegular;
+    let _ = try_system_unicode_fallback(pixmap, px, py, ch, color, em, font_cache, skip_main);
 }
 
 fn render_glyph_with_font(
@@ -256,11 +372,14 @@ fn render_glyph_with_font(
     glyph_id: ab_glyph::GlyphId,
     color: &Color,
     em: f32,
-) {
+) -> bool {
     let outline = match font.outline(glyph_id) {
         Some(o) => o,
-        None => return,
+        None => return false,
     };
+    if outline.curves.is_empty() {
+        return false;
+    }
 
     let units_per_em = font.units_per_em().unwrap_or(1000.0);
     let scale = em / units_per_em;
@@ -350,10 +469,105 @@ fn render_glyph_with_font(
         pixmap.fill_path(
             &path,
             &paint,
-            tiny_skia::FillRule::EvenOdd,
+            tiny_skia::FillRule::Winding,
             Transform::identity(),
             None,
         );
+        true
+    } else {
+        false
+    }
+}
+
+/// Color emoji (sbix / CBDT / etc.) often have no `glyf` outlines; `ttf-parser` embedded strikes + PNG.
+fn try_blit_emoji_raster_fallback(pixmap: &mut Pixmap, px: f32, py: f32, em: f32, ch: char) -> bool {
+    let Some((bytes, idx)) = ratex_unicode_font::load_emoji_font_with_index() else {
+        return false;
+    };
+    try_blit_raster_glyph(pixmap, px, py, em, ch, bytes, idx)
+}
+
+fn try_blit_raster_glyph(
+    pixmap: &mut Pixmap,
+    px: f32,
+    py: f32,
+    em: f32,
+    ch: char,
+    font_bytes: &[u8],
+    face_index: u32,
+) -> bool {
+    let face = match ttf_parser::Face::parse(font_bytes, face_index) {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+    let gid = match face.glyph_index(ch) {
+        Some(g) => g,
+        None => return false,
+    };
+    let strike = em.round().clamp(8.0, 256.0) as u16;
+    let img = face
+        .glyph_raster_image(gid, strike)
+        .or_else(|| face.glyph_raster_image(gid, u16::MAX));
+    let Some(img) = img else {
+        return false;
+    };
+    let glyph_pm = match raster_glyph_image_to_pixmap(&img) {
+        Some(p) => p,
+        None => return false,
+    };
+    let scale = em / f32::from(img.pixels_per_em.max(1));
+    let top_x = px + f32::from(img.x) * scale;
+    // `ttf-parser` / OpenType: `RasterGlyphImage::{x,y}` are in strike pixels; `y` is the
+    // **bottom** edge of the bitmap in y-up coordinates (sbix yOffset to bottom; CBDT normalized
+    // the same way). Top edge = y + height — using `y` alone shifts the glyph down by ~full height.
+    let mut top_y = py - (f32::from(img.y) + f32::from(img.height)) * scale;
+    // sbix places the bitmap bottom on the math baseline, but tall (~1em) color strikes put the
+    // ink centroid near 0.5em above baseline. Binary/relation glyphs (+, =) are centered on the
+    // math axis (~0.25em). Nudge the bitmap so its vertical center matches the axis — matches
+    // mixed `\text{emoji} … formula` rows without changing layout baselines.
+    let ppem = f32::from(img.pixels_per_em.max(1));
+    let center_strike = (f32::from(img.y) + f32::from(img.height) / 2.0) / ppem;
+    let axis = ratex_font::get_global_metrics(0).axis_height as f32;
+    top_y += (center_strike - axis) * em;
+    let paint = PixmapPaint {
+        quality: FilterQuality::Bilinear,
+        ..Default::default()
+    };
+    let transform = Transform::from_row(scale, 0.0, 0.0, scale, top_x, top_y);
+    pixmap.draw_pixmap(0, 0, glyph_pm.as_ref(), &paint, transform, None);
+    true
+}
+
+fn raster_glyph_image_to_pixmap(img: &ttf_parser::RasterGlyphImage<'_>) -> Option<Pixmap> {
+    use ttf_parser::RasterImageFormat;
+    let w = u32::from(img.width);
+    let h = u32::from(img.height);
+    let size = tiny_skia::IntSize::from_wh(w, h)?;
+    match img.format {
+        RasterImageFormat::PNG => Pixmap::decode_png(img.data).ok(),
+        RasterImageFormat::BitmapPremulBgra32 => {
+            let expected = 4usize * w as usize * h as usize;
+            if img.data.len() != expected {
+                return None;
+            }
+            let mut v = Vec::with_capacity(expected);
+            for px in img.data.chunks_exact(4) {
+                let b = px[0];
+                let g = px[1];
+                let r = px[2];
+                let a = px[3];
+                v.extend_from_slice(&[r, g, b, a]);
+            }
+            Pixmap::from_vec(v, size)
+        }
+        RasterImageFormat::BitmapGray8 => {
+            let mut v = Vec::with_capacity(4 * img.data.len());
+            for &g in img.data {
+                v.extend_from_slice(&[g, g, g, 255]);
+            }
+            Pixmap::from_vec(v, size)
+        }
+        _ => None,
     }
 }
 
