@@ -31,10 +31,11 @@ detect_host_target() {
     rustc -vV | awk '/^host:/ { print $2 }'
 }
 
-# Copy built library to native/{jna_dir}/
-copy_lib() {
-    local rust_target="$1" jna_dir="$2" lib_file="$3"
-    local src="$REPO_ROOT/target/$rust_target/release/$lib_file"
+# Copy built library from cargo's target dir to native/{jna_dir}/.
+# cargo_root is the Cargo target directory root (normally $REPO_ROOT/target).
+copy_lib_from() {
+    local cargo_root="$1" rust_target="$2" jna_dir="$3" lib_file="$4"
+    local src="$cargo_root/$rust_target/release/$lib_file"
     local dest="$NATIVE_DIR/$jna_dir"
 
     if [ ! -f "$src" ]; then
@@ -94,9 +95,11 @@ build_all() {
         read -r target jna_dir lib_file <<< "$entry"
         echo "    → $target [starting]"
         (
+            # Separate target dirs avoid shared target/ races (e.g. EEXIST) when zigbuild runs in parallel.
+            export CARGO_TARGET_DIR="$REPO_ROOT/target/jvm-$target"
             cargo zigbuild --manifest-path "$REPO_ROOT/Cargo.toml" \
                 --release -p ratex-ffi --target "$target"
-            copy_lib "$target" "$jna_dir" "$lib_file"
+            copy_lib_from "$CARGO_TARGET_DIR" "$target" "$jna_dir" "$lib_file"
         ) &
         pids+=($!)
     done

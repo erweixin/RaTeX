@@ -1,6 +1,6 @@
 Pod::Spec.new do |s|
   s.name             = 'ratex_flutter'
-  s.version = '0.1.3'
+  s.version = '0.1.4'
   s.summary          = 'Flutter FFI bindings for RaTeX — native LaTeX math rendering (macOS).'
   s.description      = <<-DESC
     Provides a Flutter plugin that links the RaTeX dynamic library

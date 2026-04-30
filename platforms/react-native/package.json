@@ -1,6 +1,6 @@
 {
   "name": "ratex-react-native",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Native LaTeX rendering for React Native (no WebView)",
   "main": "lib/index.js",
   "react-native": "src/index.ts",
