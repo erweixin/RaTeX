@@ -7,7 +7,7 @@ minSdk 21，targetSdk 34。
 
 1. **添加依赖** — 在 app 的 `build.gradle` 中：
    ```kotlin
-   implementation("io.github.erweixin:ratex-android:0.1.2")
+   implementation("io.github.erweixin:ratex-android:0.1.3")
    ```
 2. **使用** — 布局里放 `RaTeXView`，代码中设置 LaTeX 与字号；字体会在首次渲染时自动加载，无需手动调用。
    ```kotlin
