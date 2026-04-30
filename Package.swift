@@ -22,7 +22,8 @@ let package = Package(
         // In published releases this is replaced with a remote url + checksum target.
         .binaryTarget(
             name: "RaTeXFFI",
-            path: "platforms/ios/RaTeX.xcframework"
+            url: "https://github.com/erweixin/RaTeX/releases/download/v0.1.4/RaTeX.xcframework.zip",
+            checksum: "b1ea8dd07313e445697852b0d3ce221d9956b819598252353179c5dd412bedb8"
         ),
 
         // Swift wrapper: rendering, font loading, UIKit/SwiftUI views.
