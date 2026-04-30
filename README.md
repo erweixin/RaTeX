@@ -107,7 +107,7 @@ flowchart LR
     A["LaTeX string\n(math · \\ce · \\pu)"]
     subgraph core["Rust core"]
         B[ratex-lexer]
-        C[ratex-parser\nmhchem \\ce / \\pu]
+        C[ratex-parser\nmhchem · numbering · \\ce / \\pu]
         D[ratex-layout]
         E[DisplayList]
     end
@@ -133,7 +133,7 @@ flowchart LR
 | `ratex-types` | Shared types: `DisplayItem`, `DisplayList`, `Color`, `MathStyle` |
 | `ratex-font` | KaTeX-compatible font metrics and symbol tables |
 | `ratex-lexer` | LaTeX → token stream |
-| `ratex-parser` | Token stream → ParseNode AST; includes mhchem `\ce` / `\pu` |
+| `ratex-parser` | Token stream → ParseNode AST; mhchem `\ce` / `\pu`; auto-numbering for `equation` / `align` / `gather` / `alignat` and end-of-row `\tag` / `\nonumber` / `\notag` |
 | `ratex-layout` | AST → LayoutBox tree → DisplayList |
 | `ratex-ffi` | C ABI: exposes the full pipeline for native platforms |
 | `ratex-wasm` | WASM: pipeline → DisplayList JSON for the browser |
@@ -247,11 +247,14 @@ cargo test --all
 
 ## Equation numbering and `\tag`
 
-RaTeX aims for KaTeX-compatible rendering. **Automatic equation numbering is not implemented**:
+RaTeX follows KaTeX-style layout for numbered display environments.
 
-- **No auto-numbering** for `equation`, `align`, `gather`, `alignat`, etc. (their non-starred forms render the same as the starred forms).
-- To display a number/label, use **explicit** `\tag{...}` or `\tag*{...}` at the end of a row (amsmath semantics).
-- `\notag` / `\nonumber` are treated as no-ops when auto-numbering is not present.
+- **Auto-numbering** applies to non-starred `equation`, `align`, `alignat`, and `gather`: each logical row gets a sequential tag such as `(1)`, `(2)`, … . Starred forms (`equation*`, `align*`, …) and inner environments **`aligned`**, **`alignedat`**, **`split`**, and **`gathered`** do **not** auto-number (same idea as LaTeX: only the outer display is numbered).
+- **`\tag{...}`** / **`\tag*{...}`** at the **end** of a row replace the auto number for that row (amsmath-style). Empty `\tag{}` suppresses the number for that row.
+- **`\nonumber`** and **`\notag`** at the **end** of a row suppress the number for that row when auto-numbering is active. They cannot be combined with `\tag` on the same row.
+- **`\notag`** is implemented as an alias of **`\nonumber`** (same as above).
+
+Document-level options such as `\leqno` and cross-reference counters are not modeled; numbering starts from `(1)` within the parse of each formula string.
 
 ---
 

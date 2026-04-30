@@ -107,7 +107,7 @@ flowchart LR
     A["LaTeX 字符串\n(数学 · \\ce · \\pu)"]
     subgraph core["Rust 核心"]
         B[ratex-lexer]
-        C[ratex-parser\nmhchem \\ce / \\pu]
+        C[ratex-parser\nmhchem · 编号 · \\ce / \\pu]
         D[ratex-layout]
         E[DisplayList]
     end
@@ -133,7 +133,7 @@ flowchart LR
 | `ratex-types` | 共享类型：`DisplayItem`、`DisplayList`、`Color`、`MathStyle` |
 | `ratex-font` | 兼容 KaTeX 的字体度量与符号表 |
 | `ratex-lexer` | LaTeX → token 流 |
-| `ratex-parser` | token 流 → ParseNode AST；含 mhchem `\ce` / `\pu` |
+| `ratex-parser` | token 流 → ParseNode AST；mhchem `\ce` / `\pu`；`equation` / `align` / `gather` / `alignat` 等环境的自动编号与行末 `\tag` / `\nonumber` / `\notag` |
 | `ratex-layout` | AST → LayoutBox 树 → DisplayList |
 | `ratex-ffi` | C ABI：向各原生平台暴露完整流水线 |
 | `ratex-wasm` | WASM：流水线 → DisplayList JSON（浏览器） |
@@ -250,11 +250,14 @@ cargo test --all
 
 ## 公式编号与 `\tag`
 
-RaTeX 以 KaTeX 兼容为目标，当前 **不实现自动公式编号**：
+RaTeX 对有编号的显示环境与 KaTeX 式版面一致。
 
-- `equation` / `align` / `gather` / `alignat` 等**不带星号**的环境，渲染效果与对应的带星号版本一致（即不会自动生成编号）。
-- 如需显示编号/标签，请在每行末尾使用显式 `\tag{...}` 或 `\tag*{...}`（遵循 amsmath 语义）。
-- 在未实现自动编号时，`\notag` / `\nonumber` 视为无效果（no-op）。
+- **自动编号**：不带星号的 `equation`、`align`、`alignat`、`gather` 会对每一行（逻辑行）依次生成 `(1)`、`(2)`、…… 。带星号的环境（`equation*`、`align*` 等）以及 **`aligned`**、**`alignedat`**、 **`split`**、**`gathered`** 等内层环境**不**参与自动编号（与 LaTeX 思路一致：仅外层显示环境编号）。
+- **`\tag{...}`** / **`\tag*{...}`** 写在**行末**时，用显式标签替换该行自动编号。空的 `\tag{}` 会抑制该行编号。
+- 在启用自动编号时，行末的 **`\nonumber`** 与 **`\notag`** 会**去掉该行编号**；同一行不能同时使用 `\tag` 与 `\nonumber` / `\notag`。
+- **`\notag`** 与 **`\nonumber`** 等价（行为同上）。
+
+文档级选项（如 `\leqno`）与全文引用计数器未建模；每条公式字符串独立从 `(1)` 起算。
 
 ---
 

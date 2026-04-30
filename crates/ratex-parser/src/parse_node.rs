@@ -622,6 +622,13 @@ pub enum ParseNode {
         loc: Option<SourceLocation>,
     },
 
+    #[serde(rename = "nonumber")]
+    NoNumber {
+        mode: Mode,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        loc: Option<SourceLocation>,
+    },
+
     #[serde(rename = "html")]
     Html {
         mode: Mode,
@@ -756,6 +763,7 @@ impl ParseNode {
             | Self::XArrow { mode, .. }
             | Self::Pmb { mode, .. }
             | Self::Tag { mode, .. }
+            | Self::NoNumber { mode, .. }
             | Self::Html { mode, .. }
             | Self::HtmlMathMl { mode, .. }
             | Self::IncludeGraphics { mode, .. }
@@ -819,6 +827,7 @@ impl ParseNode {
             Self::XArrow { .. } => "xArrow",
             Self::Pmb { .. } => "pmb",
             Self::Tag { .. } => "tag",
+            Self::NoNumber { .. } => "nonumber",
             Self::Html { .. } => "html",
             Self::HtmlMathMl { .. } => "htmlmathml",
             Self::IncludeGraphics { .. } => "includegraphics",

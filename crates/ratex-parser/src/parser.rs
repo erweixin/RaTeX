@@ -23,6 +23,7 @@ pub struct Parser<'a> {
     pub gullet: MacroExpander<'a>,
     pub leftright_depth: i32,
     next_token: Option<Token>,
+    pub equation_counter: usize,
 }
 
 impl<'a> Parser<'a> {
@@ -32,6 +33,7 @@ impl<'a> Parser<'a> {
             gullet: MacroExpander::new(input, Mode::Math),
             leftright_depth: 0,
             next_token: None,
+            equation_counter: 0,
         }
     }
 
