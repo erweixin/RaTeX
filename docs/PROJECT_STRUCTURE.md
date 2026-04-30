@@ -65,7 +65,10 @@ RaTeX/
 ├── scripts/
 │   ├── set-version.sh             # Sync version to all platform manifests
 │   ├── sync-katex-ttf-to-font-crate.sh  # Copy KaTeX *.ttf → crates/ratex-katex-fonts/fonts/
-│   └── update_golden_output.sh    # Renders all test_cases.txt → output/
+│   ├── update_golden_output.sh    # Renders all test_cases.txt → output/
+│   ├── test-unicode-font.sh       # Batch PNG/SVG/PDF render of test-formulas.txt across system / env fonts (CJK regression)
+│   ├── test-formulas.txt          # Sample lines for test-unicode-font.sh
+│   └── fonts/                     # Optional bundled fonts for tests (e.g. NotoSansCJKsc)
 │
 └── demo/                         # Web demo + sample apps (web, ios, android, flutter, RN, jvm)
 ```
@@ -122,7 +125,7 @@ serde_json = "1.0"
 | **ratex-types** | `DisplayList`, `DisplayItem` (GlyphPath, Line, Rect, Path), `Color`, `PathCommand`, `MathStyle` |
 | **ratex-font** | KaTeX font metrics, symbol tables; `data/metrics_data.rs`, `data/symbols_data.rs` (generated) |
 | **ratex-lexer** | LaTeX string → token stream |
-| **ratex-parser** | Token stream → ParseNode AST (macro expansion, functions) |
+| **ratex-parser** | Token stream → ParseNode AST (macro expansion, functions); auto-numbering for `equation` / `align` / `gather` / `alignat` (non-starred) and trailing-row `\tag` / `\nonumber` / `\notag` |
 | **ratex-layout** | AST → LayoutBox tree → `to_display_list` → DisplayList |
 | **ratex-katex-fonts** | Bundled KaTeX `.ttf` files + embed API; optional dep for `ratex-svg` / `ratex-render` / `ratex-pdf` `embed-fonts` |
 | **ratex-ffi** | C ABI: `ratex_parse_and_layout` → DisplayList JSON; Android `jni` module when targeting Android |

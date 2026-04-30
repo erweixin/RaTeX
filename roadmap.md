@@ -2,26 +2,23 @@
 
 High-level direction (feature gaps, platforms, performance) should be tracked here as the project grows. This file is intentionally short; detailed design lives in `docs/`.
 
-## Golden tests: unnumbered display math only
+## Golden tests: mostly unnumbered display math
 
-`tests/golden/test_cases.txt` uses **only unnumbered** AMS-style environments: `equation*`, `gather*`, `align*`, `alignat*`, etc. The numbered forms (`equation`, `gather`, `align`, …) are **not** used in the golden suite.
+`tests/golden/test_cases.txt` is **mostly** starred AMS environments (`equation*`, `gather*`, `align*`, `alignat*`, …) so KaTeX reference PNGs stay a **stable** baseline for ink-based comparison.
 
-**Rationale**
+A **small** set of lines exercises **automatic numbering** (`equation`, `align`, `gather`, `alignat`), `\tag`, and `\nonumber` / `\notag` (see near the end of the file). RaTeX implements these; KaTeX reference shots for multiline numbered rows can still show **tags overlapping ink**, which is a weaker baseline for strict pixel diffs—use those lines mainly for regression coverage.
 
-1. **RaTeX** does not yet implement automatic equation numbering and tag placement comparable to LaTeX/KaTeX for these environments.
-2. **KaTeX** reference screenshots for numbered multiline environments can show **tags overlapping ink**; that is a poor, unstable baseline for raster comparison.
-
-**After editing `test_cases.txt`**, regenerate references and RaTeX outputs so indices stay aligned:
+**After editing `test_cases.txt`**, keep indices aligned:
 
 - KaTeX PNGs: `node tools/golden_compare/generate_reference.mjs` (see script header).
 - RaTeX PNGs: `scripts/update_golden_output.sh`.
 
 ---
 
-## Golden 测试：仅无编号 display 环境
+## Golden 测试：以无编号环境为主
 
-`tests/golden/test_cases.txt` 中 **一律** 使用带星号的环境（`equation*`、`gather*`、`align*`、`alignat*` 等），**不使用**会产生自动编号的 `equation`、`gather`、`align` 等写法。
+`tests/golden/test_cases.txt` **主体**仍为带星号的环境（`equation*`、`gather*`、`align*`、`alignat*` 等），以便 KaTeX 对照图作为**稳定**的像素/墨量基准。
 
-**原因**：(1) RaTeX 1.0 目标为 KaTeX 兼容渲染，当前**不实现自动公式编号**，编号/标签依赖显式 `\tag`；(2) KaTeX 在多行编号场景下参考图易出现编号与公式重叠，不适合作为稳定的像素对比基准。
+文件**末尾附近**保留少量用例，覆盖 **自动编号**（`equation`、`align`、`gather`、`alignat`）以及 `\tag`、`\nonumber` / `\notag`。RaTeX 已支持这些特性；KaTeX 在多行编号场景下参考图仍可能出现**编号与笔迹重叠**，不适合作为严苛像素对比的权威基准，以功能回归为主。
 
 修改 `test_cases.txt` 后请重跑 `generate_reference.mjs` 与 `update_golden_output.sh`，以同步 `fixtures/` 与 `output/`。
