@@ -21,7 +21,7 @@ use std::ffi::CString;
 /// Call `nativeGetLastError()` to retrieve the error message.
 #[no_mangle]
 pub extern "system" fn Java_io_ratex_RaTeXEngine_nativeParseAndLayout(
-    env: JNIEnv,
+    mut env: JNIEnv,
     _class: JClass,
     latex: JString,
     display_mode: jboolean,
@@ -109,7 +109,7 @@ pub extern "system" fn Java_io_ratex_RaTeXEngine_nativeParseAndLayout(
 /// Returns the last error message as a Java `String`, or `null` if no error.
 #[no_mangle]
 pub extern "system" fn Java_io_ratex_RaTeXEngine_nativeGetLastError(
-    mut env: JNIEnv,
+    env: JNIEnv,
     _class: JClass,
 ) -> jstring {
     let ptr = ratex_get_last_error();
