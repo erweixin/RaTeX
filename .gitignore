@@ -8,6 +8,8 @@ venv
 .DS_Store
 local.properties
 platforms/web/dist/
+# wasm-pack 输出，由 platforms/web/build.sh 生成，不提交
+platforms/web/pkg/
 # Local deploy / build copy (do not commit)
 deploy/
 .gradle/
