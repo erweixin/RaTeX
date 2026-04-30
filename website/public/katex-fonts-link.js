@@ -1,8 +1,5 @@
 /**
- * Injects KaTeX font stylesheet. Paths differ when pages live under /website/
- * (repo root server) vs site root (GitHub Pages / local _site).
- *
- * Use an absolute URL when not under /website/ so /RaTeX (no trailing slash) still resolves under base.
+ * Injects KaTeX font stylesheet. Same rules as gallery.js wasmEntryUrl (base → /RaTeX/ → flat /demo|/zh → legacy getSiteDirUrl).
  */
 (function () {
   function getSiteDirUrl() {
@@ -19,15 +16,22 @@
     u.pathname = path || "/";
     return u;
   }
+
   var g = typeof globalThis !== "undefined" ? globalThis : window;
-  var path = location.pathname;
+  var path = location.pathname || "";
   var href;
   if (typeof g.__RATEX_SITE_BASE__ === "string" && g.__RATEX_SITE_BASE__.length > 0) {
     var base = g.__RATEX_SITE_BASE__;
     if (!base.endsWith("/")) base += "/";
     href = new URL("platforms/web/fonts.css", new URL(base, location.origin)).href;
   } else if (path.indexOf("/website/") !== -1) {
-    href = "../platforms/web/fonts.css";
+    href = new URL("../platforms/web/fonts.css", location.href).href;
+  } else if (path.startsWith("/RaTeX/") || path === "/RaTeX") {
+    href = new URL("platforms/web/fonts.css", new URL("/RaTeX/", location.origin)).href;
+  } else if (location.protocol === "file:") {
+    href = new URL("platforms/web/fonts.css", getSiteDirUrl()).href;
+  } else if (/^\/demo(\/|$)/.test(path) || /^\/zh(\/|$)/.test(path)) {
+    href = new URL("/platforms/web/fonts.css", location.origin).href;
   } else {
     href = new URL("platforms/web/fonts.css", getSiteDirUrl()).href;
   }

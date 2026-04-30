@@ -1,14 +1,6 @@
-/** Resolves platforms/web/pkg/ratex_wasm.js under Astro site base, not the current page directory. */
+/** WASM entry: flat /platforms/web for /demo/ & /zh/ when base unset; else legacy subdirectory heuristic (see gallery.js). */
 function ratexWasmModuleUrl() {
   var g = typeof globalThis !== "undefined" ? globalThis : window;
-  if (typeof g.__RATES_WASM_IMPORT_URL__ === "string" && g.__RATES_WASM_IMPORT_URL__.length > 0) {
-    return g.__RATES_WASM_IMPORT_URL__;
-  }
-  var base = typeof g.__RATEX_SITE_BASE__ === "string" ? g.__RATEX_SITE_BASE__ : "";
-  if (base) {
-    if (!base.endsWith("/")) base += "/";
-    return new URL("platforms/web/pkg/ratex_wasm.js", new URL(base, location.origin)).href;
-  }
   function getSiteDirUrl() {
     var u = new URL(location.href);
     var path = u.pathname;
@@ -23,12 +15,28 @@ function ratexWasmModuleUrl() {
     u.pathname = path || "/";
     return u;
   }
-  var pageDir = getSiteDirUrl();
-  var rel =
-    location.pathname.indexOf("/website/") !== -1
-      ? "../platforms/web/pkg/ratex_wasm.js"
-      : "platforms/web/pkg/ratex_wasm.js";
-  return new URL(rel, pageDir).href;
+  if (typeof g.__RATES_WASM_IMPORT_URL__ === "string" && g.__RATES_WASM_IMPORT_URL__.length > 0) {
+    return g.__RATES_WASM_IMPORT_URL__;
+  }
+  var configured = typeof g.__RATEX_SITE_BASE__ === "string" ? g.__RATEX_SITE_BASE__ : "";
+  if (configured.length > 0) {
+    var b = configured.endsWith("/") ? configured : configured + "/";
+    return new URL("platforms/web/pkg/ratex_wasm.js", new URL(b, location.origin)).href;
+  }
+  var path = location.pathname || "";
+  if (path.indexOf("/website/") !== -1) {
+    return new URL("../platforms/web/pkg/ratex_wasm.js", location.href).href;
+  }
+  if (path.startsWith("/RaTeX/") || path === "/RaTeX") {
+    return new URL("platforms/web/pkg/ratex_wasm.js", new URL("/RaTeX/", location.origin)).href;
+  }
+  if (location.protocol === "file:") {
+    return new URL("platforms/web/pkg/ratex_wasm.js", getSiteDirUrl()).href;
+  }
+  if (/^\/demo(\/|$)/.test(path) || /^\/zh(\/|$)/.test(path)) {
+    return new URL("/platforms/web/pkg/ratex_wasm.js", location.origin).href;
+  }
+  return new URL("platforms/web/pkg/ratex_wasm.js", getSiteDirUrl()).href;
 }
 
 const EXAMPLES = [

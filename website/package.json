@@ -4,7 +4,9 @@
   "private": true,
   "scripts": {
     "dev": "astro dev",
+    "build:wasm": "bash ../platforms/web/build.sh",
     "build": "astro build",
+    "postbuild": "node scripts/verify-dist-wasm.mjs",
     "preview": "astro preview"
   },
   "dependencies": {

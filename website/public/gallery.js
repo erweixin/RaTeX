@@ -1,15 +1,16 @@
 /**
  * RaTeX WASM gallery: lazy-render formulas with IntersectionObserver.
  * WASM entry matches repo layout: platforms/web/pkg/ratex_wasm.js
- * → under site base: /RaTeX/platforms/web/pkg/ratex_wasm.js (GitHub Pages, astro dev, preview).
+ * Static hosting: `{origin}{base}platforms/web/…` — Cloudflare/`base:"/"` uses `/platforms/web/`, GitHub Pages project site uses `/RaTeX/platforms/web/`.
  *
  * Optional override (tests / custom hosting): set before loading this script
  *   window.__RATES_WASM_IMPORT_URL__ = "https://example.com/pkg/ratex_wasm.js";
  * Local dev: `astro dev` / `astro preview` mount repo platforms/web at /RaTeX/platforms/web/
  * (vite-plugin-platforms-web.mjs) after `cd platforms/web && bash build.sh`.
  *
- * Note: pathname like /RaTeX (no trailing slash) makes new URL("platforms/...", base) drop the
- * site base; we normalize to a directory URL first.
+ * Resolution order: __RATES_WASM_IMPORT_URL__ → __RATEX_SITE_BASE__ → /website/ repo dev →
+ * implicit /RaTeX/ → then: flat /platforms/web/ for Astro /demo/ & /zh/ subtrees (Cloudflare-style),
+ * else legacy getSiteDirUrl()+platforms/web (custom subdirectory installs without base).
  */
 (function (global) {
   function getSiteDirUrl() {
@@ -27,23 +28,32 @@
     return u;
   }
 
-  /** Same path segment as on disk: platforms/web/pkg/ratex_wasm.js */
+  /** platforms/web/pkg/ratex_wasm.js — backward compatible with subdirectory hosting + flat Cloudflare. */
   function wasmEntryUrl() {
     var g = typeof globalThis !== "undefined" ? globalThis : global;
     if (typeof g.__RATES_WASM_IMPORT_URL__ === "string" && g.__RATES_WASM_IMPORT_URL__.length > 0) {
       return g.__RATES_WASM_IMPORT_URL__;
     }
-    var base = typeof g.__RATEX_SITE_BASE__ === "string" ? g.__RATEX_SITE_BASE__ : "";
-    if (base) {
-      if (!base.endsWith("/")) base += "/";
-      return new URL("platforms/web/pkg/ratex_wasm.js", new URL(base, location.origin)).href;
+    var configured = typeof g.__RATEX_SITE_BASE__ === "string" ? g.__RATEX_SITE_BASE__ : "";
+    if (configured.length > 0) {
+      var b = configured.endsWith("/") ? configured : configured + "/";
+      return new URL("platforms/web/pkg/ratex_wasm.js", new URL(b, location.origin)).href;
     }
-    var pageDir = getSiteDirUrl();
-    var rel =
-      location.pathname.indexOf("/website/") !== -1
-        ? "../platforms/web/pkg/ratex_wasm.js"
-        : "platforms/web/pkg/ratex_wasm.js";
-    return new URL(rel, pageDir).href;
+    var path = location.pathname || "";
+    if (path.indexOf("/website/") !== -1) {
+      return new URL("../platforms/web/pkg/ratex_wasm.js", location.href).href;
+    }
+    if (path.startsWith("/RaTeX/") || path === "/RaTeX") {
+      return new URL("platforms/web/pkg/ratex_wasm.js", new URL("/RaTeX/", location.origin)).href;
+    }
+    if (location.protocol === "file:") {
+      return new URL("platforms/web/pkg/ratex_wasm.js", getSiteDirUrl()).href;
+    }
+    var flat = new URL("/platforms/web/pkg/ratex_wasm.js", location.origin).href;
+    if (/^\/demo(\/|$)/.test(path) || /^\/zh(\/|$)/.test(path)) {
+      return flat;
+    }
+    return new URL("platforms/web/pkg/ratex_wasm.js", getSiteDirUrl()).href;
   }
 
   const EM = 18;
