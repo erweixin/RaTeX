@@ -43,6 +43,9 @@ sed "s/^version: .*/version: $VER/" platforms/flutter/pubspec.yaml > platforms/f
 # Flutter podspec（s.version = 'X.X.X'）
 sed "s/s\.version *= *'[^']*'/s.version = '$VER'/" platforms/flutter/ios/ratex_flutter.podspec > platforms/flutter/ios/ratex_flutter.podspec.tmp && mv platforms/flutter/ios/ratex_flutter.podspec.tmp platforms/flutter/ios/ratex_flutter.podspec
 
+# Flutter macOS podspec
+sed "s/s\.version *= *'[^']*'/s.version = '$VER'/" platforms/flutter/macos/ratex_flutter.podspec > platforms/flutter/macos/ratex_flutter.podspec.tmp && mv platforms/flutter/macos/ratex_flutter.podspec.tmp platforms/flutter/macos/ratex_flutter.podspec
+
 # Flutter android/build.gradle（version 'X.X.X'）
 sed "s/^version '[^']*'/version '$VER'/" platforms/flutter/android/build.gradle > platforms/flutter/android/build.gradle.tmp && mv platforms/flutter/android/build.gradle.tmp platforms/flutter/android/build.gradle
 
@@ -77,4 +80,4 @@ for (const p of ['platforms/web/package.json', 'platforms/react-native/package.j
 }
 "
 
-echo "Done. Updated: Cargo.toml (workspace + ratex-* 依赖版本), platforms/flutter/pubspec.yaml, platforms/flutter/ios/ratex_flutter.podspec, platforms/flutter/android/build.gradle, platforms/flutter/README.md, platforms/flutter/README.zh-CN.md, platforms/android/README.md, platforms/android/README.zh-CN.md, demo/android/README.md, platforms/jvm/README.md, platforms/jvm/README.zh-CN.md, demo/flutter/pubspec.yaml, platforms/web/package.json, platforms/react-native/package.json; Android/JVM Maven 使用根目录 VERSION。各 Rust 子 crate 使用 version.workspace = true，无需单独改文件。"
+echo "Done. Updated: Cargo.toml (workspace + ratex-* 依赖版本), platforms/flutter/pubspec.yaml, platforms/flutter/ios/ratex_flutter.podspec, platforms/flutter/macos/ratex_flutter.podspec, platforms/flutter/android/build.gradle, platforms/flutter/README.md, platforms/flutter/README.zh-CN.md, platforms/android/README.md, platforms/android/README.zh-CN.md, demo/android/README.md, platforms/jvm/README.md, platforms/jvm/README.zh-CN.md, demo/flutter/pubspec.yaml, platforms/web/package.json, platforms/react-native/package.json; Android/JVM Maven 使用根目录 VERSION。各 Rust 子 crate 使用 version.workspace = true，无需单独改文件。"

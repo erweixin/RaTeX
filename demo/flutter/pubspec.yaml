@@ -1,5 +1,5 @@
 name: ratex_flutter_demo
-description: RaTeX Flutter demo — native LaTeX math rendering on iOS Simulator.
+description: RaTeX Flutter demo — native LaTeX math rendering on mobile & desktop.
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -12,9 +12,7 @@ dependencies:
     sdk: flutter
 
   # Local path to the ratex_flutter plugin.
-  # The plugin links RaTeX.xcframework which already contains the
-  # ios-arm64_x86_64-simulator slice — no extra build steps needed
-  # for iOS Simulator.
+  # Supports iOS, Android, macOS, Windows, and Linux.
   ratex_flutter:
     path: ../../platforms/flutter
 

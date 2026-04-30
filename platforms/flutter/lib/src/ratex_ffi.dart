@@ -1,4 +1,4 @@
-// ratex_ffi.dart — Dart FFI bindings to libratex_ffi (iOS static / Android .so).
+// ratex_ffi.dart — Dart FFI bindings to libratex_ffi (iOS, Android, macOS, Windows, Linux).
 //
 // C ABI:
 //   RatexResult ratex_parse_and_layout(const char* latex, const RatexOptions* opts);
@@ -71,8 +71,18 @@ DynamicLibrary _openLib() {
   if (Platform.isAndroid) {
     return DynamicLibrary.open('libratex_ffi.so');
   }
-  // iOS: the static library is linked into the process
-  return DynamicLibrary.process();
+  if (Platform.isIOS || Platform.isMacOS) {
+    // iOS: static library is force-loaded into the process via CocoaPods
+    // macOS: dynamic library is linked via vendored_libraries in the podspec
+    return DynamicLibrary.process();
+  }
+  if (Platform.isWindows) {
+    return DynamicLibrary.open('ratex_ffi.dll');
+  }
+  if (Platform.isLinux) {
+    return DynamicLibrary.open('libratex_ffi.so');
+  }
+  throw UnsupportedError('Unsupported platform: ${Platform.operatingSystem}');
 }
 
 // MARK: - FFI bindings (lazy singleton)

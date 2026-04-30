@@ -21,7 +21,7 @@ CustomPaint Widget
 
 ## Out of the box
 
-1. **Add dependency** — add `ratex_flutter: ^0.1.2` to `pubspec.yaml`, then run `flutter pub get`. No native build required — the published package includes prebuilt Android `.so` and iOS XCFramework.
+1. **Add dependency** — add `ratex_flutter: ^0.1.2` to `pubspec.yaml`, then run `flutter pub get`. No native build required — the published package includes prebuilt Android `.so`, iOS XCFramework, macOS `.dylib`, Windows `.dll`, and Linux `.so`.
 2. **Register fonts** — Flutter does not auto-register plugin fonts for the host app. Copy the [KaTeX font declarations](#font-setup) into your `pubspec.yaml` (see Installation below).
 3. **Use** — Use `RaTeXWidget`:
    ```dart
@@ -45,7 +45,7 @@ dependencies:
   ratex_flutter: ^0.1.2
 ```
 
-Then run `flutter pub get`. No native build required — the published package includes prebuilt Android `.so` and iOS `RaTeX.xcframework`.
+Then run `flutter pub get`. No native build required — the published package includes prebuilt Android `.so`, iOS `RaTeX.xcframework`, macOS `.dylib`, Windows `.dll`, and Linux `.so`.
 
 #### Font setup
 
@@ -129,6 +129,21 @@ You must build the native libraries first:
 |----------|---------|
 | iOS | `bash platforms/ios/build-ios.sh` (produces `RaTeX.xcframework`) |
 | Android | `bash platforms/android/build-android.sh` (produces `.so` files) |
+| macOS | `bash platforms/flutter/build-desktop.sh` (produces universal `.dylib`) |
+| Windows | `bash platforms/flutter/build-desktop.sh --all` from macOS/Linux (cross-compiles `.dll` via zigbuild) |
+| Linux | `bash platforms/flutter/build-desktop.sh --all` from macOS/Linux (cross-compiles `.so` via zigbuild) |
+
+Alternatively, run the desktop build on the target host directly:
+```bash
+# On macOS (builds universal dylib)
+bash platforms/flutter/build-desktop.sh
+
+# On Linux (builds host-arch .so)
+bash platforms/flutter/build-desktop.sh
+
+# On Windows (requires Git Bash / WSL; builds .dll)
+bash platforms/flutter/build-desktop.sh
+```
 
 **Prerequisites for building from source:** Flutter 3.10+, Dart 3.0+, Rust 1.75+.
 
@@ -246,6 +261,9 @@ the bounding box. The baseline is at Y = `height × fontSize`.
 | `pubspec.yaml` | Flutter plugin manifest |
 | `ios/` | iOS plugin (podspec + RaTeXPlugin.swift); links RaTeX.xcframework |
 | `android/` | Android plugin (RaTeXPlugin.kt); uses in-package `jniLibs` for `libratex_ffi.so` |
+| `macos/` | macOS plugin (podspec + RaTeXPlugin.swift); links universal `.dylib` |
+| `windows/` | Windows plugin (CMake + C++ stub); includes `ratex_ffi.dll` |
+| `linux/` | Linux plugin (CMake + GObject stub); includes per-arch `libratex_ffi.so` |
 | `lib/ratex_flutter.dart` | Public API: `RaTeXEngine`, `RaTeXWidget` |
 | `lib/src/display_list.dart` | Dart JSON types (DisplayList, DisplayItem, …) |
 | `lib/src/ratex_ffi.dart` | Dart FFI bindings to `libratex_ffi` |
@@ -273,11 +291,17 @@ To publish an **out-of-the-box** package that works without building native code
    cp -R platforms/ios/RaTeX.xcframework platforms/flutter/ios/
    ```
 
-3. **Validate and publish**:
+3. **Desktop** — Build and inject platform-specific native libs:
+   ```bash
+   # From repo root — cross-compile all desktop targets (requires zig + cargo-zigbuild)
+   ./platforms/flutter/build-desktop.sh --all
+   ```
+
+4. **Validate and publish**:
    ```bash
    cd platforms/flutter
    dart pub publish --dry-run
    dart pub publish
    ```
 
-   **CI**: Pushing a version tag (e.g. `v{VERSION}`) runs [release-flutter.yml](https://github.com/erweixin/RaTeX/blob/main/.github/workflows/release-flutter.yml): it builds Android and iOS native libs, injects them into this package, and runs `dart pub publish`. Ensure the tag matches the `version` in `pubspec.yaml`. Repository secret required: `PUB_DEV_TOKEN` (create at https://pub.dev/settings/tokens).
+   **CI**: Pushing a version tag (e.g. `v{VERSION}`) runs [release-flutter.yml](https://github.com/erweixin/RaTeX/blob/main/.github/workflows/release-flutter.yml): it builds Android, iOS, and desktop native libs, injects them into this package, and runs `dart pub publish`. Ensure the tag matches the `version` in `pubspec.yaml`. Repository secret required: `PUB_DEV_TOKEN` (create at https://pub.dev/settings/tokens).

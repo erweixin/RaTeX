@@ -1,3 +1,11 @@
+## 0.1.2
+
+- Add desktop platform support: macOS (universal `.dylib` via CocoaPods), Windows (`.dll` via CMake), Linux (`.so` via CMake, per-arch directories)
+- Extend Dart FFI `_openLib()` with `Platform.isMacOS` / `Platform.isWindows` / `Platform.isLinux` branches
+- Add `platforms/flutter/build-desktop.sh` for building desktop native libraries (host-only and `--all` cross-compile modes using cargo-zigbuild)
+- Add macOS podspec (`macos/ratex_flutter.podspec`), Windows/Linux CMake + plugin stubs
+- Update CI release workflow to build and bundle all 5 desktop native targets
+
 ## 0.0.16
 
 - Monorepo version alignment with bundled Android `.so` and iOS `RaTeX.xcframework`.

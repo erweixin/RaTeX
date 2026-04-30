@@ -1,0 +1,80 @@
+name: ratex_flutter_desktop_demo
+description: RaTeX Flutter Desktop Demo — native LaTeX rendering on macOS, Windows, and Linux.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  ratex_flutter:
+    path: ../../platforms/flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+
+  fonts:
+    - family: KaTeX_AMS
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_AMS-Regular.ttf
+    - family: KaTeX_Caligraphic
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Caligraphic-Regular.ttf
+        - asset: packages/ratex_flutter/fonts/KaTeX_Caligraphic-Bold.ttf
+          weight: 700
+    - family: KaTeX_Fraktur
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Fraktur-Regular.ttf
+        - asset: packages/ratex_flutter/fonts/KaTeX_Fraktur-Bold.ttf
+          weight: 700
+    - family: KaTeX_Main
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Main-Regular.ttf
+        - asset: packages/ratex_flutter/fonts/KaTeX_Main-Bold.ttf
+          weight: 700
+        - asset: packages/ratex_flutter/fonts/KaTeX_Main-Italic.ttf
+          style: italic
+        - asset: packages/ratex_flutter/fonts/KaTeX_Main-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: KaTeX_Math
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Math-Italic.ttf
+          style: italic
+        - asset: packages/ratex_flutter/fonts/KaTeX_Math-BoldItalic.ttf
+          weight: 700
+          style: italic
+    - family: KaTeX_SansSerif
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_SansSerif-Regular.ttf
+        - asset: packages/ratex_flutter/fonts/KaTeX_SansSerif-Bold.ttf
+          weight: 700
+        - asset: packages/ratex_flutter/fonts/KaTeX_SansSerif-Italic.ttf
+          style: italic
+    - family: KaTeX_Script
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Script-Regular.ttf
+    - family: KaTeX_Typewriter
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Typewriter-Regular.ttf
+    - family: KaTeX_Size1
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Size1-Regular.ttf
+    - family: KaTeX_Size2
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Size2-Regular.ttf
+    - family: KaTeX_Size3
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Size3-Regular.ttf
+    - family: KaTeX_Size4
+      fonts:
+        - asset: packages/ratex_flutter/fonts/KaTeX_Size4-Regular.ttf

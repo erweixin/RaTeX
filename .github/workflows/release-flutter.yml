@@ -34,7 +34,7 @@ jobs:
           fi
           echo "Version OK: $PUB_VERSION"
 
-      - name: Install Rust (Android + iOS targets)
+      - name: Install Rust (Android + iOS + Desktop targets)
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: >
@@ -43,13 +43,26 @@ jobs:
             x86_64-linux-android,
             aarch64-apple-ios,
             aarch64-apple-ios-sim,
-            x86_64-apple-ios
+            x86_64-apple-ios,
+            aarch64-apple-darwin,
+            x86_64-apple-darwin,
+            x86_64-pc-windows-gnu,
+            x86_64-unknown-linux-gnu,
+            aarch64-unknown-linux-gnu
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-ndk
         run: cargo install cargo-ndk
+
+      - name: Install zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.13.0
+
+      - name: Install cargo-zigbuild
+        run: cargo install cargo-zigbuild
 
       - name: Install Android NDK
         uses: nttld/setup-ndk@v1
@@ -65,13 +78,31 @@ jobs:
       - name: Build iOS XCFramework
         run: bash platforms/ios/build-ios.sh
 
+      - name: Build Desktop native libs
+        run: bash platforms/flutter/build-desktop.sh --all
+
       - name: Inject native libs into Flutter package
         run: |
           mkdir -p platforms/flutter/android/src/main/jniLibs
           cp -R platforms/android/src/main/jniLibs/* platforms/flutter/android/src/main/jniLibs/
           rm -rf platforms/flutter/ios/RaTeX.xcframework
           cp -R platforms/ios/RaTeX.xcframework platforms/flutter/ios/
-          echo "jniLibs and xcframework copied into platforms/flutter"
+
+          # macOS universal dylib
+          test -f platforms/flutter/macos/Libraries/libratex_ffi.dylib || \
+            echo "::warning::macOS dylib not found"
+
+          # Windows DLL
+          test -f platforms/flutter/windows/ratex_ffi.dll || \
+            echo "::warning::Windows DLL not found"
+
+          # Linux .so — per-arch directories
+          for arch in x86_64 aarch64; do
+            test -f "platforms/flutter/linux/lib/$arch/libratex_ffi.so" || \
+              echo "::warning::Linux $arch .so not found"
+          done
+
+          echo "All native libs verified in platforms/flutter"
 
       - name: Setup Dart (with pub.dev OIDC credentials)
         uses: dart-lang/setup-dart@v1
