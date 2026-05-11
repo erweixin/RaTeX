@@ -996,3 +996,6 @@ f^{(n)}(x) = \dfrac{\mathrm{d}^n f}{\mathrm{d}x^n}
 \displaystyle \iiint_{-\infty}^{infty}
 \textstyle\sum_{n=1}^{\infty}
 \textstyle\sum\limits_{n=1}^{\infty}
+\left( \htmlStyle{color: red;}{x \middle| y} \right)
+\htmlStyle{color: red;}{x}^2
+a \htmlStyle{color: red;}{+} b

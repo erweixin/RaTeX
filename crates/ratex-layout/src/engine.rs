@@ -2023,6 +2023,7 @@ fn node_contains_middle(node: &ParseNode) -> bool {
         }
         ParseNode::HorizBrace { base, .. } => node_contains_middle(base),
         ParseNode::Href { body, .. } => body.iter().any(node_contains_middle),
+        ParseNode::Html { body, .. } => body.iter().any(node_contains_middle),
         _ => false,
     }
 }
@@ -3446,6 +3447,14 @@ fn node_math_class(node: &ParseNode) -> Option<MathClass> {
             }
             None
         }
+        ParseNode::Html { body, .. } => {
+            for child in body {
+                if let Some(cls) = node_math_class(child) {
+                    return Some(cls);
+                }
+            }
+            None
+        }
         ParseNode::Lap { .. } => None,
         ParseNode::LeftRight { .. } => Some(MathClass::Inner),
         ParseNode::AccentToken { .. } => Some(MathClass::Ord),
@@ -3480,6 +3489,7 @@ fn get_base_elem(node: &ParseNode) -> &ParseNode {
     match node {
         ParseNode::OrdGroup { body, .. } if body.len() == 1 => get_base_elem(&body[0]),
         ParseNode::Color { body, .. } if body.len() == 1 => get_base_elem(&body[0]),
+        ParseNode::Html { body, .. } if body.len() == 1 => get_base_elem(&body[0]),
         ParseNode::Font { body, .. } => get_base_elem(body),
         _ => node,
     }
