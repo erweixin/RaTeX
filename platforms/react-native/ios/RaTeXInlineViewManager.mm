@@ -96,12 +96,14 @@ inline UIColor *_Nullable RaTeXInlineUIColorFromSharedColor(const SharedColor &s
   }
 
   UIColor *color = RaTeXInlineUIColorFromSharedColor(newProps.color);
-  if (color && ![color isEqual:_nativeView.color]) {
+  if ((color == nil) != (_nativeView.color == nil) ||
+      (color != nil && ![color isEqual:_nativeView.color])) {
     _nativeView.color = color;
   }
 
   UIColor *textColor = RaTeXInlineUIColorFromSharedColor(newProps.textColor);
-  if (textColor && ![textColor isEqual:_nativeView.textColor]) {
+  if ((textColor == nil) != (_nativeView.textColor == nil) ||
+      (textColor != nil && ![textColor isEqual:_nativeView.textColor])) {
     _nativeView.textColor = textColor;
   }
 

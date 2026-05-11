@@ -73,6 +73,53 @@ const INLINE_EXAMPLES = [
   },
 ];
 
+const INLINE_EDGE_CASES = [
+  {
+    name: 'Pure text — no formula',
+    content: 'This is plain text with no LaTeX formulas at all.',
+  },
+  {
+    name: 'Pure formula — no text',
+    content: String.raw`$\sum_{k=0}^{n} \binom{n}{k} x^k y^{n-k}$`,
+  },
+  {
+    name: 'Back-to-back formulas',
+    content: String.raw`$\alpha$$\beta$$\gamma$ are Greek letters.`,
+  },
+  {
+    name: 'Multiple formulas in one line',
+    content: String.raw`Given $f(x)=x^2$, then $f'(x)=2x$ and $f''(x)=2$.`,
+  },
+  {
+    name: 'CJK mixed — 中文与公式',
+    content: String.raw`欧拉公式 $e^{i\pi}+1=0$ 被认为是数学中最美的公式，它将 $e$、$\pi$、$i$ 这三个重要常数联系在了一起。`,
+  },
+  {
+    name: 'Unclosed $ fallback',
+    content: 'Price is $5 and tax is 10%.',
+  },
+  {
+    name: 'Escaped \\$ literal',
+    content: String.raw`The cost is \$100 and the formula is $E=mc^2$.`,
+  },
+  {
+    name: 'Long wrapping text with formulas',
+    content: String.raw`In probability theory, the expected value of a random variable $X$ is denoted $E[X] = \sum_{i} x_i p(x_i)$. The variance is $\text{Var}(X) = E[(X - \mu)^2] = \sigma^2$. The standard deviation $\sigma = \sqrt{\text{Var}(X)}$ measures spread around the mean $\mu$.`,
+  },
+  {
+    name: 'Subscript & superscript baseline',
+    content: String.raw`Water is $\text{H}_2\text{O}$ and the reaction $\text{2H}_2 + \text{O}_2 \rightarrow \text{2H}_2\text{O}$ is exothermic.`,
+  },
+  {
+    name: 'Fraction baseline alignment',
+    content: String.raw`The slope is $\frac{\Delta y}{\Delta x} = \frac{y_2 - y_1}{x_2 - x_1}$ between two points on a line.`,
+  },
+  {
+    name: 'Square root inline',
+    content: String.raw`The distance formula: $d = \sqrt{(x_2-x_1)^2 + (y_2-y_1)^2}$ gives the Euclidean distance.`,
+  },
+];
+
 export default function App() {
   const isDark = useColorScheme() === 'dark';
   const [custom, setCustom] = useState(String.raw`\frac{1}{\sqrt{2\pi}}`);
@@ -121,6 +168,57 @@ export default function App() {
             />
           </View>
         ))}
+
+        {/* InlineTeX edge cases */}
+        <Text style={[styles.sectionTitle, isDark && styles.textLight]}>
+          Inline Edge Cases
+        </Text>
+        {INLINE_EDGE_CASES.map(({name, content}) => (
+          <View key={name} style={styles.card}>
+            <Text style={[styles.label, isDark && styles.textLight]}>{name}</Text>
+            <InlineTeX
+              content={content}
+              fontSize={16}
+              textStyle={[styles.inlineText, isDark && styles.textLight]}
+            />
+          </View>
+        ))}
+
+        {/* InlineTeX font size & color variations */}
+        <Text style={[styles.sectionTitle, isDark && styles.textLight]}>
+          Inline Sizes &amp; Colors
+        </Text>
+        <View style={styles.card}>
+          <Text style={[styles.label, isDark && styles.textLight]}>
+            fontSize=12, small text
+          </Text>
+          <InlineTeX
+            content={String.raw`Small: $E=mc^2$ and $\alpha + \beta = \gamma$.`}
+            fontSize={12}
+            textStyle={{fontSize: 12, color: '#333'}}
+          />
+        </View>
+        <View style={styles.card}>
+          <Text style={[styles.label, isDark && styles.textLight]}>
+            fontSize=24, large text
+          </Text>
+          <InlineTeX
+            content={String.raw`Large: $\int_0^1 x\,dx = \frac{1}{2}$ done.`}
+            fontSize={24}
+            textStyle={{fontSize: 24, color: '#333'}}
+          />
+        </View>
+        <View style={styles.card}>
+          <Text style={[styles.label, isDark && styles.textLight]}>
+            Colored formula (blue) + red text
+          </Text>
+          <InlineTeX
+            content={String.raw`Color test: $\nabla \times \mathbf{E} = -\frac{\partial \mathbf{B}}{\partial t}$ is Maxwell.`}
+            fontSize={16}
+            color="#2563eb"
+            textStyle={{fontSize: 16, color: '#dc2626'}}
+          />
+        </View>
 
         {/* Preset block formulas */}
         <Text style={[styles.sectionTitle, isDark && styles.textLight]}>Formula Examples</Text>

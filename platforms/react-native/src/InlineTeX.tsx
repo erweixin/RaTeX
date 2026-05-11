@@ -1,4 +1,4 @@
-import React, {useCallback, useContext, useEffect, useState} from 'react';
+import React, {useCallback, useContext, useEffect, useMemo, useState} from 'react';
 import {StyleSheet} from 'react-native';
 import type {ColorValue, StyleProp, TextStyle, ViewStyle} from 'react-native';
 import RaTeXInlineViewNativeComponent from './RaTeXInlineViewNativeComponent';
@@ -61,9 +61,18 @@ export function InlineTeX({
   const flatStyle = StyleSheet.flatten(style) as ViewStyle | undefined;
   const hasHeight = typeof flatStyle?.height === 'number';
 
-  const resolvedStyle = contentSize
-    ? [style, hasHeight ? undefined : {height: contentSize.height}]
-    : style;
+  const estimatedHeight = useMemo(() => {
+    const lineHeight = Math.ceil(textFontSize * 1.4);
+    return lineHeight;
+  }, [textFontSize]);
+
+  const heightValue = contentSize
+    ? contentSize.height
+    : estimatedHeight;
+
+  const resolvedStyle = hasHeight
+    ? style
+    : [style, {minHeight: heightValue}];
 
   return (
     <RaTeXInlineViewNativeComponent

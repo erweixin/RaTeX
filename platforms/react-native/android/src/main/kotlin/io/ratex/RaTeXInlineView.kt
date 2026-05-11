@@ -128,6 +128,8 @@ class RaTeXInlineView @JvmOverloads constructor(
         if (content.isBlank()) {
             currentSpannable = null
             staticLayout = null
+            lastLayoutWidth = -1
+            lastReportedSize = Pair(0.0, 0.0)
             requestLayout()
             invalidate()
             return
@@ -136,6 +138,8 @@ class RaTeXInlineView @JvmOverloads constructor(
             withContext(Dispatchers.IO) { RaTeXFontLoader.ensureLoaded(context) }
             val spannable = buildSpannable()
             currentSpannable = spannable
+            lastLayoutWidth = -1
+            lastReportedSize = Pair(0.0, 0.0)
             rebuildLayout()
         }
     }
@@ -222,8 +226,23 @@ class RaTeXInlineView @JvmOverloads constructor(
             val segments = mutableListOf<Segment>()
             val current = StringBuilder()
             var inFormula = false
+            var prevWasBackslash = false
 
             for (ch in content) {
+                if (prevWasBackslash) {
+                    prevWasBackslash = false
+                    if (ch == '$') {
+                        current.append('$')
+                        continue
+                    }
+                    current.append('\\')
+                }
+
+                if (ch == '\\' && !inFormula) {
+                    prevWasBackslash = true
+                    continue
+                }
+
                 if (ch == '$') {
                     if (inFormula) {
                         if (current.isNotEmpty()) {
@@ -241,6 +260,10 @@ class RaTeXInlineView @JvmOverloads constructor(
                 } else {
                     current.append(ch)
                 }
+            }
+
+            if (prevWasBackslash) {
+                current.append('\\')
             }
 
             if (current.isNotEmpty()) {

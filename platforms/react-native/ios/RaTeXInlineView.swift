@@ -88,6 +88,12 @@ public class RaTeXInlineView: UIView {
         layoutManager.drawGlyphs(forGlyphRange: glyphRange, at: .zero)
     }
 
+    // MARK: - Intrinsic content size
+
+    public override var intrinsicContentSize: CGSize {
+        lastReportedSize
+    }
+
     // MARK: - Content size
 
     private func reportContentSizeIfNeeded() {
@@ -95,6 +101,7 @@ public class RaTeXInlineView: UIView {
         let size = CGSize(width: ceil(usedRect.width), height: ceil(usedRect.height))
         guard size != lastReportedSize, size.width > 0, size.height > 0 else { return }
         lastReportedSize = size
+        invalidateIntrinsicContentSize()
         onContentSizeChange?(size.width, size.height)
     }
 
@@ -106,6 +113,7 @@ public class RaTeXInlineView: UIView {
         textStorage.setAttributedString(attributed)
         lastLayoutWidth = -1
         lastReportedSize = .zero
+        invalidateIntrinsicContentSize()
         setNeedsLayout()
         setNeedsDisplay()
     }
@@ -161,8 +169,23 @@ public class RaTeXInlineView: UIView {
         var segments: [Segment] = []
         var current = ""
         var inFormula = false
+        var prevWasBackslash = false
 
         for ch in content {
+            if prevWasBackslash {
+                prevWasBackslash = false
+                if ch == "$" {
+                    current.append("$")
+                    continue
+                }
+                current.append("\\")
+            }
+
+            if ch == "\\" && !inFormula {
+                prevWasBackslash = true
+                continue
+            }
+
             if ch == "$" {
                 if inFormula {
                     if !current.isEmpty {
@@ -180,6 +203,10 @@ public class RaTeXInlineView: UIView {
             } else {
                 current.append(ch)
             }
+        }
+
+        if prevWasBackslash {
+            current.append("\\")
         }
 
         if !current.isEmpty {
