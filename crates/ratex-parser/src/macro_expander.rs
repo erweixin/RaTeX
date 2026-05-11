@@ -678,7 +678,8 @@ impl<'a> MacroExpander<'a> {
 
         // KaTeX HTML extensions: no-op (only render content, no HTML attributes).
         // Not standard LaTeX; for compatibility we parse and expand to second argument only.
-        for name in &["\\htmlClass", "\\htmlData", "\\htmlId", "\\htmlStyle"] {
+        // \htmlStyle is registered as a real function so the renderer can honor basic CSS.
+        for name in &["\\htmlClass", "\\htmlData", "\\htmlId"] {
             let name = (*name).to_string();
             self.macros.set(
                 name.clone(),

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use ratex_font::{get_char_metrics, get_global_metrics, FontId};
 use ratex_parser::parse_node::{ArrayTag, AtomFamily, Mode, ParseNode};
 use ratex_types::color::Color;
@@ -478,6 +480,8 @@ fn layout_node(node: &ParseNode, options: &LayoutOptions) -> LayoutBox {
         ParseNode::HtmlMathMl { html, .. } => {
             layout_expression(html, options, true)
         }
+
+        ParseNode::Html { attributes, body, .. } => layout_html(attributes, body, options),
 
         ParseNode::MClass { body, .. } => layout_expression(body, options, true),
 
@@ -2695,6 +2699,134 @@ fn layout_sizing(size: u8, body: &[ParseNode], options: &LayoutOptions) -> Layou
             color: options.color,
         }
     }
+}
+
+#[derive(Default)]
+struct HtmlStyle {
+    color: Option<Color>,
+    font_size_scale: Option<f64>,
+    bold: bool,
+    italic: bool,
+    background_color: Option<Color>,
+    underline: bool,
+}
+
+fn layout_html(attributes: &HashMap<String, String>, body: &[ParseNode], options: &LayoutOptions) -> LayoutBox {
+    let style = attributes
+        .get("style")
+        .map(|style| parse_html_style(style))
+        .unwrap_or_default();
+
+    let body_options = match style.color {
+        Some(color) => options.with_color(color),
+        None => options.clone(),
+    };
+    let font_id = match (style.bold, style.italic) {
+        (true, true) => Some(FontId::MainBoldItalic),
+        (true, false) => Some(FontId::MainBold),
+        (false, true) => Some(FontId::MainItalic),
+        (false, false) => None,
+    };
+
+    let body_node = ParseNode::OrdGroup {
+        mode: body.first().map(ParseNode::mode).unwrap_or(Mode::Math),
+        body: body.to_vec(),
+        semisimple: None,
+        loc: None,
+    };
+    let mut lbox = match font_id {
+        Some(font_id) => layout_with_font(&body_node, font_id, &body_options),
+        None => layout_expression(body, &body_options, true),
+    };
+
+    if let Some(scale) = style.font_size_scale {
+        if (scale - 1.0).abs() >= 0.001 {
+            lbox = LayoutBox {
+                width: lbox.width * scale,
+                height: lbox.height * scale,
+                depth: lbox.depth * scale,
+                content: BoxContent::Scaled {
+                    body: Box::new(lbox),
+                    child_scale: scale,
+                },
+                color: body_options.color,
+            };
+        }
+    }
+
+    if let Some(background_color) = style.background_color {
+        lbox = LayoutBox {
+            width: lbox.width,
+            height: lbox.height,
+            depth: lbox.depth,
+            content: BoxContent::Framed {
+                body: Box::new(lbox),
+                padding: 0.0,
+                border_thickness: 0.0,
+                has_border: false,
+                bg_color: Some(background_color),
+                border_color: Color::BLACK,
+            },
+            color: body_options.color,
+        };
+    }
+
+    if style.underline {
+        lbox = layout_underline_laid_out(lbox, options, body_options.color);
+    }
+
+    lbox
+}
+
+fn parse_html_style(style: &str) -> HtmlStyle {
+    let mut parsed = HtmlStyle::default();
+    for declaration in style.split(';') {
+        let Some((property, value)) = declaration.split_once(':') else {
+            continue;
+        };
+        let property = property.trim().to_ascii_lowercase();
+        let value = value.trim();
+        match property.as_str() {
+            "color" => parsed.color = Color::parse(value),
+            "font-size" => parsed.font_size_scale = parse_css_font_size(value),
+            "font-weight" => parsed.bold = is_css_bold(value),
+            "font-style" => parsed.italic = is_css_italic(value),
+            "background" | "background-color" => parsed.background_color = Color::parse(value),
+            "text-decoration" | "text-decoration-line" => {
+                parsed.underline = value
+                    .split_whitespace()
+                    .any(|part| part.eq_ignore_ascii_case("underline"));
+            }
+            _ => {}
+        }
+    }
+    parsed
+}
+
+fn parse_css_font_size(value: &str) -> Option<f64> {
+    let value = value.trim().to_ascii_lowercase().replace(' ', "");
+    let parse_number = |s: &str| s.parse::<f64>().ok().filter(|n| n.is_finite() && *n > 0.0);
+    if let Some(px) = value.strip_suffix("px") {
+        parse_number(px).map(|n| n / 16.0)
+    } else if let Some(em) = value.strip_suffix("em").or_else(|| value.strip_suffix("rem")) {
+        parse_number(em)
+    } else if let Some(percent) = value.strip_suffix('%') {
+        parse_number(percent).map(|n| n / 100.0)
+    } else {
+        None
+    }
+}
+
+fn is_css_bold(value: &str) -> bool {
+    let value = value.trim();
+    value.eq_ignore_ascii_case("bold")
+        || value.eq_ignore_ascii_case("bolder")
+        || value.parse::<u16>().is_ok_and(|weight| weight >= 600)
+}
+
+fn is_css_italic(value: &str) -> bool {
+    let value = value.trim();
+    value.eq_ignore_ascii_case("italic") || value.eq_ignore_ascii_case("oblique")
 }
 
 /// Layout \verb and \verb* — verbatim text in typewriter font.

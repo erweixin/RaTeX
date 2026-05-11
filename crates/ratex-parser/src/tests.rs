@@ -499,6 +499,19 @@ mod colors_and_sizing {
         assert_eq!(ast.len(), 1);
         assert_eq!(ast[0].type_name(), "underline");
     }
+
+    #[test]
+    fn htmlstyle() {
+        let ast = parse("\\htmlStyle{color: blue; font-size: 20px;}{x^2}").unwrap();
+        assert_eq!(ast.len(), 1);
+        assert_eq!(ast[0].type_name(), "html");
+        if let ParseNode::Html { attributes, body, .. } = &ast[0] {
+            assert_eq!(attributes.get("style").unwrap(), "color: blue; font-size: 20px;");
+            assert!(!body.is_empty());
+        } else {
+            panic!("Expected html node");
+        }
+    }
 }
 
 #[cfg(test)]

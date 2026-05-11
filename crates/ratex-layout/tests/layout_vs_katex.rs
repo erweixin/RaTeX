@@ -6,8 +6,11 @@
 ///
 /// Tolerance: 0.001em (well within the 0.02em threshold from the plan).
 use ratex_layout::{layout, LayoutOptions};
+use ratex_layout::to_display_list;
 use ratex_parser::parser::parse;
 use ratex_types::MathStyle;
+use ratex_types::color::Color;
+use ratex_types::display_item::DisplayItem;
 
 const TOLERANCE: f64 = 0.002;
 
@@ -40,6 +43,29 @@ fn layout_with_style(input: &str, style: MathStyle) -> ratex_layout::LayoutBox {
 #[test]
 fn single_char_x() {
     check("x", 0.43056, 0.0);
+}
+
+#[test]
+fn htmlstyle_applies_supported_css() {
+    let ast = parse("\\htmlStyle{color: blue; font-size: 20px; font-weight: bold; font-style: italic; background-color: yellow; text-decoration: underline;}{x}").unwrap();
+    let options = LayoutOptions::default();
+    let lbox = layout(&ast, &options);
+    let display = to_display_list(&lbox);
+
+    assert!(display.width > layout(&parse("x").unwrap(), &options).width);
+    assert!(display.items.iter().any(|item| matches!(
+        item,
+        DisplayItem::Rect { color, .. } if *color == Color::from_name("yellow").unwrap()
+    )));
+    assert!(display.items.iter().any(|item| matches!(
+        item,
+        DisplayItem::Line { color, .. } if *color == Color::from_name("blue").unwrap()
+    )));
+    assert!(display.items.iter().any(|item| matches!(
+        item,
+        DisplayItem::GlyphPath { color, font, .. }
+            if *color == Color::from_name("blue").unwrap() && font == "Main-BoldItalic"
+    )));
 }
 
 #[test]
