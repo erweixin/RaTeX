@@ -304,12 +304,26 @@ impl<'a> Parser<'a> {
             if lex.text == "\\limits" || lex.text == "\\nolimits" {
                 let is_limits = lex.text == "\\limits";
                 self.consume();
-                if let Some(
-                    ParseNode::Op { limits, .. }
-                    | ParseNode::OperatorName { limits, .. },
-                ) = base.as_mut()
-                {
-                    *limits = is_limits;
+                if let Some(base_node) = base.as_mut() {
+                    match base_node {
+                        ParseNode::Op {
+                            limits,
+                            always_handle_sup_sub,
+                            ..
+                        } => {
+                            *limits = is_limits;
+                            *always_handle_sup_sub = Some(is_limits);
+                        }
+                        ParseNode::OperatorName {
+                            limits,
+                            always_handle_sup_sub,
+                            ..
+                        } => {
+                            *limits = is_limits;
+                            *always_handle_sup_sub = is_limits;
+                        }
+                        _ => {}
+                    }
                 }
             } else if lex.text == "^" {
                 if superscript.is_some() {

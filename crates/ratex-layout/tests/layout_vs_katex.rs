@@ -7,6 +7,7 @@
 /// Tolerance: 0.001em (well within the 0.02em threshold from the plan).
 use ratex_layout::{layout, LayoutOptions};
 use ratex_parser::parser::parse;
+use ratex_types::MathStyle;
 
 const TOLERANCE: f64 = 0.002;
 
@@ -28,6 +29,12 @@ fn check(input: &str, expected_height: f64, expected_depth: f64) {
         "`{input}` depth: expected {expected_depth:.5}, got {:.5} (Δ={d_diff:.5})",
         lbox.depth
     );
+}
+
+fn layout_with_style(input: &str, style: MathStyle) -> ratex_layout::LayoutBox {
+    let ast = parse(input).unwrap_or_else(|e| panic!("Parse error for `{input}`: {e}"));
+    let options = LayoutOptions::default().with_style(style);
+    layout(&ast, &options)
 }
 
 #[test]
@@ -202,6 +209,25 @@ fn max_text_op() {
 #[test]
 fn int_with_explicit_limits() {
     check("\\int\\limits_2^2 3", 2.1922, 1.6582);
+}
+
+#[test]
+fn explicit_limits_apply_in_text_style() {
+    let default = layout_with_style("\\sum_{n=1}^{\\infty}", MathStyle::Text);
+    let explicit = layout_with_style("\\sum\\limits_{n=1}^{\\infty}", MathStyle::Text);
+
+    assert!(
+        explicit.height > default.height + 0.5,
+        "explicit limits should place superscript above in text style: default height {:.5}, explicit height {:.5}",
+        default.height,
+        explicit.height
+    );
+    assert!(
+        explicit.depth > default.depth + 0.5,
+        "explicit limits should place subscript below in text style: default depth {:.5}, explicit depth {:.5}",
+        default.depth,
+        explicit.depth
+    );
 }
 
 // ============================================================================

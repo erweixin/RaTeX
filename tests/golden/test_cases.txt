@@ -994,3 +994,5 @@ f^{(n)}(x) = \dfrac{\mathrm{d}^n f}{\mathrm{d}x^n}
 \begin{align} x &= 1 \nonumber \\ y &= 2 \end{align}
 \begin{align} x &= 1 \tag{custom} \\ y &= 2 \end{align}
 \displaystyle \iiint_{-\infty}^{infty}
+\textstyle\sum_{n=1}^{\infty}
+\textstyle\sum\limits_{n=1}^{\infty}

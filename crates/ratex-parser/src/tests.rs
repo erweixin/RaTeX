@@ -338,6 +338,48 @@ mod operators {
             assert!(sub.is_some());
         }
     }
+
+    #[test]
+    fn sum_with_explicit_limits_forces_supsub_handling() {
+        let ast = parse("\\sum\\limits_{i=0}^{n}").unwrap();
+        assert_eq!(ast.len(), 1);
+        if let ParseNode::SupSub { base, .. } = &ast[0] {
+            if let ParseNode::Op {
+                limits,
+                always_handle_sup_sub,
+                ..
+            } = base.as_ref().unwrap().as_ref()
+            {
+                assert!(*limits);
+                assert_eq!(*always_handle_sup_sub, Some(true));
+            } else {
+                panic!("expected op base");
+            }
+        } else {
+            panic!("expected supsub");
+        }
+    }
+
+    #[test]
+    fn sum_with_explicit_nolimits_does_not_force_supsub_handling() {
+        let ast = parse("\\sum\\nolimits_{i=0}^{n}").unwrap();
+        assert_eq!(ast.len(), 1);
+        if let ParseNode::SupSub { base, .. } = &ast[0] {
+            if let ParseNode::Op {
+                limits,
+                always_handle_sup_sub,
+                ..
+            } = base.as_ref().unwrap().as_ref()
+            {
+                assert!(!*limits);
+                assert_eq!(*always_handle_sup_sub, Some(false));
+            } else {
+                panic!("expected op base");
+            }
+        } else {
+            panic!("expected supsub");
+        }
+    }
 }
 
 #[cfg(test)]
