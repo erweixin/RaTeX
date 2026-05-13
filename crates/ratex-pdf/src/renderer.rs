@@ -199,6 +199,7 @@ fn build_content_stream(
     stroke_width: f64,
 ) -> Vec<u8> {
     let mut content = Content::new();
+    let mut emoji_outline_scaler = EmojiOutlineScaler::new(font_data);
 
     for item in items {
         match item {
@@ -226,6 +227,7 @@ fn build_content_stream(
                     font_data,
                     emoji_assets,
                     emoji_ix,
+                    &mut emoji_outline_scaler,
                 );
             }
             DisplayItem::Line {
@@ -297,6 +299,55 @@ fn flip_y(y: f64, page_h: f64) -> f32 {
     (page_h - y) as f32
 }
 
+/// Cache text-matrix scale for emoji outline fallback glyphs.
+///
+/// Windows COLR emoji fonts can have wider advance than the 1.0em box used by layout for
+/// missing emoji. We scale outlines horizontally+vertically to match that allocated width.
+struct EmojiOutlineScaler<'a> {
+    font: ab_glyph::FontRef<'a>,
+    units_per_em: f32,
+    scale_cache: HashMap<u32, f32>,
+}
+
+impl<'a> EmojiOutlineScaler<'a> {
+    fn new(font_data: &'a fonts::RawFontData) -> Option<Self> {
+        use ab_glyph::Font;
+
+        let font_bytes = font_data.get(&FontId::EmojiFallback)?;
+        let idx = ratex_unicode_font::emoji_font_face_index().unwrap_or(0);
+        let font = ab_glyph::FontRef::try_from_slice_and_index(font_bytes, idx).ok()?;
+        let units_per_em = font.units_per_em().unwrap_or(1000.0).max(1.0);
+        Some(Self {
+            font,
+            units_per_em,
+            scale_cache: HashMap::new(),
+        })
+    }
+
+    fn text_matrix_scale_for(&mut self, char_code: u32) -> f32 {
+        use ab_glyph::Font;
+
+        if let Some(&cached) = self.scale_cache.get(&char_code) {
+            return cached;
+        }
+
+        let mut text_matrix_scale = 1.0;
+        let ch = char::from_u32(char_code).unwrap_or('\u{FFFD}');
+        let glyph_id = self.font.glyph_id(ch);
+        if glyph_id.0 != 0 {
+            let actual_advance = self.font.h_advance_unscaled(glyph_id);
+            let actual_advance_em = actual_advance / self.units_per_em;
+            let assumed_width = 1.0;
+            if actual_advance_em > 0.01 && actual_advance_em > assumed_width * 1.01 {
+                text_matrix_scale = assumed_width / actual_advance_em;
+            }
+        }
+
+        self.scale_cache.insert(char_code, text_matrix_scale);
+        text_matrix_scale
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Glyph
 // ---------------------------------------------------------------------------
@@ -358,6 +409,7 @@ fn emit_glyph(
     font_data: &fonts::RawFontData,
     emoji_assets: &[fonts::EmbeddedEmojiImage],
     emoji_ix: &HashMap<u32, usize>,
+    emoji_outline_scaler: &mut Option<EmojiOutlineScaler<'_>>,
 ) {
     // Color emoji: collect/embed keyed only by char_code; draw whenever we embedded an XObject,
     // without re-resolving (must match [`fonts::collect_glyph_usage`] prefer-color path).
@@ -389,26 +441,14 @@ fn emit_glyph(
 
     // Emoji outline fallback has no KaTeX metrics; scale it to the 1.0em width that layout
     // allocates for missing emoji so Windows vector fallback does not overflow.
-    let mut text_matrix_scale = 1.0;
-    if actual_fid == FontId::EmojiFallback {
-        if let Some(font_bytes) = font_data.get(&FontId::EmojiFallback) {
-            use ab_glyph::Font;
-            let idx = ratex_unicode_font::emoji_font_face_index().unwrap_or(0);
-            if let Ok(font) = ab_glyph::FontRef::try_from_slice_and_index(font_bytes, idx) {
-                let ch = char::from_u32(char_code).unwrap_or('\u{FFFD}');
-                let glyph_id = font.glyph_id(ch);
-                if glyph_id.0 != 0 {
-                    let actual_advance = font.h_advance_unscaled(glyph_id);
-                    let units_per_em = font.units_per_em().unwrap_or(1000.0);
-                    let actual_advance_em = actual_advance / units_per_em;
-                    let assumed_width = 1.0;
-                    if actual_advance_em > 0.01 && actual_advance_em > assumed_width * 1.01 {
-                        text_matrix_scale = assumed_width / actual_advance_em;
-                    }
-                }
-            }
-        }
-    }
+    let text_matrix_scale = if actual_fid == FontId::EmojiFallback {
+        emoji_outline_scaler
+            .as_mut()
+            .map(|s| s.text_matrix_scale_for(char_code))
+            .unwrap_or(1.0)
+    } else {
+        1.0
+    };
 
     // CID as 2-byte big-endian.
     let cid_bytes = [(new_cid >> 8) as u8, (new_cid & 0xFF) as u8];
