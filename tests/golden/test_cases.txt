@@ -1033,3 +1033,16 @@ a · b
 \sout{abc}
 \text{\sout{abc}}
 \sout{x^2}
+\begin{CD} A @>a>> B \\ @VbVV @VcVV \\ C @>d>> D \end{CD}
+∏_{k=1}^{n} k
+∐_i S_i
+∑_{m=1}^{M} m
+⋀_{i=1}^n \varphi_i
+⋁_{j} \psi_j
+⋂_{n} U_n
+⋃_{\alpha} V_{\alpha}
+⨀_{i=1}^r G_i
+⨁_{j} H_j
+⨂_{k} L_k
+⨄_{m} P_m
+⨆_{n} Q_n
