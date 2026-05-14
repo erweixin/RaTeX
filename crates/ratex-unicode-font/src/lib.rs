@@ -17,6 +17,7 @@ mod emoji_raster;
 pub use emoji_raster::{emoji_png_raster_for_char, emoji_raster_for_char, EmojiRasterStrike};
 
 use std::sync::{Arc, OnceLock};
+use system_fonts::{find_for_system_locale, FontStyle, FoundFontSource};
 
 /// `(full font file bytes, face index within TTC or 0 for single-font / unknown collection face)`.
 static UNICODE_FONT: OnceLock<Option<(Arc<Vec<u8>>, u32)>> = OnceLock::new();
@@ -119,7 +120,8 @@ fn load_unicode_fallback_font() -> Option<(Arc<Vec<u8>>, u32)> {
     discover_system_font()
 }
 
-/// Discover a font from system paths and fontdb (does NOT check `RATEX_UNICODE_FONT`).
+/// Discover a font from system paths and locale-aware system-fonts presets (does NOT check
+/// `RATEX_UNICODE_FONT`).
 ///
 /// Prioritizes fonts with broad Unicode coverage (emoji, symbols, CJK) so that the fallback
 /// is useful even when the primary font (e.g. a narrow Korean font) lacks many glyphs.
@@ -139,85 +141,34 @@ fn discover_system_font() -> Option<(Arc<Vec<u8>>, u32)> {
 
     for &spec in candidates {
         if let Some(font) = load_font_spec(spec) {
-            eprintln!("[ratex-unicode-font] found system font: {}", spec);
+            eprintln!("[ratex-unicode-font] found via builtin path: {}", spec);
             return Some(font);
         }
     }
 
-    // 2. fontdb — search for well-known broad-coverage families first.
-    let mut db = fontdb::Database::new();
-    db.load_system_fonts();
-
-    #[cfg(target_os = "macos")]
-    let fallback_families: &[&str] = &[
-        "Arial Unicode MS",
-        "Noto Sans CJK SC",
-        "Noto Sans SC",
-        "PingFang SC",
-        "Arial",
-        "Noto Sans",
-    ];
-    #[cfg(target_os = "linux")]
-    let fallback_families: &[&str] = &[
-        "Arial Unicode MS",
-        "Noto Sans CJK SC",
-        "Noto Sans SC",
-        "DejaVu Sans",
-        "Arial",
-        "Noto Sans",
-    ];
-    #[cfg(target_os = "windows")]
-    let fallback_families: &[&str] = &[
-        "Arial Unicode MS",
-        "Noto Sans CJK SC",
-        "Noto Sans SC",
-        "Microsoft YaHei",
-        "Arial",
-        "Noto Sans",
-    ];
-    #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
-    let fallback_families: &[&str] = &[];
-
-    for family in fallback_families {
-        let query = fontdb::Query {
-            families: &[fontdb::Family::Name(family)],
-            weight: fontdb::Weight::NORMAL,
-            stretch: fontdb::Stretch::Normal,
-            style: fontdb::Style::Normal,
+    // 2. Locale-aware prioritized candidates from system-fonts.
+    let (_locale, region, fonts) = find_for_system_locale(FontStyle::Sans);
+    for found in fonts {
+        let FoundFontSource::Path(path) = found.source else {
+            continue;
         };
-        if let Some(id) = db.query(&query) {
-            if let Some(pair) = db
-                .with_face_data(id, |data, index| {
-                    is_sfnt_container(data).then(|| (data.to_vec(), index))
-                })
-                .flatten()
-            {
-                let bytes = Arc::new(pair.0);
-                eprintln!(
-                    "[ratex-unicode-font] found via fontdb: {} (face index {})",
-                    family, pair.1
-                );
-                return Some((bytes, pair.1));
-            }
-        }
-    }
 
-    // 3. Generic SansSerif query.
-    let query = fontdb::Query {
-        families: &[fontdb::Family::SansSerif],
-        weight: fontdb::Weight::NORMAL,
-        stretch: fontdb::Stretch::Normal,
-        style: fontdb::Style::Normal,
-    };
-    if let Some(id) = db.query(&query) {
-        if let Some(pair) = db
-            .with_face_data(id, |data, index| {
-                is_sfnt_container(data).then(|| (data.to_vec(), index))
-            })
-            .flatten()
+        let spec = if path
+            .extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("ttc"))
         {
-            let bytes = Arc::new(pair.0);
-            return Some((bytes, pair.1));
+            format!("{}#{}", path.display(), found.family)
+        } else {
+            path.display().to_string()
+        };
+
+        if let Some(font) = load_font_spec(&spec) {
+            eprintln!(
+                "[ratex-unicode-font] found via system-fonts: {} ({region:?})",
+                spec
+            );
+            return Some(font);
         }
     }
 
