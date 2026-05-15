@@ -177,7 +177,7 @@ fn wrap_svg(vb_w: f64, vb_h: f64, body: &str) -> String {
     let w = fmt_num(vb_w);
     let h = fmt_num(vb_h);
     format!(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}" height="{h}">{body}</svg>"#
+        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}pt" height="{h}pt">{body}</svg>"#
     )
 }
 
