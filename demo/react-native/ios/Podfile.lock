@@ -8,7 +8,7 @@ PODS:
   - hermes-engine (0.81.6):
     - hermes-engine/Pre-built (= 0.81.6)
   - hermes-engine/Pre-built (0.81.6)
-  - ratex-react-native (0.1.6):
+  - ratex-react-native (0.1.7):
     - boost
     - DoubleConversion
     - fast_float
@@ -2609,7 +2609,7 @@ SPEC CHECKSUMS:
   fmt: a40bb5bd0294ea969aaaba240a927bd33d878cdd
   glog: 5683914934d5b6e4240e497e0f4a3b42d1854183
   hermes-engine: 7219f6e751ad6ec7f3d7ec121830ee34dae40749
-  ratex-react-native: b3717bd0aedc19771207367e4a8e4b9d574961cd
+  ratex-react-native: b36a48d49c0dfc9e8ae7cab011608fb419dbd860
   RCT-Folly: 846fda9475e61ec7bcbf8a3fe81edfcaeb090669
   RCTDeprecation: d4ef510f229cea15314176aee5e3ba10064a8496
   RCTRequired: 1e41b794629558f6626e2bc39c166ac0ec1c5878

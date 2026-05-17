@@ -36,6 +36,28 @@ public class RaTeXInlineView: PlatformView {
         didSet { guard textFontSize != oldValue else { return }; rebuild() }
     }
 
+    public var textFontFamily: String? {
+        didSet {
+            let newTrimmed = textFontFamily?.trimmingCharacters(in: .whitespacesAndNewlines)
+            let oldTrimmed = trimmedTextFontFamily
+            guard oldTrimmed != newTrimmed else { return }
+            trimmedTextFontFamily = newTrimmed
+            rebuild()
+        }
+    }
+
+    public var textItalic: Bool = false {
+        didSet { guard textItalic != oldValue else { return }; rebuild() }
+    }
+
+    public var textUnderline: Bool = false {
+        didSet { guard textUnderline != oldValue else { return }; rebuild() }
+    }
+
+    public var textLineThrough: Bool = false {
+        didSet { guard textLineThrough != oldValue else { return }; rebuild() }
+    }
+
     public var onContentSizeChange: ((CGFloat, CGFloat) -> Void)?
 
     // MARK: - Private state
@@ -46,6 +68,7 @@ public class RaTeXInlineView: PlatformView {
     private var lastReportedSize: CGSize = .zero
     private var lastEmittedSize: CGSize?
     private var lastLayoutWidth: CGFloat = -1
+    private var trimmedTextFontFamily: String?
 
     // MARK: - Init
 
@@ -185,11 +208,17 @@ public class RaTeXInlineView: PlatformView {
         let segments = Self.parseContent(content)
         let result = NSMutableAttributedString()
 
-        let textFont = PlatformFont.systemFont(ofSize: textFontSize)
-        let textAttrs: [NSAttributedString.Key: Any] = [
+        let textFont = makeTextFont()
+        var textAttrs: [NSAttributedString.Key: Any] = [
             .font: textFont,
             .foregroundColor: textColor,
         ]
+        if textUnderline {
+            textAttrs[.underlineStyle] = NSUnderlineStyle.single.rawValue
+        }
+        if textLineThrough {
+            textAttrs[.strikethroughStyle] = NSUnderlineStyle.single.rawValue
+        }
 
         for segment in segments {
             switch segment {
@@ -204,6 +233,30 @@ public class RaTeXInlineView: PlatformView {
             }
         }
         return result
+    }
+
+    private func makeTextFont() -> PlatformFont {
+        #if os(macOS)
+        let customFont = trimmedTextFontFamily.flatMap { family -> NSFont? in
+            guard !family.isEmpty else { return nil }
+            return NSFont(name: family, size: textFontSize)
+        }
+        let baseFont = customFont ?? NSFont.systemFont(ofSize: textFontSize)
+        guard textItalic else { return baseFont }
+        let italicFont = NSFontManager.shared.convert(baseFont, toHaveTrait: .italicFontMask)
+        return italicFont
+        #else
+        let customFont = trimmedTextFontFamily.flatMap { family -> UIFont? in
+            guard !family.isEmpty else { return nil }
+            return UIFont(name: family, size: textFontSize)
+        }
+        let baseFont = customFont ?? UIFont.systemFont(ofSize: textFontSize)
+        guard textItalic else { return baseFont }
+        if let descriptor = baseFont.fontDescriptor.withSymbolicTraits([.traitItalic]) {
+            return UIFont(descriptor: descriptor, size: textFontSize)
+        }
+        return UIFont.italicSystemFont(ofSize: textFontSize)
+        #endif
     }
 
     private func makeFormulaAttachment(_ latex: String) -> RaTeXTextAttachment? {

@@ -63,4 +63,24 @@ class RaTeXInlineViewManager(private val reactContext: ReactApplicationContext) 
     override fun setTextFontSize(view: RaTeXInlineView, value: Float) {
         view.textFontSize = value
     }
+
+    @ReactProp(name = "textFontFamily")
+    override fun setTextFontFamily(view: RaTeXInlineView, value: String?) {
+        view.textFontFamily = value
+    }
+
+    @ReactProp(name = "textItalic", defaultBoolean = false)
+    override fun setTextItalic(view: RaTeXInlineView, value: Boolean) {
+        view.textItalic = value
+    }
+
+    @ReactProp(name = "textUnderline", defaultBoolean = false)
+    override fun setTextUnderline(view: RaTeXInlineView, value: Boolean) {
+        view.textUnderline = value
+    }
+
+    @ReactProp(name = "textLineThrough", defaultBoolean = false)
+    override fun setTextLineThrough(view: RaTeXInlineView, value: Boolean) {
+        view.textLineThrough = value
+    }
 }

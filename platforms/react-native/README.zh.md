@@ -125,7 +125,7 @@ function Screen() {
 
 ### `<InlineTeX />`
 
-将包含 `$...$` 标记的混合字符串渲染为原生内联文本流。公式在 iOS 上通过 `NSTextAttachment` 嵌入，在 Android 上通过 `ReplacementSpan` 嵌入，因此换行、断词和基线对齐都交给平台文本排版引擎处理。
+将包含 `$...$` 标记的混合字符串渲染为原生内联文本流。公式在 iOS/macOS 上通过 `NSTextAttachment` 嵌入，在 Android 上通过 `ReplacementSpan` 嵌入，因此换行、断词和基线对齐都交给平台文本排版引擎处理。
 
 **渲染流程：**
 
@@ -137,7 +137,7 @@ function Screen() {
 | `content` | `string` | — | 包含 `$...$` 标记的文字字符串（必填）。 |
 | `fontSize` | `number` | `16` | 传给每个公式渲染器的字体大小（dp）。 |
 | `color` | `ColorValue` | — | 传给每个行内公式的默认颜色。显式 LaTeX 颜色仍然优先。 |
-| `textStyle` | `StyleProp<TextStyle>` | — | 普通文字样式来源。目前会将 `color` 和 `fontSize` 应用到原生文本排版。 |
+| `textStyle` | `StyleProp<TextStyle>` | — | 普通文字样式来源。支持字段：`color`、`fontSize`、`fontFamily`、`fontStyle: 'italic'`，以及包含 `underline` / `line-through` 的 `textDecorationLine`。 |
 | `style` | `StyleProp<ViewStyle>` | — | 原生内联容器的标准 React Native 样式。若未显式指定高度，会自动使用测量高度。 |
 
 > `InlineTeX` 会自动对所有公式传入 `displayMode={false}`——`$...$` 始终使用行内样式。

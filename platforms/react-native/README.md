@@ -125,7 +125,7 @@ If you explicitly provide `style.width` and/or `style.height`, `RaTeXView` will 
 
 ### `<InlineTeX />`
 
-Renders a mixed string of plain text and `$...$` LaTeX formulas as a single native text flow. Formulas are embedded with `NSTextAttachment` on iOS and `ReplacementSpan` on Android, so line wrapping, word breaking, and baseline alignment are handled by the platform text layout engine.
+Renders a mixed string of plain text and `$...$` LaTeX formulas as a single native text flow. Formulas are embedded with `NSTextAttachment` on iOS/macOS and `ReplacementSpan` on Android, so line wrapping, word breaking, and baseline alignment are handled by the platform text layout engine.
 
 **Rendering pipeline:**
 
@@ -137,7 +137,7 @@ Renders a mixed string of plain text and `$...$` LaTeX formulas as a single nati
 | `content` | `string` | — | Text string with `$...$` markers for inline LaTeX (required). |
 | `fontSize` | `number` | `16` | Font size passed to each formula renderer (dp). |
 | `color` | `ColorValue` | — | Default color passed to each inline formula. Explicit LaTeX colors still take precedence. |
-| `textStyle` | `StyleProp<TextStyle>` | — | Plain-text style source. `color` and `fontSize` are applied to native text layout. |
+| `textStyle` | `StyleProp<TextStyle>` | — | Plain-text style source. Supported fields: `color`, `fontSize`, `fontFamily`, `fontStyle: 'italic'`, and `textDecorationLine` with `underline` / `line-through`. |
 | `style` | `StyleProp<ViewStyle>` | — | Standard React Native style for the native inline container. Height is measured automatically unless explicitly provided. |
 
 > `InlineTeX` automatically passes `displayMode={false}` to every formula it renders — `$...$` is always inline style.

@@ -19,6 +19,14 @@ export interface NativeProps extends ViewProps {
   textColor?: ColorValue;
   /** Plain-text font size (points). Defaults to fontSize. */
   textFontSize?: Float;
+  /** Plain-text font family. */
+  textFontFamily?: string;
+  /** Plain-text italic style. */
+  textItalic?: boolean;
+  /** Plain-text underline decoration. */
+  textUnderline?: boolean;
+  /** Plain-text line-through decoration. */
+  textLineThrough?: boolean;
   onContentSizeChange?: DirectEventHandler<OnContentSizeChangeEvent>;
 }
 

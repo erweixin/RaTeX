@@ -57,6 +57,26 @@ class RaTeXInlineViewManager(private val reactContext: ReactApplicationContext) 
         view.textFontSize = value
     }
 
+    @ReactProp(name = "textFontFamily")
+    fun setTextFontFamily(view: RaTeXInlineView, value: String?) {
+        view.textFontFamily = value
+    }
+
+    @ReactProp(name = "textItalic", defaultBoolean = false)
+    fun setTextItalic(view: RaTeXInlineView, value: Boolean) {
+        view.textItalic = value
+    }
+
+    @ReactProp(name = "textUnderline", defaultBoolean = false)
+    fun setTextUnderline(view: RaTeXInlineView, value: Boolean) {
+        view.textUnderline = value
+    }
+
+    @ReactProp(name = "textLineThrough", defaultBoolean = false)
+    fun setTextLineThrough(view: RaTeXInlineView, value: Boolean) {
+        view.textLineThrough = value
+    }
+
     override fun getExportedCustomDirectEventTypeConstants(): Map<String, Any> =
         mapOf(
             "topContentSizeChange" to mapOf("registrationName" to "onContentSizeChange"),

@@ -9,6 +9,7 @@ package io.ratex
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Typeface
 import android.text.Layout
 import android.text.SpannableStringBuilder
 import android.text.StaticLayout
@@ -59,14 +60,43 @@ class RaTeXInlineView @JvmOverloads constructor(
         set(value) {
             if (field == value) return
             field = value
-            rebuild()
+            updateTextLayout()
         }
 
     var textFontSize: Float = 16f
         set(value) {
             if (field == value) return
             field = value
-            rebuild()
+            updateTextLayout()
+        }
+
+    var textFontFamily: String? = null
+        set(value) {
+            val normalized = value?.trim()?.takeIf { it.isNotEmpty() }
+            if (field == normalized) return
+            field = normalized
+            updateTextLayout()
+        }
+
+    var textItalic: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            updateTextLayout()
+        }
+
+    var textUnderline: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            updateTextLayout()
+        }
+
+    var textLineThrough: Boolean = false
+        set(value) {
+            if (field == value) return
+            field = value
+            updateTextLayout()
         }
 
     var onContentSizeChange: ((width: Double, height: Double) -> Unit)? = null
@@ -157,8 +187,7 @@ class RaTeXInlineView @JvmOverloads constructor(
         lastLayoutWidth = availWidth
 
         val density = context.resources.displayMetrics.density
-        textPaint.textSize = textFontSize * density
-        textPaint.color = inlineTextColor
+        applyTextPaint(density)
 
         val layout = StaticLayout.Builder
             .obtain(spannable, 0, spannable.length, textPaint, availWidth)
@@ -182,9 +211,7 @@ class RaTeXInlineView @JvmOverloads constructor(
         val widthSize = MeasureSpec.getSize(widthMeasureSpec)
         val horizontalPadding = paddingLeft + paddingRight
         val density = context.resources.displayMetrics.density
-
-        textPaint.textSize = textFontSize * density
-        textPaint.color = inlineTextColor
+        applyTextPaint(density)
 
         val targetWidth = when (widthMode) {
             MeasureSpec.EXACTLY -> (widthSize - horizontalPadding).coerceAtLeast(1)
@@ -226,6 +253,25 @@ class RaTeXInlineView @JvmOverloads constructor(
             lastReportedSize = size
             onContentSizeChange?.invoke(widthDp, heightDp)
         }
+    }
+
+    private fun updateTextLayout() {
+        lastLayoutWidth = -1
+        if (currentSpannable == null) return
+        rebuildLayout()
+    }
+
+    private fun applyTextPaint(density: Float) {
+        textPaint.textSize = textFontSize * density
+        textPaint.color = inlineTextColor
+        val style = if (textItalic) Typeface.ITALIC else Typeface.NORMAL
+        textPaint.typeface = if (textFontFamily.isNullOrEmpty()) {
+            Typeface.defaultFromStyle(style)
+        } else {
+            Typeface.create(textFontFamily, style) ?: Typeface.defaultFromStyle(style)
+        }
+        textPaint.isUnderlineText = textUnderline
+        textPaint.isStrikeThruText = textLineThrough
     }
 
     private suspend fun buildSpannable(): SpannableStringBuilder {

@@ -49,6 +49,26 @@ public class RaTeXInlineRNView: PlatformView {
         set { innerView.textFontSize = newValue; invalidateIntrinsicContentSize(); platformSetNeedsLayout() }
     }
 
+    @objc public var textFontFamily: NSString? {
+        get { innerView.textFontFamily as NSString? }
+        set { innerView.textFontFamily = newValue as String?; invalidateIntrinsicContentSize(); platformSetNeedsLayout() }
+    }
+
+    @objc public var textItalic: Bool {
+        get { innerView.textItalic }
+        set { innerView.textItalic = newValue; invalidateIntrinsicContentSize(); platformSetNeedsLayout() }
+    }
+
+    @objc public var textUnderline: Bool {
+        get { innerView.textUnderline }
+        set { innerView.textUnderline = newValue; invalidateIntrinsicContentSize(); platformSetNeedsLayout() }
+    }
+
+    @objc public var textLineThrough: Bool {
+        get { innerView.textLineThrough }
+        set { innerView.textLineThrough = newValue; invalidateIntrinsicContentSize(); platformSetNeedsLayout() }
+    }
+
     // MARK: - Event callbacks
 
     @objc public var onContentSizeChange: ((NSDictionary?) -> Void)? {

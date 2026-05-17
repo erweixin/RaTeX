@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import {
+  Platform,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -236,6 +237,58 @@ export default function App() {
             textStyle={styles.inlineRedText}
           />
         </View>
+        <View style={styles.card}>
+          <Text style={[styles.label, isDark && styles.textLight]}>
+            textStyle: fontFamily only — Georgia / serif (no color, size, or
+            decoration in textStyle)
+          </Text>
+          <InlineTeX
+            content={String.raw`Plain text uses the chosen serif face; inline math $E=mc^2$ uses the default formula font.`}
+            fontSize={16}
+            textStyle={styles.inlineFontFamilyOnly}
+          />
+        </View>
+        <View style={styles.card}>
+          <Text style={[styles.label, isDark && styles.textLight]}>
+            textStyle: italic + underline + fontFamily (Android: generic serif;
+            Apple: Georgia)
+          </Text>
+          <InlineTeX
+            content={String.raw`Styled text with formula $E=mc^2$: serif, italic, and underlined plain text.`}
+            fontSize={16}
+            textStyle={styles.inlineDecoratedText}
+          />
+        </View>
+        <View style={styles.card}>
+          <Text style={[styles.label, isDark && styles.textLight]}>
+            textStyle: Georgia — iOS/macOS system serif (PostScript name)
+          </Text>
+          <InlineTeX
+            content={String.raw`Georgia sample with $\sum_{n=1}^{\infty}\frac{1}{n^2}=\frac{\pi^2}{6}$: uses a built-in Apple font.`}
+            fontSize={16}
+            textStyle={styles.inlineGeorgiaText}
+          />
+        </View>
+        <View style={styles.card}>
+          <Text style={[styles.label, isDark && styles.textLight]}>
+            textStyle: Helvetica Neue — iOS/macOS sans-serif
+          </Text>
+          <InlineTeX
+            content={String.raw`Helvetica Neue with inline math $a^2+b^2=c^2$ on Apple platforms.`}
+            fontSize={16}
+            textStyle={styles.inlineHelveticaText}
+          />
+        </View>
+        <View style={styles.card}>
+          <Text style={[styles.label, isDark && styles.textLight]}>
+            textStyle: line-through
+          </Text>
+          <InlineTeX
+            content={String.raw`Line-through sample with inline math $\int_0^1 x^2\,dx=\frac{1}{3}$.`}
+            fontSize={16}
+            textStyle={styles.inlineStrikeText}
+          />
+        </View>
 
         {/* Preset block formulas */}
         <Text style={[styles.sectionTitle, isDark && styles.textLight]}>Formula Examples</Text>
@@ -306,6 +359,42 @@ const styles = StyleSheet.create({
   inlineSmallText: {fontSize: 12, color: '#333'},
   inlineLargeText: {fontSize: 24, color: '#333'},
   inlineRedText: {fontSize: 16, color: '#dc2626'},
+  inlineFontFamilyOnly: {
+    fontFamily: Platform.select({
+      ios: 'Georgia',
+      macos: 'Georgia',
+      default: 'serif',
+    }),
+  },
+  inlineDecoratedText: {
+    fontSize: 16,
+    color: '#1f2937',
+    // Android maps generic families; iOS/macOS need PostScript names (see Georgia example).
+    fontFamily: Platform.select({
+      ios: 'Georgia',
+      macos: 'Georgia',
+      default: 'serif',
+    }),
+    fontStyle: 'italic',
+    textDecorationLine: 'underline',
+  },
+  inlineGeorgiaText: {
+    fontSize: 16,
+    color: '#1f2937',
+    fontFamily: 'Georgia',
+    fontStyle: 'italic',
+    textDecorationLine: 'underline',
+  },
+  inlineHelveticaText: {
+    fontSize: 16,
+    color: '#1f2937',
+    fontFamily: 'Helvetica Neue',
+  },
+  inlineStrikeText: {
+    fontSize: 16,
+    color: '#374151',
+    textDecorationLine: 'line-through',
+  },
   inlineCenterWrapper: {
     alignItems: 'center',
     justifyContent: 'center',

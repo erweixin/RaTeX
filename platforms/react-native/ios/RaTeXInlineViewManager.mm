@@ -114,6 +114,29 @@ using namespace facebook::react;
     _nativeView.textFontSize = textFontSize;
   }
 
+  NSString *textFontFamily = nil;
+  if (!newProps.textFontFamily.empty()) {
+    textFontFamily =
+        [NSString stringWithUTF8String:newProps.textFontFamily.c_str()];
+  }
+  if ((textFontFamily == nil) != (_nativeView.textFontFamily == nil) ||
+      (textFontFamily != nil &&
+       ![textFontFamily isEqualToString:_nativeView.textFontFamily])) {
+    _nativeView.textFontFamily = textFontFamily;
+  }
+
+  if (newProps.textItalic != _nativeView.textItalic) {
+    _nativeView.textItalic = newProps.textItalic;
+  }
+
+  if (newProps.textUnderline != _nativeView.textUnderline) {
+    _nativeView.textUnderline = newProps.textUnderline;
+  }
+
+  if (newProps.textLineThrough != _nativeView.textLineThrough) {
+    _nativeView.textLineThrough = newProps.textLineThrough;
+  }
+
   [super updateProps:props oldProps:oldProps];
 }
 
@@ -161,6 +184,10 @@ RCT_EXPORT_VIEW_PROPERTY(color, UIColor)
 RCT_EXPORT_VIEW_PROPERTY(textColor, UIColor)
 #endif
 RCT_EXPORT_VIEW_PROPERTY(textFontSize, CGFloat)
+RCT_EXPORT_VIEW_PROPERTY(textFontFamily, NSString)
+RCT_EXPORT_VIEW_PROPERTY(textItalic, BOOL)
+RCT_EXPORT_VIEW_PROPERTY(textUnderline, BOOL)
+RCT_EXPORT_VIEW_PROPERTY(textLineThrough, BOOL)
 RCT_EXPORT_VIEW_PROPERTY(onContentSizeChange, RCTDirectEventBlock)
 
 @end
