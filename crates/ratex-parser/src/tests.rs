@@ -980,6 +980,59 @@ mod environments {
     }
 
     #[test]
+    fn prooftree_fcenter_renders_visible_symbol() {
+        let ast =
+            parse("\\begin{prooftree}\\AxiomC{A \\fCenter B}\\UIC{C}\\end{prooftree}")
+                .unwrap();
+        if let ParseNode::ProofTree { tree, .. } = &ast[0] {
+            // The axiom's conclusion contains A \fCenter B, stored in premises[0].conclusion
+            let axiom = &tree.premises[0];
+            let has_arrow_rel = axiom.conclusion.iter().any(|n| match n {
+                ParseNode::Atom { family, text, .. } => {
+                    matches!(family, crate::parse_node::AtomFamily::Rel) && text == "\\Rightarrow"
+                }
+                _ => false,
+            });
+            assert!(
+                has_arrow_rel,
+                "\\fCenter should produce a relation arrow (\\\\Rightarrow) in the axiom"
+            );
+        } else {
+            panic!("Expected ProofTree node");
+        }
+    }
+
+    #[test]
+    fn prooftree_root_at_top_flag() {
+        let ast =
+            parse("\\begin{prooftree}\\AxiomC{P}\\rootAtTop\\UIC{Q}\\end{prooftree}")
+                .unwrap();
+        if let ParseNode::ProofTree { tree, .. } = &ast[0] {
+            assert!(tree.root_at_top, "\\rootAtTop should set root_at_top flag");
+        } else {
+            panic!("Expected ProofTree node");
+        }
+    }
+
+    #[test]
+    fn prooftree_root_at_bottom_is_default() {
+        let ast =
+            parse("\\begin{prooftree}\\AxiomC{P}\\UIC{Q}\\end{prooftree}").unwrap();
+        if let ParseNode::ProofTree { tree, .. } = &ast[0] {
+            assert!(!tree.root_at_top, "root_at_top should default to false");
+        } else {
+            panic!("Expected ProofTree node");
+        }
+    }
+
+    #[test]
+    fn prooftree_orphan_label_errors() {
+        let result =
+            parse("\\begin{prooftree}\\AxiomC{P}\\LeftLabel{L}\\end{prooftree}");
+        assert!(result.is_err(), "orphan \\LeftLabel should produce an error");
+    }
+
+    #[test]
     fn vmatrix_double_wraps() {
         let ast =
             parse("\\begin{Vmatrix} a & b \\\\ c & d \\end{Vmatrix}").unwrap();

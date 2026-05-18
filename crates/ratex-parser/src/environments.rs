@@ -1243,6 +1243,14 @@ fn register_subarray(map: &mut HashMap<&'static str, EnvSpec>) {
 }
 
 // ── prooftree (bussproofs subset) ───────────────────────────────────────
+//
+// Implemented: \AxiomC, \UnaryInfC, \BinaryInfC, \TrinaryInfC, \QuaternaryInfC,
+//   \QuinaryInfC (and their abbreviations \AXC, \UIC, \BIC, \TIC),
+//   \LeftLabel/\RightLabel (and \LL, \RL), \fCenter,
+//   line styles: \solidLine, \dashedLine, \noLine (and \always* variants),
+//   \rootAtTop, \rootAtBottom (and \always* variants).
+//
+// Not yet implemented: \InsertBetweenHyps, \ScoreTree, \Cell, \noCell.
 
 fn register_prooftree(map: &mut HashMap<&'static str, EnvSpec>) {
     fn handle_prooftree(
@@ -1287,6 +1295,8 @@ fn parse_prooftree(parser: &mut Parser) -> ParseResult<ParseNode> {
     let mut right_label: Option<Vec<ParseNode>> = None;
     let mut next_line_style = ProofLineStyle::Solid;
     let mut default_line_style = ProofLineStyle::Solid;
+    let mut next_root_at_top = false;
+    let mut default_root_at_top = false;
 
     loop {
         parser.consume_spaces()?;
@@ -1307,6 +1317,7 @@ fn parse_prooftree(parser: &mut Parser) -> ParseResult<ParseNode> {
                     left_label: None,
                     right_label: None,
                     line_style: ProofLineStyle::None,
+                    root_at_top: false,
                 });
             }
             "\\LeftLabel" | "\\LL" => {
@@ -1336,7 +1347,20 @@ fn parse_prooftree(parser: &mut Parser) -> ParseResult<ParseNode> {
                 default_line_style = ProofLineStyle::None;
                 next_line_style = ProofLineStyle::None;
             }
-            "\\rootAtTop" | "\\rootAtBottom" | "\\alwaysRootAtTop" | "\\alwaysRootAtBottom" => {}
+            "\\rootAtTop" => {
+                next_root_at_top = true;
+            }
+            "\\rootAtBottom" => {
+                next_root_at_top = false;
+            }
+            "\\alwaysRootAtTop" => {
+                default_root_at_top = true;
+                next_root_at_top = true;
+            }
+            "\\alwaysRootAtBottom" => {
+                default_root_at_top = false;
+                next_root_at_top = false;
+            }
             name if proof_command_arity(name).is_some() => {
                 let arity = proof_command_arity(name).unwrap();
                 if stack.len() < arity {
@@ -1356,8 +1380,10 @@ fn parse_prooftree(parser: &mut Parser) -> ParseResult<ParseNode> {
                     left_label: left_label.take(),
                     right_label: right_label.take(),
                     line_style: next_line_style.clone(),
+                    root_at_top: next_root_at_top,
                 });
                 next_line_style = default_line_style.clone();
+                next_root_at_top = default_root_at_top;
             }
             _ => {
                 return Err(ParseError::msg(format!(
@@ -1373,6 +1399,12 @@ fn parse_prooftree(parser: &mut Parser) -> ParseResult<ParseNode> {
             "prooftree ended with {} proof stack item(s), expected 1",
             stack.len()
         )));
+    }
+
+    if left_label.is_some() || right_label.is_some() {
+        return Err(ParseError::msg(
+            "prooftree has a \\LeftLabel or \\RightLabel without a following inference command",
+        ));
     }
 
     Ok(ParseNode::ProofTree {

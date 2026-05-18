@@ -102,6 +102,26 @@ fn prooftree_dashed_and_noline_rules() {
 }
 
 #[test]
+fn prooftree_root_at_top_flips_layout() {
+    let normal_ast = parse("\\begin{prooftree}\\AxiomC{P}\\UIC{Q}\\end{prooftree}").unwrap();
+    let root_at_top_ast = parse("\\begin{prooftree}\\AxiomC{P}\\rootAtTop\\UIC{Q}\\end{prooftree}").unwrap();
+    let options = LayoutOptions::default();
+    let normal_display = to_display_list(&layout(&normal_ast, &options));
+    let root_at_top_display = to_display_list(&layout(&root_at_top_ast, &options));
+    // Both should produce valid non-empty output
+    assert!(normal_display.width > 0.0);
+    assert!(normal_display.height > 0.0);
+    assert!(root_at_top_display.width > 0.0);
+    assert!(root_at_top_display.height > 0.0);
+    // rootAtTop places conclusion at top, so height should differ from normal
+    // (normal has premises above conclusion; rootAtTop has conclusion at top)
+    assert!(
+        (normal_display.height - root_at_top_display.height).abs() > 0.001,
+        "rootAtTop should change the vertical layout"
+    );
+}
+
+#[test]
 fn single_char_uppercase() {
     check("A", 0.68333, 0.0);
 }

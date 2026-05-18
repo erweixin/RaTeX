@@ -78,6 +78,12 @@ pub struct ProofBranch {
     pub right_label: Option<Vec<ParseNode>>,
     #[serde(rename = "lineStyle")]
     pub line_style: ProofLineStyle,
+    #[serde(rename = "rootAtTop", skip_serializing_if = "is_false")]
+    pub root_at_top: bool,
+}
+
+fn is_false(b: &bool) -> bool {
+    !*b
 }
 
 /// The main AST node type. Each variant corresponds to a KaTeX ParseNode type.
