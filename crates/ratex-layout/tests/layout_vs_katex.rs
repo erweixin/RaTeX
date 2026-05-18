@@ -69,6 +69,39 @@ fn htmlstyle_applies_supported_css() {
 }
 
 #[test]
+fn prooftree_binary_emits_inference_rule() {
+    let ast = parse("\\begin{prooftree}\\AxiomC{P}\\AxiomC{Q}\\BinaryInfC{R}\\end{prooftree}").unwrap();
+    let options = LayoutOptions::default();
+    let lbox = layout(&ast, &options);
+    let display = to_display_list(&lbox);
+
+    assert!(display.width > 0.0);
+    assert!(display.height > 0.0);
+    assert!(display.items.iter().any(|item| matches!(
+        item,
+        DisplayItem::Line { dashed: false, .. }
+    )));
+}
+
+#[test]
+fn prooftree_dashed_and_noline_rules() {
+    let dashed_ast = parse("\\begin{prooftree}\\AxiomC{P}\\dashedLine\\UnaryInfC{Q}\\end{prooftree}").unwrap();
+    let options = LayoutOptions::default();
+    let dashed_display = to_display_list(&layout(&dashed_ast, &options));
+    assert!(dashed_display.items.iter().any(|item| matches!(
+        item,
+        DisplayItem::Line { dashed: true, .. }
+    )));
+
+    let noline_ast = parse("\\begin{prooftree}\\AxiomC{P}\\noLine\\UnaryInfC{Q}\\end{prooftree}").unwrap();
+    let noline_display = to_display_list(&layout(&noline_ast, &options));
+    assert!(!noline_display.items.iter().any(|item| matches!(
+        item,
+        DisplayItem::Line { .. }
+    )));
+}
+
+#[test]
 fn single_char_uppercase() {
     check("A", 0.68333, 0.0);
 }

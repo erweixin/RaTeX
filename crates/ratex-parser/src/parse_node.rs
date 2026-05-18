@@ -58,6 +58,28 @@ pub enum AlignType {
     Separator,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ProofLineStyle {
+    Solid,
+    Dashed,
+    None,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProofBranch {
+    pub conclusion: Vec<ParseNode>,
+    pub premises: Vec<ProofBranch>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "leftLabel")]
+    pub left_label: Option<Vec<ParseNode>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "rightLabel")]
+    pub right_label: Option<Vec<ParseNode>>,
+    #[serde(rename = "lineStyle")]
+    pub line_style: ProofLineStyle,
+}
+
 /// The main AST node type. Each variant corresponds to a KaTeX ParseNode type.
 ///
 /// Serializes to JSON with `"type": "variant_name"` to match KaTeX's format,
@@ -692,6 +714,14 @@ pub enum ParseNode {
         #[serde(skip_serializing_if = "Option::is_none")]
         loc: Option<SourceLocation>,
     },
+
+    #[serde(rename = "proofTree")]
+    ProofTree {
+        mode: Mode,
+        tree: ProofBranch,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        loc: Option<SourceLocation>,
+    },
 }
 
 fn default_arraystretch() -> f64 {
@@ -769,7 +799,8 @@ impl ParseNode {
             | Self::IncludeGraphics { mode, .. }
             | Self::CdLabel { mode, .. }
             | Self::CdLabelParent { mode, .. }
-            | Self::CdArrow { mode, .. } => *mode,
+            | Self::CdArrow { mode, .. }
+            | Self::ProofTree { mode, .. } => *mode,
         }
     }
 
@@ -834,6 +865,7 @@ impl ParseNode {
             Self::CdLabel { .. } => "cdlabel",
             Self::CdLabelParent { .. } => "cdlabelparent",
             Self::CdArrow { .. } => "cdArrow",
+            Self::ProofTree { .. } => "proofTree",
         }
     }
 

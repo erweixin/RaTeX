@@ -202,8 +202,30 @@ pub enum BoxContent {
         rule_thickness: f64,
     },
 
+    /// Bussproofs-style proof tree with absolutely placed child boxes and inference rules.
+    ProofTree {
+        children: Vec<PlacedBox>,
+        rules: Vec<ProofRule>,
+    },
+
     /// Empty placeholder.
     Empty,
+}
+
+#[derive(Debug, Clone)]
+pub struct PlacedBox {
+    pub box_: LayoutBox,
+    pub x: f64,
+    pub baseline_y: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct ProofRule {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub thickness: f64,
+    pub dashed: bool,
 }
 
 /// A child element in a vertical box.

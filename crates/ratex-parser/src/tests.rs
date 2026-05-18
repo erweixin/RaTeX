@@ -948,6 +948,38 @@ mod environments {
     }
 
     #[test]
+    fn prooftree_unary_with_label_and_abbreviations() {
+        let ast = parse("\\begin{prooftree}\\AXC{P}\\RL{r}\\UIC{Q}\\end{prooftree}").unwrap();
+        assert_eq!(ast.len(), 1);
+        assert_eq!(ast[0].type_name(), "proofTree");
+        if let ParseNode::ProofTree { tree, .. } = &ast[0] {
+            assert_eq!(tree.premises.len(), 1);
+            assert!(tree.left_label.is_none());
+            assert!(tree.right_label.is_some());
+            assert_eq!(tree.conclusion.len(), 1);
+        } else {
+            panic!("Expected ProofTree node");
+        }
+    }
+
+    #[test]
+    fn prooftree_binary_dashed_line() {
+        let ast = parse("\\begin{prooftree}\\AxiomC{P}\\AxiomC{Q}\\dashedLine\\BinaryInfC{R}\\end{prooftree}").unwrap();
+        if let ParseNode::ProofTree { tree, .. } = &ast[0] {
+            assert_eq!(tree.premises.len(), 2);
+            assert!(matches!(tree.line_style, crate::parse_node::ProofLineStyle::Dashed));
+        } else {
+            panic!("Expected ProofTree node");
+        }
+    }
+
+    #[test]
+    fn prooftree_errors_on_short_stack() {
+        let result = parse("\\begin{prooftree}\\AxiomC{P}\\BinaryInfC{Q}\\end{prooftree}");
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn vmatrix_double_wraps() {
         let ast =
             parse("\\begin{Vmatrix} a & b \\\\ c & d \\end{Vmatrix}").unwrap();

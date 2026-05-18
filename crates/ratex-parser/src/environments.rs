@@ -4,7 +4,10 @@ use ratex_lexer::token::Token;
 
 use crate::error::{ParseError, ParseResult};
 use crate::macro_expander::MacroDefinition;
-use crate::parse_node::{AlignSpec, AlignType, ArrayTag, Measurement, Mode, ParseNode, StyleStr};
+use crate::parse_node::{
+    AlignSpec, AlignType, ArrayTag, Measurement, Mode, ParseNode, ProofBranch, ProofLineStyle,
+    StyleStr,
+};
 use crate::parser::Parser;
 
 // ── Environment registry ─────────────────────────────────────────────────
@@ -40,6 +43,7 @@ pub static ENVIRONMENTS: std::sync::LazyLock<HashMap<&'static str, EnvSpec>> =
         register_alignat(&mut map);
         register_subarray(&mut map);
         register_cd(&mut map);
+        register_prooftree(&mut map);
         map
     });
 
@@ -1236,4 +1240,144 @@ fn register_subarray(map: &mut HashMap<&'static str, EnvSpec>) {
             handler: handle_subarray,
         },
     );
+}
+
+// ── prooftree (bussproofs subset) ───────────────────────────────────────
+
+fn register_prooftree(map: &mut HashMap<&'static str, EnvSpec>) {
+    fn handle_prooftree(
+        ctx: &mut EnvContext,
+        _args: Vec<ParseNode>,
+        _opt_args: Vec<Option<ParseNode>>,
+    ) -> ParseResult<ParseNode> {
+        parse_prooftree(ctx.parser)
+    }
+
+    map.insert(
+        "prooftree",
+        EnvSpec {
+            num_args: 0,
+            num_optional_args: 0,
+            handler: handle_prooftree,
+        },
+    );
+}
+
+fn proof_command_arity(name: &str) -> Option<usize> {
+    match name {
+        "\\UnaryInfC" | "\\UnaryInf" | "\\UIC" => Some(1),
+        "\\BinaryInfC" | "\\BinaryInf" | "\\BIC" => Some(2),
+        "\\TrinaryInfC" | "\\TrinaryInf" | "\\TIC" => Some(3),
+        "\\QuaternaryInfC" | "\\QuaternaryInf" => Some(4),
+        "\\QuinaryInfC" | "\\QuinaryInf" => Some(5),
+        _ => None,
+    }
+}
+
+fn parse_prooftree_arg(parser: &mut Parser, command: &str) -> ParseResult<Vec<ParseNode>> {
+    let arg = parser.parse_argument_group(false, None)?.ok_or_else(|| {
+        ParseError::msg(format!("Expected argument for {}", command))
+    })?;
+    Ok(ParseNode::ord_argument(arg))
+}
+
+fn parse_prooftree(parser: &mut Parser) -> ParseResult<ParseNode> {
+    let mut stack: Vec<ProofBranch> = Vec::new();
+    let mut left_label: Option<Vec<ParseNode>> = None;
+    let mut right_label: Option<Vec<ParseNode>> = None;
+    let mut next_line_style = ProofLineStyle::Solid;
+    let mut default_line_style = ProofLineStyle::Solid;
+
+    loop {
+        parser.consume_spaces()?;
+        let token = parser.fetch()?;
+        let command = token.text.clone();
+
+        if command == "\\end" {
+            break;
+        }
+        parser.consume();
+
+        match command.as_str() {
+            "\\AxiomC" | "\\Axiom" | "\\AXC" => {
+                let conclusion = parse_prooftree_arg(parser, &command)?;
+                stack.push(ProofBranch {
+                    conclusion,
+                    premises: Vec::new(),
+                    left_label: None,
+                    right_label: None,
+                    line_style: ProofLineStyle::None,
+                });
+            }
+            "\\LeftLabel" | "\\LL" => {
+                left_label = Some(parse_prooftree_arg(parser, &command)?);
+            }
+            "\\RightLabel" | "\\RL" => {
+                right_label = Some(parse_prooftree_arg(parser, &command)?);
+            }
+            "\\singleLine" | "\\solidLine" => {
+                next_line_style = ProofLineStyle::Solid;
+            }
+            "\\dashedLine" => {
+                next_line_style = ProofLineStyle::Dashed;
+            }
+            "\\noLine" => {
+                next_line_style = ProofLineStyle::None;
+            }
+            "\\alwaysSingleLine" | "\\alwaysSolidLine" => {
+                default_line_style = ProofLineStyle::Solid;
+                next_line_style = ProofLineStyle::Solid;
+            }
+            "\\alwaysDashedLine" => {
+                default_line_style = ProofLineStyle::Dashed;
+                next_line_style = ProofLineStyle::Dashed;
+            }
+            "\\alwaysNoLine" => {
+                default_line_style = ProofLineStyle::None;
+                next_line_style = ProofLineStyle::None;
+            }
+            "\\rootAtTop" | "\\rootAtBottom" | "\\alwaysRootAtTop" | "\\alwaysRootAtBottom" => {}
+            name if proof_command_arity(name).is_some() => {
+                let arity = proof_command_arity(name).unwrap();
+                if stack.len() < arity {
+                    return Err(ParseError::msg(format!(
+                        "{} needs {} premise(s), but only {} available",
+                        name,
+                        arity,
+                        stack.len()
+                    )));
+                }
+                let conclusion = parse_prooftree_arg(parser, name)?;
+                let start = stack.len() - arity;
+                let premises = stack.split_off(start);
+                stack.push(ProofBranch {
+                    conclusion,
+                    premises,
+                    left_label: left_label.take(),
+                    right_label: right_label.take(),
+                    line_style: next_line_style.clone(),
+                });
+                next_line_style = default_line_style.clone();
+            }
+            _ => {
+                return Err(ParseError::msg(format!(
+                    "{} valid only as a supported bussproofs command within prooftree",
+                    command
+                )));
+            }
+        }
+    }
+
+    if stack.len() != 1 {
+        return Err(ParseError::msg(format!(
+            "prooftree ended with {} proof stack item(s), expected 1",
+            stack.len()
+        )));
+    }
+
+    Ok(ParseNode::ProofTree {
+        mode: parser.mode,
+        tree: stack.pop().unwrap(),
+        loc: None,
+    })
 }

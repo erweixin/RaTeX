@@ -1,13 +1,15 @@
 use std::collections::HashMap;
 
 use ratex_font::{get_char_metrics, get_global_metrics, FontId};
-use ratex_parser::parse_node::{ArrayTag, AtomFamily, Mode, ParseNode};
+use ratex_parser::parse_node::{
+    ArrayTag, AtomFamily, Mode, ParseNode, ProofBranch, ProofLineStyle,
+};
 use ratex_types::color::Color;
 use ratex_types::math_style::MathStyle;
 use ratex_types::path_command::PathCommand;
 
 use crate::hbox::make_hbox;
-use crate::layout_box::{BoxContent, LayoutBox};
+use crate::layout_box::{BoxContent, LayoutBox, PlacedBox, ProofRule};
 use crate::layout_options::LayoutOptions;
 
 use crate::katex_svg::parse_svg_path_data;
@@ -391,6 +393,8 @@ fn layout_node(node: &ParseNode, options: &LayoutOptions) -> LayoutBox {
             label_below,
             ..
         } => layout_cd_arrow(direction, label_above.as_deref(), label_below.as_deref(), 0.0, 0.0, 0.0, options),
+
+        ParseNode::ProofTree { tree, .. } => layout_proof_tree(tree, options),
 
         ParseNode::Sizing { size, body, .. } => layout_sizing(*size, body, options),
 
@@ -4663,6 +4667,181 @@ fn layout_cd(body: &[Vec<ParseNode>], options: &LayoutOptions) -> LayoutBox {
             tags_left: false,
         },
         color: options.color,
+    }
+}
+
+struct ProofTreeLayout {
+    width: f64,
+    height: f64,
+    depth: f64,
+    children: Vec<PlacedBox>,
+    rules: Vec<ProofRule>,
+}
+
+fn layout_proof_tree(tree: &ProofBranch, options: &LayoutOptions) -> LayoutBox {
+    let laid = layout_proof_branch(tree, options);
+    LayoutBox {
+        width: laid.width,
+        height: laid.height,
+        depth: laid.depth,
+        content: BoxContent::ProofTree {
+            children: laid.children,
+            rules: laid.rules,
+        },
+        color: options.color,
+    }
+}
+
+fn layout_proof_branch(tree: &ProofBranch, options: &LayoutOptions) -> ProofTreeLayout {
+    let metrics = options.metrics();
+    let rule_thickness = metrics.default_rule_thickness;
+    let premise_gap = 0.6;
+    let label_gap = 0.25;
+    let vertical_gap = 0.18;
+
+    let conclusion = layout_expression(&tree.conclusion, options, true);
+
+    if tree.premises.is_empty() {
+        let width = conclusion.width;
+        let height = conclusion.height;
+        let depth = conclusion.depth;
+        return ProofTreeLayout {
+            width,
+            height,
+            depth,
+            children: vec![PlacedBox {
+                box_: conclusion,
+                x: 0.0,
+                baseline_y: height,
+            }],
+            rules: Vec::new(),
+        };
+    }
+
+    let premise_layouts: Vec<ProofTreeLayout> = tree
+        .premises
+        .iter()
+        .map(|p| layout_proof_branch(p, options))
+        .collect();
+
+    let premise_width = premise_layouts.iter().map(|p| p.width).sum::<f64>()
+        + premise_gap * premise_layouts.len().saturating_sub(1) as f64;
+    let premise_height = premise_layouts
+        .iter()
+        .map(|p| p.height)
+        .fold(0.0_f64, f64::max);
+    let premise_depth = premise_layouts
+        .iter()
+        .map(|p| p.depth)
+        .fold(0.0_f64, f64::max);
+    let premise_total = premise_height + premise_depth;
+
+    let rule_width = premise_width.max(conclusion.width).max(0.5);
+    let core_width = premise_width.max(rule_width).max(conclusion.width);
+    let center_x = core_width / 2.0;
+    let premise_start_x = center_x - premise_width / 2.0;
+    let rule_x = center_x - rule_width / 2.0;
+    let rule_y = premise_total + vertical_gap + rule_thickness / 2.0;
+    let conclusion_x = center_x - conclusion.width / 2.0;
+    let conclusion_baseline_y = rule_y + rule_thickness / 2.0 + vertical_gap + conclusion.height;
+
+    let mut children = Vec::new();
+    let mut rules = Vec::new();
+    let mut min_x = 0.0_f64;
+    let mut max_x = core_width;
+
+    let mut cursor = premise_start_x;
+    for premise in premise_layouts {
+        let baseline_y = premise_height;
+        let child_top_y = baseline_y - premise.height;
+        for child in premise.children {
+            let x = cursor + child.x;
+            let y = child_top_y + child.baseline_y;
+            min_x = min_x.min(x);
+            max_x = max_x.max(x + child.box_.width);
+            children.push(PlacedBox {
+                box_: child.box_,
+                x,
+                baseline_y: y,
+            });
+        }
+        for rule in premise.rules {
+            min_x = min_x.min(cursor + rule.x);
+            max_x = max_x.max(cursor + rule.x + rule.width);
+            rules.push(ProofRule {
+                x: cursor + rule.x,
+                y: child_top_y + rule.y,
+                width: rule.width,
+                thickness: rule.thickness,
+                dashed: rule.dashed,
+            });
+        }
+        cursor += premise.width + premise_gap;
+    }
+
+    min_x = min_x.min(conclusion_x);
+    max_x = max_x.max(conclusion_x + conclusion.width);
+    children.push(PlacedBox {
+        box_: conclusion,
+        x: conclusion_x,
+        baseline_y: conclusion_baseline_y,
+    });
+
+    if !matches!(tree.line_style, ProofLineStyle::None) {
+        rules.push(ProofRule {
+            x: rule_x,
+            y: rule_y,
+            width: rule_width,
+            thickness: rule_thickness,
+            dashed: matches!(tree.line_style, ProofLineStyle::Dashed),
+        });
+    }
+
+    if let Some(label) = tree.left_label.as_ref() {
+        let label_box = layout_expression(label, options, true);
+        let x = rule_x - label_gap - label_box.width;
+        let baseline_y = rule_y + (label_box.height - label_box.depth) / 2.0;
+        min_x = min_x.min(x);
+        max_x = max_x.max(x + label_box.width);
+        children.push(PlacedBox {
+            box_: label_box,
+            x,
+            baseline_y,
+        });
+    }
+
+    if let Some(label) = tree.right_label.as_ref() {
+        let label_box = layout_expression(label, options, true);
+        let x = rule_x + rule_width + label_gap;
+        let baseline_y = rule_y + (label_box.height - label_box.depth) / 2.0;
+        min_x = min_x.min(x);
+        max_x = max_x.max(x + label_box.width);
+        children.push(PlacedBox {
+            box_: label_box,
+            x,
+            baseline_y,
+        });
+    }
+
+    if min_x < 0.0 {
+        let shift = -min_x;
+        for child in &mut children {
+            child.x += shift;
+        }
+        for rule in &mut rules {
+            rule.x += shift;
+        }
+    }
+
+    ProofTreeLayout {
+        width: max_x - min_x,
+        height: conclusion_baseline_y,
+        depth: children
+            .iter()
+            .map(|c| c.baseline_y + c.box_.depth - conclusion_baseline_y)
+            .fold(0.0_f64, f64::max),
+        children,
+        rules,
     }
 }
 

@@ -650,6 +650,30 @@ fn emit_box(
             });
         }
 
+        BoxContent::ProofTree { children, rules } => {
+            let top_y = y - lbox.height * scale;
+            for child in children {
+                emit_box(
+                    &child.box_,
+                    x + child.x * scale,
+                    top_y + child.baseline_y * scale,
+                    scale,
+                    items,
+                    font_str_cache,
+                );
+            }
+            for rule in rules {
+                items.push(DisplayItem::Line {
+                    x: x + rule.x * scale,
+                    y: top_y + rule.y * scale,
+                    width: rule.width * scale,
+                    thickness: rule.thickness * scale,
+                    color: lbox.color,
+                    dashed: rule.dashed,
+                });
+            }
+        }
+
         BoxContent::Kern | BoxContent::Empty => {}
     }
 }
@@ -794,4 +818,3 @@ fn shift_item_x(item: &mut DisplayItem, dx: f64) {
         DisplayItem::Path { x, .. } => *x += dx,
     }
 }
-

@@ -37,6 +37,7 @@ pub mod char_cmd;
 pub mod math;
 pub mod tag;
 pub mod nonumber;
+pub mod bussproofs;
 
 use std::collections::HashMap;
 use crate::error::ParseResult;
@@ -127,6 +128,7 @@ pub static FUNCTIONS: std::sync::LazyLock<HashMap<&'static str, FunctionSpec>> =
         math::register(&mut map);
         tag::register(&mut map);
         nonumber::register(&mut map);
+        bussproofs::register(&mut map);
         map
     });
 
