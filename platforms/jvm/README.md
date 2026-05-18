@@ -7,7 +7,7 @@ for macOS, Linux, and Windows via JNA.
 
 1. **Add dependency** — In your `build.gradle.kts`:
    ```kotlin
-   implementation("io.github.erweixin:ratex-jvm:0.1.8")
+   implementation("io.github.erweixin:ratex-jvm:0.1.9")
    ```
 2. **Load fonts & render:**
    ```kotlin
