@@ -261,7 +261,7 @@ export default function App() {
         </View>
         <View style={styles.card}>
           <Text style={[styles.label, isDark && styles.textLight]}>
-            textStyle: Georgia — iOS/macOS system serif (PostScript name)
+            textStyle: Georgia — iOS/macOS system serif
           </Text>
           <InlineTeX
             content={String.raw`Georgia sample with $\sum_{n=1}^{\infty}\frac{1}{n^2}=\frac{\pi^2}{6}$: uses a built-in Apple font.`}
@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
   inlineDecoratedText: {
     fontSize: 16,
     color: '#1f2937',
-    // Android maps generic families; iOS/macOS need PostScript names (see Georgia example).
+    // Android maps generic families; Apple platforms accept family or PostScript names.
     fontFamily: Platform.select({
       ios: 'Georgia',
       macos: 'Georgia',

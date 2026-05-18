@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "expo": "~55.0.0",
+    "expo-font": "~55.0.6",
     "expo-status-bar": "~55.0.5",
     "ratex-react-native": "file:../../platforms/react-native",
     "react": "19.2.0",

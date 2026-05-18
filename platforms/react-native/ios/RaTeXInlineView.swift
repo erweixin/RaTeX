@@ -237,26 +237,230 @@ public class RaTeXInlineView: PlatformView {
 
     private func makeTextFont() -> PlatformFont {
         #if os(macOS)
-        let customFont = trimmedTextFontFamily.flatMap { family -> NSFont? in
-            guard !family.isEmpty else { return nil }
-            return NSFont(name: family, size: textFontSize)
-        }
-        let baseFont = customFont ?? NSFont.systemFont(ofSize: textFontSize)
-        guard textItalic else { return baseFont }
-        let italicFont = NSFontManager.shared.convert(baseFont, toHaveTrait: .italicFontMask)
-        return italicFont
+        return Self.resolveMacTextFont(
+            family: trimmedTextFontFamily,
+            size: textFontSize,
+            italic: textItalic
+        )
         #else
-        let customFont = trimmedTextFontFamily.flatMap { family -> UIFont? in
-            guard !family.isEmpty else { return nil }
-            return UIFont(name: family, size: textFontSize)
-        }
-        let baseFont = customFont ?? UIFont.systemFont(ofSize: textFontSize)
-        guard textItalic else { return baseFont }
-        if let descriptor = baseFont.fontDescriptor.withSymbolicTraits([.traitItalic]) {
-            return UIFont(descriptor: descriptor, size: textFontSize)
-        }
-        return UIFont.italicSystemFont(ofSize: textFontSize)
+        return Self.resolveIOSTextFont(
+            family: trimmedTextFontFamily,
+            size: textFontSize,
+            italic: textItalic
+        )
         #endif
+    }
+
+    #if os(macOS)
+    private static func resolveMacTextFont(
+        family: String?,
+        size: CGFloat,
+        italic: Bool
+    ) -> NSFont {
+        guard let family, !family.isEmpty else {
+            return italic
+                ? NSFontManager.shared.convert(NSFont.systemFont(ofSize: size), toHaveTrait: .italicFontMask)
+                : NSFont.systemFont(ofSize: size)
+        }
+
+        if let font = bestMacFont(from: macFontNames(for: family), size: size, italic: italic) {
+            return font
+        }
+        if let font = NSFont(name: family, size: size) {
+            return italic ? macFontByApplyingItalic(font, size: size) : font
+        }
+        if let font = bestMacFont(from: fuzzyMacFontNames(matching: family), size: size, italic: italic) {
+            return font
+        }
+
+        return italic
+            ? NSFontManager.shared.convert(NSFont.systemFont(ofSize: size), toHaveTrait: .italicFontMask)
+            : NSFont.systemFont(ofSize: size)
+    }
+
+    private static func macFontNames(for family: String) -> [String] {
+        if let members = NSFontManager.shared.availableMembers(ofFontFamily: family), !members.isEmpty {
+            return members.compactMap { $0.first as? String }
+        }
+        let matchedFamily = NSFontManager.shared.availableFontFamilies.first {
+            fontIdentifierMatches($0, family)
+        }
+        guard let matchedFamily,
+              let members = NSFontManager.shared.availableMembers(ofFontFamily: matchedFamily)
+        else { return [] }
+        return members.compactMap { $0.first as? String }
+    }
+
+    private static var fuzzyMacFontNamesCache: [String: [String]] = [:]
+
+    private static func fuzzyMacFontNames(matching query: String) -> [String] {
+        if let cached = fuzzyMacFontNamesCache[query] { return cached }
+        let result = NSFontManager.shared.availableFonts.filter {
+            fontIdentifierMatches($0, query)
+        }
+        fuzzyMacFontNamesCache[query] = result
+        return result
+    }
+
+    private static func bestMacFont(from names: [String], size: CGFloat, italic: Bool) -> NSFont? {
+        names.reduce(nil as NSFont?) { best, name in
+            guard let font = NSFont(name: name, size: size) else { return best }
+            guard let currentBest = best else { return font }
+            return macFontScore(font, italic: italic) < macFontScore(currentBest, italic: italic)
+                ? font : currentBest
+        }.map { italic ? macFontByApplyingItalic($0, size: size) : $0 }
+    }
+
+    private static func macFontScore(_ font: NSFont, italic: Bool) -> Int {
+        var score = isMacItalicFont(font) == italic ? 0 : 1_000
+        let name = font.fontName.lowercased()
+        if italic {
+            if name.contains("italic") || name.contains("oblique") {
+                score -= 100
+            }
+        } else {
+            if name.contains("regular") || name.contains("roman") || name.contains("normal") {
+                score -= 100
+            }
+            if name.contains("bold") || name.contains("black") || name.contains("heavy") {
+                score += 50
+            }
+        }
+        return score
+    }
+
+    private static func isMacItalicFont(_ font: NSFont) -> Bool {
+        NSFontManager.shared.traits(of: font).contains(.italicFontMask)
+    }
+
+    private static func macFontByApplyingItalic(_ font: NSFont, size: CGFloat) -> NSFont {
+        guard !isMacItalicFont(font) else { return font }
+        return NSFontManager.shared.convert(font, toHaveTrait: .italicFontMask)
+    }
+    #else
+    private static func resolveIOSTextFont(
+        family: String?,
+        size: CGFloat,
+        italic: Bool
+    ) -> UIFont {
+        guard let family, !family.isEmpty else {
+            return italic ? UIFont.italicSystemFont(ofSize: size) : UIFont.systemFont(ofSize: size)
+        }
+
+        if let font = bestUIFont(from: iosFontNames(for: family), size: size, italic: italic) {
+            return font
+        }
+        if let font = UIFont(name: family, size: size) {
+            return italic ? uiFontByApplyingItalic(font, size: size) : font
+        }
+        if let font = bestUIFont(from: fuzzyIOSFontNames(matching: family), size: size, italic: italic) {
+            return font
+        }
+
+        return italic ? UIFont.italicSystemFont(ofSize: size) : UIFont.systemFont(ofSize: size)
+    }
+
+    private static func iosFontNames(for family: String) -> [String] {
+        let names = UIFont.fontNames(forFamilyName: family)
+        if !names.isEmpty { return names }
+
+        guard let matchedFamily = UIFont.familyNames.first(where: {
+            fontIdentifierMatches($0, family)
+        }) else { return [] }
+        return UIFont.fontNames(forFamilyName: matchedFamily)
+    }
+
+    private static var fuzzyIOSFontNamesCache: [String: [String]] = [:]
+
+    private static func fuzzyIOSFontNames(matching query: String) -> [String] {
+        if let cached = fuzzyIOSFontNamesCache[query] { return cached }
+        let result = UIFont.familyNames
+            .flatMap { UIFont.fontNames(forFamilyName: $0) }
+            .filter { fontIdentifierMatches($0, query) }
+        fuzzyIOSFontNamesCache[query] = result
+        return result
+    }
+
+    private static func bestUIFont(from names: [String], size: CGFloat, italic: Bool) -> UIFont? {
+        names.reduce(nil as UIFont?) { best, name in
+            guard let font = UIFont(name: name, size: size) else { return best }
+            guard let currentBest = best else { return font }
+            return uiFontScore(font, italic: italic) < uiFontScore(currentBest, italic: italic)
+                ? font : currentBest
+        }.map { italic ? uiFontByApplyingItalic($0, size: size) : $0 }
+    }
+
+    private static func uiFontScore(_ font: UIFont, italic: Bool) -> Int {
+        var score = isUIItalicFont(font) == italic ? 0 : 1_000
+        let name = font.fontName.lowercased()
+        if italic {
+            if name.contains("italic") || name.contains("oblique") {
+                score -= 100
+            }
+        } else {
+            if name.contains("regular") || name.contains("roman") || name.contains("normal") {
+                score -= 100
+            }
+            if name.contains("bold") || name.contains("black") || name.contains("heavy") {
+                score += 50
+            }
+        }
+        return score
+    }
+
+    private static func isUIItalicFont(_ font: UIFont) -> Bool {
+        let traits = font.fontDescriptor.symbolicTraits
+        return traits.contains(.traitItalic)
+            || font.fontName.lowercased().contains("italic")
+            || font.fontName.lowercased().contains("oblique")
+    }
+
+    private static func uiFontByApplyingItalic(_ font: UIFont, size: CGFloat) -> UIFont {
+        guard !isUIItalicFont(font) else { return font }
+        var traits = font.fontDescriptor.symbolicTraits
+        traits.insert(.traitItalic)
+        if let descriptor = font.fontDescriptor.withSymbolicTraits(traits) {
+            return UIFont(descriptor: descriptor, size: size)
+        }
+        return UIFont.italicSystemFont(ofSize: size)
+    }
+    #endif
+
+    private static func fontIdentifierMatches(_ lhs: String, _ rhs: String) -> Bool {
+        if lhs.caseInsensitiveCompare(rhs) == .orderedSame {
+            return true
+        }
+        let normalizedLhs = normalizedFontIdentifier(lhs)
+        let normalizedRhs = normalizedFontIdentifier(rhs)
+        if !normalizedLhs.isEmpty && normalizedLhs == normalizedRhs {
+            return true
+        }
+        let compactLhs = compactFontIdentifier(lhs)
+        let compactRhs = compactFontIdentifier(rhs)
+        return !compactLhs.isEmpty && compactLhs == compactRhs
+    }
+
+    private static func normalizedFontIdentifier(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(
+                of: "[^a-z0-9]+",
+                with: "_",
+                options: .regularExpression
+            )
+            .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
+    }
+
+    private static func compactFontIdentifier(_ value: String) -> String {
+        value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(
+                of: "[^a-z0-9]+",
+                with: "",
+                options: .regularExpression
+            )
     }
 
     private func makeFormulaAttachment(_ latex: String) -> RaTeXTextAttachment? {

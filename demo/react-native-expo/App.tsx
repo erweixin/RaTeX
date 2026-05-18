@@ -25,11 +25,14 @@ import {
   useWindowDimensions,
   ScrollView,
 } from "react-native";
-import { RaTeXView } from "ratex-react-native";
+import { InlineTeX, RaTeXView } from "ratex-react-native";
 
 const EXPR = String.raw`x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}`;
 const EXPR2 = String.raw`\sum_{n=1}^{\infty} \frac{1}{n^2} = \frac{\pi^2}{6}`;
 const EXPR3 = String.raw`\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}`;
+const INLINE_FONT_FAMILY = "cofosans-regular";
+const INLINE_FONT_CONTENT =
+  "For a right triangle, the sides satisfy $a^2 + b^2 = c^2$, where c is the hypotenuse.";
 
 const PAGES = [
   { id: "1", latex: EXPR },
@@ -225,6 +228,27 @@ function CasePR45Smoke() {
   );
 }
 
+// ─── InlineTeX custom font smoke: Expo prebuild assets/font(s) path ──
+function CaseInlineTeXCustomFont() {
+  return (
+    <View style={[styles.card, styles.fontCard]}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>InlineTeX custom font</Text>
+      </View>
+      <View style={styles.fontCaseBody}>
+        <Text style={styles.fontCaseLabel}>React Native Text</Text>
+        <Text style={styles.customFontText}>{INLINE_FONT_CONTENT}</Text>
+
+        <Text style={styles.fontCaseLabel}>InlineTeX textStyle</Text>
+        <InlineTeX
+          content={INLINE_FONT_CONTENT}
+          textStyle={styles.customFontText}
+        />
+      </View>
+    </View>
+  );
+}
+
 // ─── Case C: Explicit dimensions (control — should always work) ─────
 function CaseExplicit({ renderKey }: { renderKey: number }) {
   const [status, setStatus] = useState<"pending" | "ok" | "error">("pending");
@@ -279,6 +303,7 @@ export default function App() {
         </Pressable>
 
         <CasePR45Smoke />
+        <CaseInlineTeXCustomFont />
 
         <View style={styles.cases}>
           <CaseFlexMinHeight renderKey={key} />
@@ -374,6 +399,27 @@ const styles = StyleSheet.create({
   smokeFixedHost: {
     alignItems: "center",
     paddingBottom: 8,
+  },
+  fontCard: {
+    flex: 0,
+    marginHorizontal: 12,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  fontCaseBody: {
+    gap: 8,
+    padding: 12,
+  },
+  fontCaseLabel: {
+    color: "#4b5563",
+    fontSize: 11,
+    fontWeight: "600",
+    textTransform: "uppercase",
+  },
+  customFontText: {
+    color: "#111827",
+    fontFamily: INLINE_FONT_FAMILY,
+    fontSize: 17,
   },
   card: {
     flex: 1,

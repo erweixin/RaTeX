@@ -7,6 +7,7 @@
 package io.ratex
 
 import android.content.Context
+import android.content.res.AssetManager
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Typeface
@@ -17,6 +18,9 @@ import android.text.TextPaint
 import android.util.AttributeSet
 import android.view.View
 import androidx.annotation.ColorInt
+import com.facebook.react.common.assets.ReactFontManager
+import java.util.concurrent.ConcurrentHashMap
+import java.util.Locale
 import kotlin.math.max
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -265,13 +269,90 @@ class RaTeXInlineView @JvmOverloads constructor(
         textPaint.textSize = textFontSize * density
         textPaint.color = inlineTextColor
         val style = if (textItalic) Typeface.ITALIC else Typeface.NORMAL
-        textPaint.typeface = if (textFontFamily.isNullOrEmpty()) {
-            Typeface.defaultFromStyle(style)
-        } else {
-            Typeface.create(textFontFamily, style) ?: Typeface.defaultFromStyle(style)
-        }
+        textPaint.typeface = resolveTextTypeface(style)
         textPaint.isUnderlineText = textUnderline
         textPaint.isStrikeThruText = textLineThrough
+    }
+
+    private fun resolveTextTypeface(style: Int): Typeface {
+        val family = textFontFamily ?: return Typeface.defaultFromStyle(style)
+        loadTextTypefaceFromAssets(context.assets, family, style)?.let { return it }
+        // ReactFontManager handles runtime-registered fonts (e.g. expo-font) and
+        // falls back to Typeface.create() internally — it does not throw.
+        return ReactFontManager.getInstance().getTypeface(family, style, context.assets)
+    }
+
+    private fun loadTextTypefaceFromAssets(
+        assetManager: AssetManager,
+        family: String,
+        style: Int,
+    ): Typeface? {
+        val cacheKey = "$family:$style"
+        textTypefaceCache[cacheKey]?.let { return it }
+
+        val candidates = textFontAssetCandidates(family, style)
+        for (dir in TEXT_FONT_ASSET_DIRS) {
+            for (candidate in candidates) {
+                for (extension in TEXT_FONT_FILE_EXTENSIONS) {
+                    val path = "$dir/${candidate.baseName}$extension"
+                    loadTypefaceFromAssetPath(assetManager, path, style, candidate.exactStyle)?.let {
+                        textTypefaceCache[cacheKey] = it
+                        return it
+                    }
+                }
+            }
+        }
+
+        for (dir in TEXT_FONT_ASSET_DIRS) {
+            val files = try {
+                assetManager.list(dir)?.toList().orEmpty()
+            } catch (_: Exception) {
+                emptyList()
+            }
+            if (files.isEmpty()) continue
+
+            for (candidate in candidates) {
+                val normalizedCandidate = normalizeFontAssetName(candidate.baseName)
+                val compactCandidate = compactFontAssetName(candidate.baseName)
+                val file = files.firstOrNull { assetName ->
+                    val extension = TEXT_FONT_FILE_EXTENSIONS.firstOrNull {
+                        assetName.endsWith(it, ignoreCase = true)
+                    }
+                    if (extension == null) {
+                        false
+                    } else {
+                        val assetBaseName = assetName.dropLast(extension.length)
+                        assetBaseName.equals(candidate.baseName, ignoreCase = true) ||
+                            (normalizedCandidate.isNotEmpty() &&
+                                normalizeFontAssetName(assetBaseName) == normalizedCandidate) ||
+                            (compactCandidate.isNotEmpty() &&
+                                compactFontAssetName(assetBaseName) == compactCandidate)
+                    }
+                } ?: continue
+
+                loadTypefaceFromAssetPath(assetManager, "$dir/$file", style, candidate.exactStyle)?.let {
+                    textTypefaceCache[cacheKey] = it
+                    return it
+                }
+            }
+        }
+        return null
+    }
+
+    private fun loadTypefaceFromAssetPath(
+        assetManager: AssetManager,
+        path: String,
+        style: Int,
+        exactStyle: Boolean,
+    ): Typeface? = try {
+        val typeface = Typeface.createFromAsset(assetManager, path)
+        if (exactStyle || style == Typeface.NORMAL) {
+            typeface
+        } else {
+            Typeface.create(typeface, style)
+        }
+    } catch (_: RuntimeException) {
+        null
     }
 
     private suspend fun buildSpannable(): SpannableStringBuilder {
@@ -322,6 +403,49 @@ class RaTeXInlineView @JvmOverloads constructor(
     }
 
     companion object {
+        private val TEXT_FONT_ASSET_DIRS = listOf("font", "fonts")
+        private val TEXT_FONT_FILE_EXTENSIONS = listOf(".ttf", ".otf")
+        // Indices map to Android Typeface style constants: NORMAL=0, BOLD=1, ITALIC=2, BOLD_ITALIC=3.
+        private val TEXT_FONT_STYLE_SUFFIXES = listOf("", "_bold", "_italic", "_bold_italic")
+        private val textTypefaceCache = ConcurrentHashMap<String, Typeface>()
+        private val NON_FONT_ASSET_CHARS = Regex("[^a-z0-9]+")
+
+        private data class TextFontAssetCandidate(
+            val baseName: String,
+            val exactStyle: Boolean,
+        )
+
+        private fun textFontAssetCandidates(
+            family: String,
+            style: Int,
+        ): List<TextFontAssetCandidate> {
+            val suffix = TEXT_FONT_STYLE_SUFFIXES.getOrElse(style) { "" }
+            val baseNames = textFontBaseNameVariants(family)
+            val candidates = mutableListOf<TextFontAssetCandidate>()
+            if (suffix.isNotEmpty()) {
+                baseNames.forEach { candidates += TextFontAssetCandidate("$it$suffix", true) }
+            }
+            baseNames.forEach { candidates += TextFontAssetCandidate(it, suffix.isEmpty()) }
+            return candidates.distinctBy { "${it.baseName}:${it.exactStyle}" }
+        }
+
+        private fun textFontBaseNameVariants(family: String): List<String> {
+            val trimmed = family.trim()
+            val underscored = trimmed.replace('-', '_').replace(' ', '_')
+            val androidResourceName = normalizeFontAssetName(trimmed)
+            return listOf(trimmed, underscored, androidResourceName)
+                .filter { it.isNotEmpty() }
+                .distinct()
+        }
+
+        private fun normalizeFontAssetName(value: String): String =
+            NON_FONT_ASSET_CHARS
+                .replace(value.trim().lowercase(Locale.US), "_")
+                .trim('_')
+
+        private fun compactFontAssetName(value: String): String =
+            NON_FONT_ASSET_CHARS.replace(value.trim().lowercase(Locale.US), "")
+
         fun parseContent(content: String): List<Segment> {
             val segments = mutableListOf<Segment>()
             val current = StringBuilder()
