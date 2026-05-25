@@ -218,6 +218,9 @@ printf '%s\n' '\frac{1}{2} + \sqrt{x}' | ./target/release/render --output-dir ./
 printf '%s\n' '\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}' | \
   ./target/release/render-svg --font-dir /path/to/katex/fonts --color '#1E88E5' --output-dir ./out
 
+# SVG: write the rendered SVG document to stdout instead of a file
+printf '%s\n' '\frac{1}{2} + \sqrt{x}' | ./target/release/render-svg --stdout > formula.svg
+
 # PDF: load KaTeX TTFs at runtime
 printf '%s\n' '\ce{H2SO4 + 2NaOH -> Na2SO4 + 2H2O}' | \
   ./target/release/render-pdf --font-dir /path/to/katex/fonts --output-dir ./out
@@ -233,6 +236,7 @@ CLI notes
 
 - `--input <FILE>`: read formulas from a file, one per line.
 - `--output-dir <DIR>`: output directory. Defaults are `output`, `output_svg`, and `output_pdf`.
+- `render-svg --stdout`: write SVG documents to stdout instead of files; status messages go to stderr.
 - `--help`: show supported options and whether the current build uses embedded fonts.
 - `--color` / `--background-color` accept named colors (for example `black`, `red`, `teal`), 3- or 6-digit hex (`#f00`, `#ff0000`), and KaTeX / MathJax-style color model values (`[RGB]255,0,0`, `[rgb]1,0,0`, `[HTML]B22222`, `[gray]0.5`, `[cmyk]0,1,1,0`).
 - `ratex-render --background-color transparent` produces a transparent PNG.
