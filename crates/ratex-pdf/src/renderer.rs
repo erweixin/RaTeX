@@ -14,6 +14,10 @@ use ratex_types::path_command::PathCommand;
 
 use crate::fonts::{self, EmbeddedFont};
 
+// Keep a tiny vertical guard band for rasterizers/viewers that antialias
+// glyphs just outside the TeX layout box when callers render with little/no padding.
+const MIN_VERTICAL_ANTIALIAS_GUARD: f64 = 1.0;
+
 /// Options controlling PDF output.
 #[derive(Debug, Clone)]
 pub struct PdfOptions {
@@ -66,8 +70,14 @@ pub fn render_to_pdf(
     let sw = options.stroke_width;
 
     let total_h = display_list.height + display_list.depth;
+    let vertical_guard = if display_list.items.is_empty() {
+        0.0
+    } else {
+        (MIN_VERTICAL_ANTIALIAS_GUARD - pad).max(0.0)
+    };
+    let y_origin = pad + vertical_guard;
     let page_w = display_list.width * em + 2.0 * pad;
-    let page_h = total_h * em + 2.0 * pad;
+    let page_h = total_h * em + 2.0 * pad + 2.0 * vertical_guard;
 
     // Load raw font data (lazy: only fonts referenced by this display list).
     let font_data = ratex_font_loader::load_fonts_for_items(&options.font_dir, &display_list.items)
@@ -115,6 +125,7 @@ pub fn render_to_pdf(
         &emoji_ix,
         em,
         pad,
+        y_origin,
         page_h,
         sw,
     );
@@ -186,7 +197,8 @@ fn build_content_stream(
     emoji_assets: &[fonts::EmbeddedEmojiImage],
     emoji_ix: &HashMap<u32, usize>,
     em: f64,
-    pad: f64,
+    x_origin: f64,
+    y_origin: f64,
     page_h: f64,
     stroke_width: f64,
 ) -> Vec<u8> {
@@ -205,8 +217,8 @@ fn build_content_stream(
             } => {
                 emit_glyph(
                     &mut content,
-                    *x * em + pad,
-                    *y * em + pad,
+                    *x * em + x_origin,
+                    *y * em + y_origin,
                     font,
                     *char_code,
                     *scale,
@@ -231,8 +243,8 @@ fn build_content_stream(
                 emit_line(
                     &mut content,
                     &LineParams {
-                        x: *x * em + pad,
-                        y: *y * em + pad,
+                        x: *x * em + x_origin,
+                        y: *y * em + y_origin,
                         width: *width * em,
                         thickness: *thickness * em,
                         color: *color,
@@ -250,8 +262,8 @@ fn build_content_stream(
             } => {
                 emit_rect(
                     &mut content,
-                    *x * em + pad,
-                    *y * em + pad,
+                    *x * em + x_origin,
+                    *y * em + y_origin,
                     *width * em,
                     *height * em,
                     color,
@@ -267,8 +279,8 @@ fn build_content_stream(
             } => {
                 emit_path(
                     &mut content,
-                    *x * em + pad,
-                    *y * em + pad,
+                    *x * em + x_origin,
+                    *y * em + y_origin,
                     commands,
                     *fill,
                     color,

@@ -5,6 +5,7 @@ use std::path::Path;
 use ratex_layout::{layout, to_display_list, LayoutOptions};
 use ratex_parser::parser::parse;
 use ratex_pdf::{render_to_pdf, PdfOptions};
+use ratex_types::display_item::DisplayList;
 use ratex_types::math_style::MathStyle;
 
 fn katex_font_dir() -> String {
@@ -16,18 +17,42 @@ fn katex_font_dir() -> String {
         .into_owned()
 }
 
-fn latex_to_pdf(latex: &str) -> Vec<u8> {
+fn latex_to_display_list(latex: &str) -> DisplayList {
     let nodes = parse(latex).expect("parse LaTeX");
     let lbox = layout(
         &nodes,
         &LayoutOptions::default().with_style(MathStyle::Display),
     );
-    let list = to_display_list(&lbox);
+    to_display_list(&lbox)
+}
+
+fn latex_to_pdf(latex: &str) -> Vec<u8> {
+    let list = latex_to_display_list(latex);
     let opts = PdfOptions {
         font_dir: katex_font_dir(),
         ..Default::default()
     };
     render_to_pdf(&list, &opts).expect("render_to_pdf")
+}
+
+fn extract_media_box(pdf: &[u8]) -> [f64; 4] {
+    let s = String::from_utf8_lossy(pdf);
+    let marker = "/MediaBox [";
+    let start = s.find(marker).expect("expected /MediaBox") + marker.len();
+    let end = s[start..].find(']').expect("expected MediaBox close") + start;
+    let parts: Vec<f64> = s[start..end]
+        .split_whitespace()
+        .map(|part| part.parse().expect("parse MediaBox number"))
+        .collect();
+    assert_eq!(parts.len(), 4, "expected four MediaBox values");
+    [parts[0], parts[1], parts[2], parts[3]]
+}
+
+fn assert_close(actual: f64, expected: f64) {
+    assert!(
+        (actual - expected).abs() < 0.01,
+        "expected {actual} to be close to {expected}"
+    );
 }
 
 #[test]
@@ -43,6 +68,27 @@ fn smoke_fraction_renders_valid_pdf() {
         pdf.len() > 256,
         "PDF unexpectedly small: {} bytes",
         pdf.len()
+    );
+}
+
+#[test]
+fn zero_padding_pdf_media_box_keeps_vertical_antialias_guard() {
+    let list = latex_to_display_list(r"x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}");
+    let opts = PdfOptions {
+        font_size: 40.0,
+        padding: 0.0,
+        font_dir: katex_font_dir(),
+        ..Default::default()
+    };
+    let pdf = render_to_pdf(&list, &opts).expect("render_to_pdf");
+    let media_box = extract_media_box(&pdf);
+
+    assert_close(media_box[0], 0.0);
+    assert_close(media_box[1], 0.0);
+    assert_close(media_box[2], list.width * opts.font_size);
+    assert_close(
+        media_box[3],
+        (list.height + list.depth) * opts.font_size + 2.0,
     );
 }
 
