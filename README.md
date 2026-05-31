@@ -282,6 +282,7 @@ See [`platforms/web/README.md`](platforms/web/README.md) for the full setup.
 |---|---|
 | iOS | [`platforms/ios/README.md`](platforms/ios/README.md) |
 | Android | [`platforms/android/README.md`](platforms/android/README.md) |
+| GTK4 (Linux) | [`platforms/gtk/README.md`](platforms/gtk/README.md) |
 | Flutter | [`platforms/flutter/README.md`](platforms/flutter/README.md) |
 | React Native | [`platforms/react-native/README.md`](platforms/react-native/README.md) |
 | Compose Multiplatform | [`RaTeX-CMP`](https://github.com/darriousliu/RaTeX-CMP) |

@@ -30,6 +30,8 @@ RaTeX/
 │   ├── ratex-katex-fonts/        # KaTeX TTF blobs for embed-fonts (crates.io–safe path)
 │   ├── ratex-font-loader/        # Shared lazy font loading/cache for PNG/SVG/PDF
 │   ├── ratex-ffi/                # C ABI: LaTeX → DisplayList JSON (+ Android JNI)
+│   ├── ratex-cairo/              # DisplayList → Cairo context (native Linux / GTK base)
+│   ├── ratex-gtk4/               # GTK4 widget subclass for native Linux rendering
 │   ├── ratex-render/             # DisplayList → PNG (tiny-skia, server-side)
 │   ├── ratex-wasm/               # WASM: LaTeX → DisplayList JSON (browser)
 │   ├── ratex-svg/                # SVG export: DisplayList → SVG string (vector output)
@@ -39,6 +41,7 @@ RaTeX/
 ├── platforms/
 │   ├── ios/                      # Swift + XCFramework + CoreGraphics
 │   ├── android/                  # Kotlin + AAR + JNI/Canvas
+│   ├── gtk/                      # GTK4 Linux docs / examples / future GI packaging notes
 │   ├── flutter/                  # Dart FFI + widget
 │   ├── react-native/             # Native module + iOS/Android views
 │   └── web/                      # npm package `ratex-wasm`: WASM + TypeScript web-render
