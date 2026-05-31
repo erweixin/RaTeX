@@ -28,6 +28,10 @@ impl ParseError {
             loc: Some(loc),
         }
     }
+
+    pub fn recursion_limit_exceeded() -> Self {
+        Self::msg("Recursion limit exceeded")
+    }
 }
 
 impl std::fmt::Display for ParseError {
