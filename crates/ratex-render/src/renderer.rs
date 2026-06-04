@@ -566,7 +566,7 @@ fn render_glyph_with_font(
             (color.r * 255.0) as u8,
             (color.g * 255.0) as u8,
             (color.b * 255.0) as u8,
-            255,
+            (color.a * 255.0).round() as u8,
         );
         paint.anti_alias = true;
         pixmap.fill_path(
@@ -702,7 +702,7 @@ fn render_line(
         (color.r * 255.0) as u8,
         (color.g * 255.0) as u8,
         (color.b * 255.0) as u8,
-        255,
+        (color.a * 255.0).round() as u8,
     );
 
     if dashed {
@@ -738,7 +738,7 @@ fn render_rect(pixmap: &mut Pixmap, x: f32, y: f32, width: f32, height: f32, col
             (color.r * 255.0) as u8,
             (color.g * 255.0) as u8,
             (color.b * 255.0) as u8,
-            255,
+            (color.a * 255.0).round() as u8,
         );
         pixmap.fill_rect(rect, &paint, Transform::identity(), None);
     }
@@ -858,7 +858,7 @@ fn render_path_segment(
             (color.r * 255.0) as u8,
             (color.g * 255.0) as u8,
             (color.b * 255.0) as u8,
-            255,
+            (color.a * 255.0).round() as u8,
         );
         if fill {
             paint.anti_alias = true;
