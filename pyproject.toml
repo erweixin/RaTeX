@@ -1,0 +1,19 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "ratex-py"
+version = "0.1.9"
+description = "Python bindings for RaTeX — KaTeX-compatible math rendering in pure Rust"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+readme = "README.md"
+# authors = ""  # TODO
+# classifiers = [] # TODO
+# urls = [] # TODO
+
+[tool.maturin]
+module-name = "ratex_py"
+manifest-path = "crates/ratex-py/Cargo.toml"
+features = ["extension-module", "embed-fonts"]
