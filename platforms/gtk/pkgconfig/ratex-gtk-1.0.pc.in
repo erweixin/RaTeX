@@ -1,0 +1,14 @@
+prefix=@prefix@
+exec_prefix=${prefix}
+libdir=@libdir@
+includedir=@includedir@
+datadir=@datadir@
+girdir=${datadir}/gir-1.0
+typelibdir=${libdir}/girepository-1.0
+
+Name: RatexGtk
+Description: GTK4/GObject widget for native RaTeX math rendering
+Version: @version@
+Requires: gtk4
+Libs: -L${libdir} -lratex_gtk4
+Cflags: -I${includedir}/ratex-gtk-1.0

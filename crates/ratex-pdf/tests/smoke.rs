@@ -94,7 +94,7 @@ fn zero_padding_pdf_media_box_keeps_vertical_antialias_guard() {
 
 #[test]
 #[cfg(not(feature = "embed-fonts"))]
-fn missing_font_dir_returns_font_error() {
+fn missing_font_dir_returns_font_error_unless_fonts_are_unified() {
     let nodes = parse("x").expect("parse LaTeX");
     let lbox = layout(
         &nodes,
@@ -105,11 +105,16 @@ fn missing_font_dir_returns_font_error() {
         font_dir: "/definitely/not/a/ratex/font/dir".to_string(),
         ..Default::default()
     };
-    let err = render_to_pdf(&list, &opts).expect_err("bad font_dir must fail");
-    assert!(
-        err.to_string().contains("Missing required font"),
-        "unexpected error: {err}"
-    );
+    match render_to_pdf(&list, &opts) {
+        Ok(pdf) => assert!(
+            pdf.starts_with(b"%PDF-"),
+            "embedded-font feature unification should still render a valid PDF"
+        ),
+        Err(err) => assert!(
+            err.to_string().contains("Missing required font"),
+            "unexpected error: {err}"
+        ),
+    }
 }
 
 /// Color emoji in PDF: `EmojiFallback` → image XObjects (sbix PNG), not empty outlines.

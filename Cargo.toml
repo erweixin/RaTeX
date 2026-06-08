@@ -9,6 +9,8 @@ members = [
     "crates/ratex-katex-fonts",
     "crates/ratex-font-loader",
     "crates/ratex-ffi",
+    "crates/ratex-cairo",
+    "crates/ratex-gtk4",
     "crates/ratex-render",
     "crates/ratex-svg",
     "crates/ratex-wasm",
@@ -33,6 +35,7 @@ ratex-parser = { path = "crates/ratex-parser", version = "0.1.11" }
 ratex-layout = { path = "crates/ratex-layout", version = "0.1.11" }
 ratex-katex-fonts = { path = "crates/ratex-katex-fonts", version = "0.1.11" }
 ratex-font-loader = { path = "crates/ratex-font-loader", version = "0.1.11" }
+ratex-cairo  = { path = "crates/ratex-cairo", version = "0.1.11" }
 ratex-svg    = { path = "crates/ratex-svg", version = "0.1.11" }
 ratex-pdf    = { path = "crates/ratex-pdf", version = "0.1.11" }
 ratex-unicode-font = { path = "crates/ratex-unicode-font", version = "0.1.11" }

@@ -18,8 +18,10 @@ jobs:
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Install CJK font (for ratex-unicode-font tests)
-        run: sudo apt-get update && sudo apt-get install -y fonts-noto-cjk
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y fonts-noto-cjk libgtk-4-dev libadwaita-1-dev libcairo2-dev
       - name: Build
         run: cargo build --workspace
       - name: Clippy
@@ -63,6 +65,72 @@ jobs:
           cd platforms/web
           npm ci
           npm run build
+
+  gtk-gobject-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install GTK/GI tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gobject-introspection libgirepository1.0-dev libgtk-4-dev libadwaita-1-dev libcairo2-dev python3-gi python3-gi-cairo valac xvfb
+      - name: Build RatexGtk library and Rust demos
+        run: cargo build -p ratex-gtk4 --lib --example formula_demo --example adw_formula_demo
+      - name: Compile RatexGtk typelib
+        run: g-ir-compiler platforms/gtk/gir/RatexGtk-1.0.gir -o target/debug/RatexGtk-1.0.typelib
+      - name: Build C example
+        run: |
+          gcc platforms/gtk/examples/c/formula_demo.c \
+            -o target/debug/ratex-gtk-c-demo \
+            -Iplatforms/gtk/include/ratex-gtk-1.0 \
+            -Ltarget/debug -lratex_gtk4 \
+            $(pkg-config --cflags --libs gtk4) \
+            -Wl,-rpath,$PWD/target/debug
+          gcc platforms/gtk/examples/c/init_contract.c \
+            -o target/debug/ratex-gtk-c-init-contract \
+            -Iplatforms/gtk/include/ratex-gtk-1.0 \
+            -Ltarget/debug -lratex_gtk4 \
+            $(pkg-config --cflags --libs gtk4) \
+            -Wl,-rpath,$PWD/target/debug
+      - name: Validate GTK metadata consistency
+        run: |
+          nm -D --defined-only target/debug/libratex_gtk4.so | grep -q ' ratex_formula_get_type$'
+          nm -D --defined-only target/debug/libratex_gtk4.so | grep -q ' ratex_formula_new$'
+          grep -q 'RatexFormula \*ratex_formula_new(void);' platforms/gtk/include/ratex-gtk-1.0/ratex-gtk.h
+          for property in latex display-mode font-size padding color font-dir error-message; do
+            grep -q "property name=\"$property\"" platforms/gtk/gir/RatexGtk-1.0.gir
+            grep -q "${property//-/_}" platforms/gtk/vapi/ratex-gtk-1.0.vapi
+          done
+      - name: Build Vala example
+        run: |
+          valac --vapidir=platforms/gtk/vapi \
+            --pkg gtk4 --pkg ratex-gtk-1.0 \
+            -X -Iplatforms/gtk/include/ratex-gtk-1.0 \
+            -X -Ltarget/debug -X -lratex_gtk4 \
+            -X -Wl,-rpath,$PWD/target/debug \
+            platforms/gtk/examples/vala/formula_demo.vala \
+            -o target/debug/ratex-gtk-vala-demo
+      - name: Smoke examples under Xvfb
+        run: |
+          export LD_LIBRARY_PATH=$PWD/target/debug:${LD_LIBRARY_PATH:-}
+          export GI_TYPELIB_PATH=$PWD/target/debug:${GI_TYPELIB_PATH:-}
+          run_smoke() {
+            set +e
+            timeout 5s xvfb-run -a "$@"
+            status=$?
+            set -e
+            if [ "$status" -ne 0 ] && [ "$status" -ne 124 ]; then
+              return "$status"
+            fi
+          }
+          run_smoke cargo run -p ratex-gtk4 --example formula_demo
+          run_smoke cargo run -p ratex-gtk4 --example adw_formula_demo
+          xvfb-run -a target/debug/ratex-gtk-c-init-contract
+          run_smoke target/debug/ratex-gtk-c-demo
+          run_smoke python3 platforms/gtk/examples/python/formula_demo.py
+          run_smoke target/debug/ratex-gtk-vala-demo
 
   ios-swift-smoke:
     runs-on: macos-15
