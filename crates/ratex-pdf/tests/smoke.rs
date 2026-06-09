@@ -168,6 +168,43 @@ fn pdf_preserves_textcolor_hex_alpha() {
 }
 
 #[test]
+fn pdf_preserves_emoji_raster_alpha() {
+    let ch = '😀';
+    #[cfg(target_os = "macos")]
+    let glyph_em = 80.0;
+    #[cfg(not(target_os = "macos"))]
+    let glyph_em = 40.0;
+
+    if ratex_unicode_font::emoji_png_raster_for_char(ch, glyph_em).is_none() {
+        eprintln!("SKIP pdf alpha: PNG emoji raster missing");
+        return;
+    }
+
+    let list = DisplayList {
+        width: 1.2,
+        height: 1.2,
+        depth: 0.4,
+        items: vec![DisplayItem::GlyphPath {
+            x: 0.0,
+            y: 0.8,
+            scale: 1.0,
+            font: "Emoji-Fallback".to_string(),
+            char_code: ch as u32,
+            color: Color::new(1.0, 0.0, 0.0, 0.5),
+        }],
+    };
+    let opts = PdfOptions {
+        font_dir: katex_font_dir(),
+        ..Default::default()
+    };
+    let pdf = render_to_pdf(&list, &opts).expect("render_to_pdf");
+    let content = decoded_pdf_streams(&pdf).join("\n");
+
+    assert!(content.contains("/GS500000 gs"), "{content}");
+    assert!(content.contains(" Do"), "{content}");
+}
+
+#[test]
 fn pdf_omits_alpha_graphics_state_for_opaque_colors() {
     let list = DisplayList {
         width: 1.0,

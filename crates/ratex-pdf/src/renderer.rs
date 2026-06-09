@@ -393,7 +393,9 @@ fn emit_glyph(
     // without re-resolving (must match [`fonts::collect_glyph_usage`] prefer-color path).
     if let Some(&ix) = emoji_ix.get(&char_code) {
         let asset = &emoji_assets[ix];
+        let alpha_applied = apply_non_stroking_alpha(content, color, alpha_states);
         emit_emoji_raster(content, px, py, scale * em, page_h, asset);
+        restore_alpha_if_needed(content, alpha_applied);
         return;
     }
 

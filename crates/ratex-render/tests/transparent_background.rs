@@ -220,6 +220,36 @@ fn render_to_png_preserves_glyph_alpha() {
 }
 
 #[test]
+fn render_to_png_preserves_emoji_raster_alpha() {
+    let ch = '😀';
+    if ratex_unicode_font::emoji_png_raster_for_char(ch, 10.0).is_none() {
+        eprintln!("SKIP transparent_background: PNG emoji raster missing");
+        return;
+    }
+
+    let Some(png) = render_display_list(DisplayList {
+        items: vec![DisplayItem::GlyphPath {
+            x: 0.0,
+            y: 1.0,
+            scale: 1.0,
+            font: "Emoji-Fallback".to_string(),
+            char_code: ch as u32,
+            color: Color::new(1.0, 0.0, 0.0, 0.5),
+        }],
+        width: 1.2,
+        height: 2.0,
+        depth: 0.0,
+    }) else {
+        eprintln!("SKIP transparent_background: KaTeX font_dir missing");
+        return;
+    };
+
+    let alpha = max_alpha(&png);
+    assert!(alpha > 0, "expected emoji raster ink");
+    assert!(alpha <= 128, "expected emoji alpha <= 128, got {alpha}");
+}
+
+#[test]
 fn render_to_png_preserves_textcolor_hex_alpha() {
     let Some(png) = render_latex(
         r"\textcolor{#ff000010}{x}",

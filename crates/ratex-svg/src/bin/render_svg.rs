@@ -161,7 +161,7 @@ fn default_font_dir() -> String {
 fn parse_color_arg(value: &str) -> Result<Color, String> {
     Color::parse(value).ok_or_else(|| {
         format!(
-            "invalid --color '{}': expected a named color, #rgb, #rrggbb, or [MODEL]value",
+            "invalid --color '{}': expected a named color, #rgb, #rgba, #rrggbb, #rrggbbaa, or [MODEL]value",
             value
         )
     })
@@ -194,7 +194,8 @@ Options:
   --stdout                   Write SVGs to stdout instead of files
   --dpr <FACTOR>             Scale font size, padding, and stroke width [default: 1.0]
   --font-size <SIZE>         Base SVG font size in user units [default: 40.0]
-  --color <COLOR>            Formula color: named, #rgb, #rrggbb, or [MODEL]value
+  --color <COLOR>            Formula color: named, #rgb, #rgba, #rrggbb, #rrggbbaa,
+                             or [MODEL]value
                              [default: black]
   --inline                   Use inline math style instead of display style
 "

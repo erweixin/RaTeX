@@ -98,6 +98,14 @@ fn paint_for_color(color: &Color) -> Paint<'static> {
     paint
 }
 
+fn normalized_alpha(alpha: f32) -> f32 {
+    if alpha.is_finite() {
+        alpha.clamp(0.0, 1.0)
+    } else {
+        1.0
+    }
+}
+
 /// Build a `FontId → FontRef` map from the raw font data (borrowed from the cache lock).
 fn build_font_refs(data: &FontSet) -> Result<HashMap<FontId, FontRef<'_>>, String> {
     let mut font_refs = HashMap::new();
@@ -310,7 +318,7 @@ fn try_emoji_vector_then_bitmap(
     em: f32,
     font_cache: &HashMap<FontId, FontRef<'_>>,
 ) -> bool {
-    if try_blit_emoji_raster_fallback(pixmap, px, py, em, ch) {
+    if try_blit_emoji_raster_fallback(pixmap, px, py, em, ch, color) {
         return true;
     }
     if let Some(emoji_font) = font_cache.get(&FontId::EmojiFallback) {
@@ -363,7 +371,7 @@ fn render_glyph(
     }
 
     if font_id == FontId::EmojiFallback {
-        if try_blit_emoji_raster_fallback(pixmap, px, py, em, ch) {
+        if try_blit_emoji_raster_fallback(pixmap, px, py, em, ch, color) {
             return;
         }
         let _ = render_glyph_with_font(
@@ -464,6 +472,14 @@ struct FontGlyph<'a> {
     font_id: FontId,
     font: &'a FontRef<'a>,
     glyph_id: ab_glyph::GlyphId,
+}
+
+struct RasterGlyphParams {
+    px: f32,
+    py: f32,
+    em: f32,
+    ch: char,
+    opacity: f32,
 }
 
 fn render_glyph_with_font(
@@ -594,20 +610,29 @@ fn try_blit_emoji_raster_fallback(
     py: f32,
     em: f32,
     ch: char,
+    color: &Color,
 ) -> bool {
     let Some(bytes) = ratex_unicode_font::load_emoji_font_arc() else {
         return false;
     };
     let idx = ratex_unicode_font::emoji_font_face_index().unwrap_or(0);
-    try_blit_raster_glyph(pixmap, px, py, em, ch, bytes.as_slice(), idx)
+    try_blit_raster_glyph(
+        pixmap,
+        RasterGlyphParams {
+            px,
+            py,
+            em,
+            ch,
+            opacity: normalized_alpha(color.a),
+        },
+        bytes.as_slice(),
+        idx,
+    )
 }
 
 fn try_blit_raster_glyph(
     pixmap: &mut Pixmap,
-    px: f32,
-    py: f32,
-    em: f32,
-    ch: char,
+    params: RasterGlyphParams,
     font_bytes: &[u8],
     face_index: u32,
 ) -> bool {
@@ -615,11 +640,11 @@ fn try_blit_raster_glyph(
         Ok(f) => f,
         Err(_) => return false,
     };
-    let gid = match face.glyph_index(ch) {
+    let gid = match face.glyph_index(params.ch) {
         Some(g) => g,
         None => return false,
     };
-    let strike = em.round().clamp(8.0, 256.0) as u16;
+    let strike = params.em.round().clamp(8.0, 256.0) as u16;
     let img = face
         .glyph_raster_image(gid, strike)
         .or_else(|| face.glyph_raster_image(gid, u16::MAX));
@@ -631,26 +656,27 @@ fn try_blit_raster_glyph(
         None => return false,
     };
     let ppm = f32::from(img.pixels_per_em.max(1));
-    let mut scale = em / ppm;
+    let mut scale = params.em / ppm;
     // Scale emoji to fit 1.0em layout width if it's wider (prevents overflow).
     let actual_width_em = f32::from(img.width) / ppm;
     let assumed_width = 1.0;
     if actual_width_em > 0.01 && actual_width_em > assumed_width * 1.01 {
         scale *= assumed_width / actual_width_em;
     }
-    let top_x = px + f32::from(img.x) * scale;
+    let top_x = params.px + f32::from(img.x) * scale;
     // `ttf-parser` / OpenType: `RasterGlyphImage::{x,y}` are in strike pixels; `y` is the
     // **bottom** edge of the bitmap in y-up coordinates (sbix yOffset to bottom; CBDT normalized
     // the same way). Top edge = y + height — using `y` alone shifts the glyph down by ~full height.
-    let mut top_y = py - (f32::from(img.y) + f32::from(img.height)) * scale;
+    let mut top_y = params.py - (f32::from(img.y) + f32::from(img.height)) * scale;
     // sbix places the bitmap bottom on the math baseline, but tall (~1em) color strikes put the
     // ink centroid near 0.5em above baseline. Binary/relation glyphs (+, =) are centered on the
     // math axis (~0.25em). Nudge the bitmap so its vertical center matches the axis — matches
     // mixed `\text{emoji} … formula` rows without changing layout baselines.
     let center_strike = (f32::from(img.y) + f32::from(img.height) / 2.0) / ppm;
     let axis = ratex_font::get_global_metrics(0).axis_height as f32;
-    top_y += (center_strike - axis) * em;
+    top_y += (center_strike - axis) * params.em;
     let paint = PixmapPaint {
+        opacity: params.opacity,
         quality: FilterQuality::Bilinear,
         ..Default::default()
     };
