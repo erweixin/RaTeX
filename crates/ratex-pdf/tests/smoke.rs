@@ -5,8 +5,11 @@ use std::path::Path;
 use ratex_layout::{layout, to_display_list, LayoutOptions};
 use ratex_parser::parser::parse;
 use ratex_pdf::{render_to_pdf, PdfOptions};
+use ratex_types::color::Color;
+use ratex_types::display_item::DisplayItem;
 use ratex_types::display_item::DisplayList;
 use ratex_types::math_style::MathStyle;
+use ratex_types::path_command::PathCommand;
 
 fn katex_font_dir() -> String {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -55,6 +58,37 @@ fn assert_close(actual: f64, expected: f64) {
     );
 }
 
+fn find_bytes(haystack: &[u8], needle: &[u8]) -> Option<usize> {
+    haystack
+        .windows(needle.len())
+        .position(|window| window == needle)
+}
+
+fn decoded_pdf_streams(pdf: &[u8]) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut pos = 0;
+    while let Some(stream_pos) = find_bytes(&pdf[pos..], b"stream") {
+        let mut data_start = pos + stream_pos + b"stream".len();
+        if pdf.get(data_start) == Some(&b'\r') && pdf.get(data_start + 1) == Some(&b'\n') {
+            data_start += 2;
+        } else if pdf.get(data_start) == Some(&b'\n') {
+            data_start += 1;
+        }
+
+        let Some(end_rel) = find_bytes(&pdf[data_start..], b"endstream") else {
+            break;
+        };
+        let data_end = data_start + end_rel;
+        if let Ok(decoded) =
+            miniz_oxide::inflate::decompress_to_vec_zlib(&pdf[data_start..data_end])
+        {
+            out.push(String::from_utf8_lossy(&decoded).into_owned());
+        }
+        pos = data_end + b"endstream".len();
+    }
+    out
+}
+
 #[test]
 fn smoke_fraction_renders_valid_pdf() {
     let pdf = latex_to_pdf(r"\frac{1}{2}");
@@ -69,6 +103,93 @@ fn smoke_fraction_renders_valid_pdf() {
         "PDF unexpectedly small: {} bytes",
         pdf.len()
     );
+}
+
+#[test]
+fn pdf_preserves_fill_and_stroke_alpha() {
+    let list = DisplayList {
+        width: 2.0,
+        height: 1.0,
+        depth: 0.0,
+        items: vec![
+            DisplayItem::Rect {
+                x: 0.0,
+                y: 0.0,
+                width: 1.0,
+                height: 1.0,
+                color: Color::new(1.0, 0.0, 0.0, 0.5),
+            },
+            DisplayItem::Path {
+                x: 0.0,
+                y: 0.0,
+                commands: vec![
+                    PathCommand::MoveTo { x: 0.0, y: 0.0 },
+                    PathCommand::LineTo { x: 1.0, y: 1.0 },
+                ],
+                fill: false,
+                color: Color::new(0.0, 0.0, 1.0, 0.25),
+            },
+        ],
+    };
+    let opts = PdfOptions {
+        font_dir: katex_font_dir(),
+        ..Default::default()
+    };
+    let pdf = render_to_pdf(&list, &opts).expect("render_to_pdf");
+    let pdf_text = String::from_utf8_lossy(&pdf);
+
+    assert!(pdf_text.contains("/ExtGState"));
+    assert!(pdf_text.contains("/GS500000"));
+    assert!(pdf_text.contains("/GS250000"));
+    assert!(pdf_text.contains("/ca 0.5"));
+    assert!(pdf_text.contains("/CA 0.5"));
+    assert!(pdf_text.contains("/ca 0.25"));
+    assert!(pdf_text.contains("/CA 0.25"));
+
+    let content = decoded_pdf_streams(&pdf).join("\n");
+    assert!(content.contains("/GS500000 gs"), "{content}");
+    assert!(content.contains("/GS250000 gs"), "{content}");
+}
+
+#[test]
+fn pdf_preserves_textcolor_hex_alpha() {
+    let pdf = latex_to_pdf(r"\textcolor{#ff000050}{x}");
+    let pdf_text = String::from_utf8_lossy(&pdf);
+    let alpha_key = ((80.0_f32 / 255.0) * 1_000_000.0).round() as u32;
+    let state_name = format!("/GS{alpha_key}");
+
+    assert!(pdf_text.contains("/ExtGState"));
+    assert!(pdf_text.contains(&state_name));
+    assert!(pdf_text.contains("/ca 0.313725"));
+    assert!(pdf_text.contains("/CA 0.313725"));
+
+    let content = decoded_pdf_streams(&pdf).join("\n");
+    assert!(content.contains(&format!("{state_name} gs")), "{content}");
+}
+
+#[test]
+fn pdf_omits_alpha_graphics_state_for_opaque_colors() {
+    let list = DisplayList {
+        width: 1.0,
+        height: 1.0,
+        depth: 0.0,
+        items: vec![DisplayItem::Rect {
+            x: 0.0,
+            y: 0.0,
+            width: 1.0,
+            height: 1.0,
+            color: Color::new(1.0, 0.0, 0.0, 1.0),
+        }],
+    };
+    let opts = PdfOptions {
+        font_dir: katex_font_dir(),
+        ..Default::default()
+    };
+    let pdf = render_to_pdf(&list, &opts).expect("render_to_pdf");
+    let pdf_text = String::from_utf8_lossy(&pdf);
+
+    assert!(!pdf_text.contains("/ExtGState"));
+    assert!(!decoded_pdf_streams(&pdf).join("\n").contains(" gs"));
 }
 
 #[test]
