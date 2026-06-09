@@ -14,5 +14,14 @@ if ! command -v cargo >/dev/null 2>&1; then
 fi
 
 echo "Running cargo clippy..."
-cargo clippy --workspace -- -D warnings
+cargo clippy --workspace --exclude ratex-gtk4 -- -D warnings
+
+if command -v pkg-config >/dev/null 2>&1 \
+  && pkg-config --exists gtk4 graphene-gobject-1.0; then
+  echo "Running cargo clippy for ratex-gtk4..."
+  cargo clippy -p ratex-gtk4 -- -D warnings
+else
+  echo "Skipping ratex-gtk4 clippy: GTK4/graphene pkg-config files were not found." >&2
+  echo "Install GTK4 development packages to check the GTK crate locally." >&2
+fi
 echo "Clippy passed."

@@ -39,7 +39,7 @@ impl Color {
         Self { r, g, b, a: 1.0 }
     }
 
-    /// Parse a hex color string like "#ff0000" or "#f00".
+    /// Parse a hex color string like "#ff0000", "#f00", "#ff000080", or "#f008".
     pub fn from_hex(hex: &str) -> Option<Self> {
         let hex = hex.strip_prefix('#').unwrap_or(hex);
         match hex.len() {
@@ -53,6 +53,18 @@ impl Color {
                     (b * 17) as f32 / 255.0,
                 ))
             }
+            4 => {
+                let r = u8::from_str_radix(&hex[0..1], 16).ok()?;
+                let g = u8::from_str_radix(&hex[1..2], 16).ok()?;
+                let b = u8::from_str_radix(&hex[2..3], 16).ok()?;
+                let a = u8::from_str_radix(&hex[3..4], 16).ok()?;
+                Some(Self::new(
+                    (r * 17) as f32 / 255.0,
+                    (g * 17) as f32 / 255.0,
+                    (b * 17) as f32 / 255.0,
+                    (a * 17) as f32 / 255.0,
+                ))
+            }
             6 => {
                 let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
                 let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
@@ -61,6 +73,18 @@ impl Color {
                     r as f32 / 255.0,
                     g as f32 / 255.0,
                     b as f32 / 255.0,
+                ))
+            }
+            8 => {
+                let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
+                let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
+                let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+                let a = u8::from_str_radix(&hex[6..8], 16).ok()?;
+                Some(Self::new(
+                    r as f32 / 255.0,
+                    g as f32 / 255.0,
+                    b as f32 / 255.0,
+                    a as f32 / 255.0,
                 ))
             }
             _ => None,
@@ -198,11 +222,29 @@ mod tests {
     }
 
     #[test]
+    fn test_from_hex_4() {
+        let c = Color::from_hex("#f008").unwrap();
+        assert!((c.r - 1.0).abs() < 0.01);
+        assert!(c.g.abs() < 0.01);
+        assert!(c.b.abs() < 0.01);
+        assert!((c.a - 136.0 / 255.0).abs() < 0.01);
+    }
+
+    #[test]
     fn test_from_hex_no_hash() {
         let c = Color::from_hex("00ff00").unwrap();
         assert!(c.r.abs() < 0.01);
         assert!((c.g - 1.0).abs() < 0.01);
         assert!(c.b.abs() < 0.01);
+    }
+
+    #[test]
+    fn test_from_hex_8() {
+        let c = Color::from_hex("#ff000010").unwrap();
+        assert!((c.r - 1.0).abs() < 0.01);
+        assert!(c.g.abs() < 0.01);
+        assert!(c.b.abs() < 0.01);
+        assert!((c.a - 16.0 / 255.0).abs() < 0.01);
     }
 
     #[test]

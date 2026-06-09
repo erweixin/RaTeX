@@ -1046,3 +1046,4 @@ a · b
 ⨂_{k} L_k
 ⨄_{m} P_m
 ⨆_{n} Q_n
+\textcolor{#ff000050}{x}

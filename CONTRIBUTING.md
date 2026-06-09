@@ -6,6 +6,7 @@ Thanks for helping improve RaTeX. Keep changes focused and consistent with surro
 
 - **Rust**: stable toolchain ([rustup](https://rustup.rs)); see README for minimum version.
 - **Web / WASM builds**: [wasm-pack](https://rustwasm.github.io/wasm-pack/installer/) when working under `platforms/web`.
+- **GTK checks**: full workspace checks include `crates/ratex-gtk4`, which needs GTK4/graphene development packages visible to `pkg-config`.
 
 ## Build, lint, test
 
@@ -17,7 +18,7 @@ cargo clippy --workspace -- -D warnings
 cargo test --workspace
 ```
 
-CI runs the same checks (`.github/workflows/ci.yml`).
+CI runs the same checks (`.github/workflows/ci.yml`) after installing GTK dependencies. The local pre-commit hook skips only `ratex-gtk4` when GTK4/graphene `pkg-config` files are missing, while still linting the rest of the workspace.
 
 ## Golden (visual) tests
 

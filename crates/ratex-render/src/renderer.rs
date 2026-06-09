@@ -87,6 +87,17 @@ fn to_tiny_skia_color(color: Color) -> tiny_skia::Color {
     .unwrap_or(tiny_skia::Color::TRANSPARENT)
 }
 
+fn paint_for_color(color: &Color) -> Paint<'static> {
+    let mut paint = Paint::default();
+    paint.set_color_rgba8(
+        (color.r * 255.0) as u8,
+        (color.g * 255.0) as u8,
+        (color.b * 255.0) as u8,
+        (color.a.clamp(0.0, 1.0) * 255.0).round() as u8,
+    );
+    paint
+}
+
 /// Build a `FontId → FontRef` map from the raw font data (borrowed from the cache lock).
 fn build_font_refs(data: &FontSet) -> Result<HashMap<FontId, FontRef<'_>>, String> {
     let mut font_refs = HashMap::new();
@@ -561,13 +572,7 @@ fn render_glyph_with_font(
     }
 
     if let Some(path) = builder.finish() {
-        let mut paint = Paint::default();
-        paint.set_color_rgba8(
-            (color.r * 255.0) as u8,
-            (color.g * 255.0) as u8,
-            (color.b * 255.0) as u8,
-            255,
-        );
+        let mut paint = paint_for_color(color);
         paint.anti_alias = true;
         pixmap.fill_path(
             &path,
@@ -697,13 +702,7 @@ fn render_line(
     dashed: bool,
 ) {
     let t = thickness.max(1.0);
-    let mut paint = Paint::default();
-    paint.set_color_rgba8(
-        (color.r * 255.0) as u8,
-        (color.g * 255.0) as u8,
-        (color.b * 255.0) as u8,
-        255,
-    );
+    let paint = paint_for_color(color);
 
     if dashed {
         // Draw a dashed line: dash length = 4t, gap = 4t.
@@ -733,13 +732,7 @@ fn render_rect(pixmap: &mut Pixmap, x: f32, y: f32, width: f32, height: f32, col
     let height = height.max(2.0);
     let rect = tiny_skia::Rect::from_xywh(x, y, width, height);
     if let Some(rect) = rect {
-        let mut paint = Paint::default();
-        paint.set_color_rgba8(
-            (color.r * 255.0) as u8,
-            (color.g * 255.0) as u8,
-            (color.b * 255.0) as u8,
-            255,
-        );
+        let paint = paint_for_color(color);
         pixmap.fill_rect(rect, &paint, Transform::identity(), None);
     }
 }
@@ -853,13 +846,7 @@ fn render_path_segment(
     }
 
     if let Some(path) = builder.finish() {
-        let mut paint = Paint::default();
-        paint.set_color_rgba8(
-            (color.r * 255.0) as u8,
-            (color.g * 255.0) as u8,
-            (color.b * 255.0) as u8,
-            255,
-        );
+        let mut paint = paint_for_color(color);
         if fill {
             paint.anti_alias = true;
             // Even-odd: KaTeX `tallDelim` vert uses two subpaths (outline + stem); nonzero winding
@@ -882,17 +869,7 @@ fn render_path_segment(
 }
 
 fn encode_png(pixmap: &Pixmap) -> Result<Vec<u8>, String> {
-    let mut buf = Vec::new();
-    {
-        let mut encoder = png::Encoder::new(&mut buf, pixmap.width(), pixmap.height());
-        encoder.set_color(png::ColorType::Rgba);
-        encoder.set_depth(png::BitDepth::Eight);
-        let mut writer = encoder
-            .write_header()
-            .map_err(|e| format!("PNG header error: {}", e))?;
-        writer
-            .write_image_data(pixmap.data())
-            .map_err(|e| format!("PNG write error: {}", e))?;
-    }
-    Ok(buf)
+    pixmap
+        .encode_png()
+        .map_err(|e| format!("PNG encode error: {}", e))
 }
