@@ -1974,7 +1974,9 @@ fn layout_accent(
 // Left/Right stretchy delimiters
 // ============================================================================
 
-/// Returns true if the node (or any descendant) is a Middle node.
+/// Returns true if the node (or any descendant in the current `\left...\right`
+/// scope) is a Middle node.  A nested LeftRight starts its own scope, so its
+/// `\middle`s are handled by that nested layout pass.
 fn node_contains_middle(node: &ParseNode) -> bool {
     match node {
         ParseNode::Middle { .. } => true,
@@ -1998,7 +2000,7 @@ fn node_contains_middle(node: &ParseNode) -> bool {
         ParseNode::Op { body, .. } => body
             .as_ref()
             .is_some_and(|b| b.iter().any(node_contains_middle)),
-        ParseNode::LeftRight { body, .. } => body.iter().any(node_contains_middle),
+        ParseNode::LeftRight { .. } => false,
         ParseNode::OperatorName { body, .. } => body.iter().any(node_contains_middle),
         ParseNode::Font { body, .. } => node_contains_middle(body),
         ParseNode::Text { body, .. }
@@ -2046,7 +2048,8 @@ fn node_contains_middle(node: &ParseNode) -> bool {
     }
 }
 
-/// Returns true if any node in the slice (recursing into all container nodes) is a Middle node.
+/// Returns true if any node in the slice contains a Middle node governed by the
+/// current `\left...\right` pass.
 fn body_contains_middle(nodes: &[ParseNode]) -> bool {
     nodes.iter().any(node_contains_middle)
 }

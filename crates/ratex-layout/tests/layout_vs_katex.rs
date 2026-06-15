@@ -69,6 +69,32 @@ fn htmlstyle_applies_supported_css() {
 }
 
 #[test]
+fn htmlstyle_nested_leftright_middle_keeps_inner_metrics() {
+    let options = LayoutOptions::default();
+    let inner = layout(
+        &parse("\\left( x \\middle| y \\right)").unwrap(),
+        &options,
+    );
+    let wrapped = layout(
+        &parse("\\htmlStyle{background-color: yellow;}{\\left( x \\middle| y \\right)}").unwrap(),
+        &options,
+    );
+
+    assert!(
+        (wrapped.height - inner.height).abs() < TOLERANCE,
+        "HTML wrapper should not reserve current-pass \\middle height for nested LeftRight: inner height {:.5}, wrapped height {:.5}",
+        inner.height,
+        wrapped.height,
+    );
+    assert!(
+        (wrapped.depth - inner.depth).abs() < TOLERANCE,
+        "HTML wrapper should not reserve current-pass \\middle depth for nested LeftRight: inner depth {:.5}, wrapped depth {:.5}",
+        inner.depth,
+        wrapped.depth,
+    );
+}
+
+#[test]
 fn href_non_typewriter_body_keeps_link_underline() {
     let ast = parse("\\href{https://example.com}{x}").unwrap();
     let options = LayoutOptions::default();
