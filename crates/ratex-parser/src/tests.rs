@@ -60,6 +60,24 @@ mod core_parsing {
     }
 
     #[test]
+    fn dotsc_before_comma_omits_thinspace() {
+        let ast = parse("x,\\dotsc,y").unwrap();
+        assert!(!ast.iter().any(|node| matches!(node, ParseNode::Kern { .. })));
+        assert_eq!(ast.len(), 5);
+        assert_eq!(ast[2].symbol_text(), Some("\\ldots"));
+        assert_eq!(ast[3].symbol_text(), Some(","));
+    }
+
+    #[test]
+    fn dotsc_before_selected_punctuation_keeps_thinspace() {
+        let ast = parse("x,\\dotsc;y").unwrap();
+        assert_eq!(ast.len(), 6);
+        assert_eq!(ast[2].symbol_text(), Some("\\ldots"));
+        assert!(matches!(ast[3], ParseNode::Kern { .. }));
+        assert_eq!(ast[4].symbol_text(), Some(";"));
+    }
+
+    #[test]
     fn open_paren() {
         let ast = parse("(").unwrap();
         assert_eq!(ast.len(), 1);
