@@ -200,6 +200,7 @@ pub enum BoxContent {
     Underline {
         body: Box<LayoutBox>,
         rule_thickness: f64,
+        offset: f64,
     },
 
     /// Bussproofs-style proof tree with absolutely placed child boxes and inference rules.

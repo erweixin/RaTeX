@@ -636,10 +636,9 @@ fn emit_box(
             });
         }
 
-        BoxContent::Underline { body, rule_thickness } => {
+        BoxContent::Underline { body, rule_thickness, offset } => {
             emit_box(body, x, y, scale, items, font_str_cache);
-            // Rule center is at 2.5 * rule_thickness below the body's bottom
-            let rule_center_y = y + (body.depth + 2.5 * rule_thickness) * scale;
+            let rule_center_y = y + (body.depth + offset) * scale;
             items.push(DisplayItem::Line {
                 x,
                 y: rule_center_y,
