@@ -155,6 +155,27 @@ fn htmlstyle_mathchoice_ignores_middle_in_unselected_branch() {
 }
 
 #[test]
+fn htmlmathml_leftright_middle_renders_html_branch_delimiter() {
+    let options = LayoutOptions::default();
+    let plain = layout(
+        &parse("\\left( x \\middle| y \\right)").unwrap(),
+        &options,
+    );
+    let wrapped = layout(
+        &parse("\\left( \\html@mathml{x \\middle| y}{x} \\right)").unwrap(),
+        &options,
+    );
+    let plain_display = to_display_list(&plain);
+    let wrapped_display = to_display_list(&wrapped);
+
+    assert_eq!(
+        wrapped_display.items.len(),
+        plain_display.items.len(),
+        "\\html@mathml html branch should render the current-pass \\middle delimiter"
+    );
+}
+
+#[test]
 fn widetilde_path_stays_inside_display_width_after_previous_glyph() {
     let ast = parse("x\\widetilde{x}").unwrap();
     let options = LayoutOptions::default();

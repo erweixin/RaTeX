@@ -2065,6 +2065,9 @@ fn node_contains_middle(node: &ParseNode, style: MathStyle) -> bool {
         ParseNode::Href { body, .. } | ParseNode::Html { body, .. } => {
             body.iter().any(|n| node_contains_middle(n, style))
         }
+        ParseNode::HtmlMathMl { html, .. } => {
+            html.iter().any(|n| node_contains_middle(n, style))
+        }
         _ => false,
     }
 }
