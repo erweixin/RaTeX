@@ -1,47 +1,47 @@
-pub mod genfrac;
-pub mod sqrt;
-pub mod op;
 pub mod accent;
-pub mod font;
-pub mod color;
-pub mod sizing;
-pub mod delimsizing;
-pub mod left_right;
-pub mod spacing;
-pub mod styling;
-pub mod overline;
-pub mod kern;
-pub mod phantom;
-pub mod text;
-pub mod cr;
-pub mod relax;
-pub mod verb;
-pub mod symbols_cmd;
-pub mod environment;
-pub mod mclass;
-pub mod operatorname;
-pub mod horiz_brace;
 pub mod arrow;
-pub mod enclose;
-pub mod rule;
-pub mod href;
-pub mod hbox;
-pub mod lap;
-pub mod raisebox;
-pub mod vcenter;
-pub mod pmb;
-pub mod mathchoice;
-pub mod def;
-pub mod htmlmathml;
-pub mod char_cmd;
-pub mod math;
-pub mod tag;
-pub mod nonumber;
 pub mod bussproofs;
+pub mod char_cmd;
+pub mod color;
+pub mod cr;
+pub mod def;
+pub mod delimsizing;
+pub mod enclose;
+pub mod environment;
+pub mod font;
+pub mod genfrac;
+pub mod hbox;
+pub mod horiz_brace;
+pub mod href;
+pub mod htmlmathml;
+pub mod kern;
+pub mod lap;
+pub mod left_right;
+pub mod math;
+pub mod mathchoice;
+pub mod mclass;
+pub mod nonumber;
+pub mod op;
+pub mod operatorname;
+pub mod overline;
+pub mod phantom;
+pub mod pmb;
+pub mod raisebox;
+pub mod relax;
+pub mod rule;
+pub mod sizing;
+pub mod spacing;
+pub mod sqrt;
+pub mod styling;
+pub mod symbols_cmd;
+pub mod tag;
+pub mod text;
+pub mod vcenter;
+pub mod verb;
 
-use std::collections::HashMap;
 use crate::error::ParseResult;
 use crate::parse_node::{Mode, ParseNode};
+use std::collections::HashMap;
 
 use ratex_lexer::token::Token;
 
@@ -54,8 +54,11 @@ pub struct FunctionContext<'a, 'b> {
 }
 
 /// Handler function signature.
-pub type FunctionHandler =
-    fn(ctx: &mut FunctionContext, args: Vec<ParseNode>, opt_args: Vec<Option<ParseNode>>) -> ParseResult<ParseNode>;
+pub type FunctionHandler = fn(
+    ctx: &mut FunctionContext,
+    args: Vec<ParseNode>,
+    opt_args: Vec<Option<ParseNode>>,
+) -> ParseResult<ParseNode>;
 
 /// Argument types for function parameters.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -9,8 +9,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\mathchoice"],
         "mathchoice",
-        4, 0, None,
-        false, false, true, false, true,
+        4,
+        0,
+        None,
+        false,
+        false,
+        true,
+        false,
+        true,
         handle_mathchoice,
     );
 }

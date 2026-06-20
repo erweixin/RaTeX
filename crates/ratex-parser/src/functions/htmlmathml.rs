@@ -9,8 +9,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\html@mathml"],
         "htmlmathml",
-        2, 0, None,
-        false, true, true, false, false,
+        2,
+        0,
+        None,
+        false,
+        true,
+        true,
+        false,
+        false,
         handle_htmlmathml,
     );
 
@@ -18,9 +24,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\htmlStyle"],
         "html",
-        2, 0,
+        2,
+        0,
         Some(vec![ArgType::Raw, ArgType::Original]),
-        false, true, true, false, false,
+        false,
+        true,
+        true,
+        false,
+        false,
         handle_htmlstyle,
     );
 }

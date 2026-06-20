@@ -111,7 +111,10 @@ fn load_unicode_fallback_font() -> Option<(Arc<Vec<u8>>, u32)> {
     // 1. User-specified font via RATEX_UNICODE_FONT
     if let Ok(spec) = std::env::var("RATEX_UNICODE_FONT") {
         if let Some(font) = load_font_spec(&spec) {
-            eprintln!("[ratex-unicode-font] loaded from RATEX_UNICODE_FONT: {}", spec);
+            eprintln!(
+                "[ratex-unicode-font] loaded from RATEX_UNICODE_FONT: {}",
+                spec
+            );
             return Some(font);
         }
     }
@@ -302,18 +305,29 @@ mod tests {
         let ttc = "/System/Library/Fonts/PingFang.ttc";
         if std::path::Path::new(ttc).exists() {
             let result_family = load_font_spec(&format!("{ttc}#PingFang SC"));
-            assert!(result_family.is_some(), "Should load PingFang.ttc with family name");
+            assert!(
+                result_family.is_some(),
+                "Should load PingFang.ttc with family name"
+            );
 
             let result_default = load_font_spec(ttc);
-            assert!(result_default.is_some(), "Should load PingFang.ttc without selector");
+            assert!(
+                result_default.is_some(),
+                "Should load PingFang.ttc without selector"
+            );
             if let Some((_, face_index)) = result_default {
-                assert_eq!(face_index, 0, "TTC without selector should default to face 0");
+                assert_eq!(
+                    face_index, 0,
+                    "TTC without selector should default to face 0"
+                );
             }
 
             if let Some((_, face_index_family)) = result_family {
-                let result_index =
-                    load_font_spec(&format!("{ttc}#{face_index_family}"));
-                assert!(result_index.is_some(), "Should load PingFang.ttc with index");
+                let result_index = load_font_spec(&format!("{ttc}#{face_index_family}"));
+                assert!(
+                    result_index.is_some(),
+                    "Should load PingFang.ttc with index"
+                );
                 if let Some((_, face_index_idx)) = result_index {
                     assert_eq!(
                         face_index_family, face_index_idx,

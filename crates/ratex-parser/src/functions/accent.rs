@@ -5,8 +5,17 @@ use crate::functions::{define_function_full, ArgType, FunctionContext, FunctionS
 use crate::parse_node::{Mode, ParseNode};
 
 static NON_STRETCHY: &[&str] = &[
-    "\\acute", "\\grave", "\\ddot", "\\tilde", "\\bar", "\\breve",
-    "\\check", "\\hat", "\\vec", "\\dot", "\\mathring",
+    "\\acute",
+    "\\grave",
+    "\\ddot",
+    "\\tilde",
+    "\\bar",
+    "\\breve",
+    "\\check",
+    "\\hat",
+    "\\vec",
+    "\\dot",
+    "\\mathring",
 ];
 
 pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
@@ -14,15 +23,38 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
     define_function_full(
         map,
         &[
-            "\\acute", "\\grave", "\\ddot", "\\tilde", "\\bar", "\\breve",
-            "\\check", "\\hat", "\\vec", "\\dot", "\\mathring", "\\widecheck",
-            "\\widehat", "\\widetilde", "\\overrightarrow", "\\overleftarrow",
-            "\\Overrightarrow", "\\overleftrightarrow", "\\overgroup",
-            "\\overlinesegment", "\\overleftharpoon", "\\overrightharpoon",
+            "\\acute",
+            "\\grave",
+            "\\ddot",
+            "\\tilde",
+            "\\bar",
+            "\\breve",
+            "\\check",
+            "\\hat",
+            "\\vec",
+            "\\dot",
+            "\\mathring",
+            "\\widecheck",
+            "\\widehat",
+            "\\widetilde",
+            "\\overrightarrow",
+            "\\overleftarrow",
+            "\\Overrightarrow",
+            "\\overleftrightarrow",
+            "\\overgroup",
+            "\\overlinesegment",
+            "\\overleftharpoon",
+            "\\overrightharpoon",
         ],
         "accent",
-        1, 0, None,
-        false, false, true, false, false,
+        1,
+        0,
+        None,
+        false,
+        false,
+        true,
+        false,
+        false,
         handle_accent,
     );
 
@@ -30,16 +62,29 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
     define_function_full(
         map,
         &[
-            "\\'", "\\`", "\\^", "\\~", "\\=", "\\u", "\\.", "\\\"",
-            "\\c", "\\r", "\\H", "\\v", "\\textcircled",
+            "\\'",
+            "\\`",
+            "\\^",
+            "\\~",
+            "\\=",
+            "\\u",
+            "\\.",
+            "\\\"",
+            "\\c",
+            "\\r",
+            "\\H",
+            "\\v",
+            "\\textcircled",
         ],
         "accent",
-        1, 0,
+        1,
+        0,
         Some(vec![ArgType::Primitive]),
         false,
-        true,  // allowed_in_text
-        true,  // allowed_in_math
-        false, false,
+        true, // allowed_in_text
+        true, // allowed_in_math
+        false,
+        false,
         handle_text_accent,
     );
 
@@ -47,12 +92,22 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
     define_function_full(
         map,
         &[
-            "\\underleftarrow", "\\underrightarrow", "\\underleftrightarrow",
-            "\\undergroup", "\\underlinesegment", "\\utilde",
+            "\\underleftarrow",
+            "\\underrightarrow",
+            "\\underleftrightarrow",
+            "\\undergroup",
+            "\\underlinesegment",
+            "\\utilde",
         ],
         "accentUnder",
-        1, 0, None,
-        false, false, true, false, false,
+        1,
+        0,
+        None,
+        false,
+        false,
+        true,
+        false,
+        false,
         handle_accent_under,
     );
 }

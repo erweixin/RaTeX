@@ -10,7 +10,7 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         &["\\sqrt"],
         "sqrt",
         1,
-        1,    // one optional arg [n]
+        1, // one optional arg [n]
         None,
         false,
         false,

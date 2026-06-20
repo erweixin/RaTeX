@@ -9,8 +9,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\overline"],
         "overline",
-        1, 0, None,
-        false, false, true, false, false,
+        1,
+        0,
+        None,
+        false,
+        false,
+        true,
+        false,
+        false,
         handle_overline,
     );
 
@@ -18,11 +24,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\underline"],
         "underline",
-        1, 0, None,
+        1,
+        0,
+        None,
         false,
-        true,  // allowed_in_text
+        true, // allowed_in_text
         true,
-        false, false,
+        false,
+        false,
         handle_underline,
     );
 }

@@ -2,8 +2,8 @@ use std::fs::File;
 use std::io::{self, BufRead};
 use std::path::PathBuf;
 
-use ratex_layout::{layout, LayoutOptions};
 use ratex_layout::to_display_list;
+use ratex_layout::{layout, LayoutOptions};
 use ratex_parser::parser::parse;
 use ratex_render::{render_to_png, RenderOptions};
 use ratex_types::color::Color;
@@ -12,7 +12,10 @@ use ratex_types::math_style::MathStyle;
 fn main() {
     let args: Vec<String> = std::env::args().collect();
     if args.iter().any(|a| a == "-h" || a == "--help") {
-        print!("{}", help_text(args.first().map(String::as_str).unwrap_or("render")));
+        print!(
+            "{}",
+            help_text(args.first().map(String::as_str).unwrap_or("render"))
+        );
         return;
     }
 
@@ -85,14 +88,20 @@ fn main() {
     };
 
     let inline = args.contains(&"--inline".to_string());
-    let style = if inline { MathStyle::Text } else { MathStyle::Display };
+    let style = if inline {
+        MathStyle::Text
+    } else {
+        MathStyle::Display
+    };
     let layout_opts = LayoutOptions::default().with_style(style).with_color(color);
 
     let mut idx = 0;
     let reader: Box<dyn BufRead> = match input_file {
-        Some(path) => Box::new(io::BufReader::new(
-            File::open(&path).unwrap_or_else(|e| panic!("Failed to open input file '{}': {}", path, e)),
-        )),
+        Some(path) => {
+            Box::new(io::BufReader::new(File::open(&path).unwrap_or_else(|e| {
+                panic!("Failed to open input file '{}': {}", path, e)
+            })))
+        }
         None => Box::new(io::BufReader::new(io::stdin())),
     };
     for line in reader.lines() {

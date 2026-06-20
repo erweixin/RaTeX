@@ -67,13 +67,25 @@ fn sanitize_item(item: &mut DisplayItem) {
             sanitize_f64(y);
             sanitize_f64(scale);
         }
-        DisplayItem::Line { x, y, width, thickness, .. } => {
+        DisplayItem::Line {
+            x,
+            y,
+            width,
+            thickness,
+            ..
+        } => {
             sanitize_f64(x);
             sanitize_f64(y);
             sanitize_f64(width);
             sanitize_f64(thickness);
         }
-        DisplayItem::Rect { x, y, width, height, .. } => {
+        DisplayItem::Rect {
+            x,
+            y,
+            width,
+            height,
+            ..
+        } => {
             sanitize_f64(x);
             sanitize_f64(y);
             sanitize_f64(width);
@@ -95,7 +107,14 @@ fn sanitize_path_command(cmd: &mut PathCommand) {
             sanitize_f64(x);
             sanitize_f64(y);
         }
-        PathCommand::CubicTo { x1, y1, x2, y2, x, y } => {
+        PathCommand::CubicTo {
+            x1,
+            y1,
+            x2,
+            y2,
+            x,
+            y,
+        } => {
             sanitize_f64(x1);
             sanitize_f64(y1);
             sanitize_f64(x2);

@@ -10,12 +10,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\textcolor"],
         "color",
-        2, 1,
+        2,
+        1,
         Some(vec![ArgType::Raw, ArgType::Color, ArgType::Original]),
         false,
-        true,  // allowed_in_text
+        true, // allowed_in_text
         true,
-        false, false,
+        false,
+        false,
         handle_textcolor,
     );
 
@@ -24,12 +26,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\color"],
         "color",
-        1, 1,
+        1,
+        1,
         Some(vec![ArgType::Raw, ArgType::Color]),
         false,
         true,
         true,
-        false, false,
+        false,
+        false,
         handle_color,
     );
 
@@ -38,12 +42,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\colorbox"],
         "enclose",
-        2, 0,
+        2,
+        0,
         Some(vec![ArgType::Color, ArgType::Text]),
         false,
         true,
         true,
-        false, false,
+        false,
+        false,
         handle_colorbox,
     );
 
@@ -52,12 +58,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\fcolorbox"],
         "enclose",
-        3, 0,
+        3,
+        0,
         Some(vec![ArgType::Color, ArgType::Color, ArgType::Text]),
         false,
         true,
         true,
-        false, false,
+        false,
+        false,
         handle_fcolorbox,
     );
 }
@@ -85,9 +93,7 @@ fn handle_color(
 ) -> ParseResult<ParseNode> {
     let color = encode_color(extract_color(&args[0])?, &opt_args);
     let break_on = ctx.break_on_token_text.clone();
-    let body = ctx
-        .parser
-        .parse_expression(true, break_on.as_deref())?;
+    let body = ctx.parser.parse_expression(true, break_on.as_deref())?;
 
     Ok(ParseNode::Color {
         mode: ctx.parser.mode,

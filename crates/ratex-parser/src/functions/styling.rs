@@ -14,11 +14,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
             "\\scriptscriptstyle",
         ],
         "styling",
-        0, 0, None,
-        true,  // allowed_in_argument
+        0,
+        0,
+        None,
+        true, // allowed_in_argument
         true,
         true,
-        false, false,
+        false,
+        false,
         handle_styling,
     );
 }

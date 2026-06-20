@@ -20,7 +20,11 @@ fn normalize_input(s: &str) -> String {
     out
 }
 
-pub(crate) fn go_machine(ctx: &ParserCtx<'_>, input: &str, machine: &str) -> MhchemResult<Vec<Value>> {
+pub(crate) fn go_machine(
+    ctx: &ParserCtx<'_>,
+    input: &str,
+    machine: &str,
+) -> MhchemResult<Vec<Value>> {
     let mut input = normalize_input(input);
     if input.is_empty() {
         return Ok(vec![]);

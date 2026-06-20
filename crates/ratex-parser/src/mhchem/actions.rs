@@ -10,8 +10,7 @@ use regex::Regex;
 use serde_json::{json, Value};
 use std::sync::LazyLock;
 
-static RE_DIGITS_ONLY: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^[0-9]+$").unwrap());
+static RE_DIGITS_ONLY: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[0-9]+$").unwrap());
 static RE_CELSIUS_C: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\u{00B0}C|\^oC|\^\{o\}C").unwrap());
 static RE_CELSIUS_F: LazyLock<Regex> =
@@ -255,7 +254,11 @@ fn ce_o_after_d(ctx: &ParserCtx, buffer: &mut Buffer, m: &MatchToken) -> MhchemR
     Ok(ret)
 }
 
-fn ce_charge_or_bond(ctx: &ParserCtx, buffer: &mut Buffer, m: &MatchToken) -> MhchemResult<Vec<Value>> {
+fn ce_charge_or_bond(
+    ctx: &ParserCtx,
+    buffer: &mut Buffer,
+    m: &MatchToken,
+) -> MhchemResult<Vec<Value>> {
     if buffer.begins_with_bond {
         let mut ret = ce_output(ctx, buffer, None)?;
         ret.push(json!({"type_": "bond", "kind_": "-"}));
@@ -275,12 +278,17 @@ fn ce_after_od(
     let dash = token_string(m);
     let o = buffer.o.as_deref().unwrap_or("");
     let c1 = match_pattern(ctx.data, "orbital", o).ok().flatten();
-    let c2 = match_pattern(ctx.data, "one lowercase greek letter $", o).ok().flatten();
-    let c3 = match_pattern(ctx.data, "one lowercase latin letter $", o).ok().flatten();
-    let c4 = match_pattern(ctx.data, "$one lowercase latin letter$ $", o).ok().flatten();
+    let c2 = match_pattern(ctx.data, "one lowercase greek letter $", o)
+        .ok()
+        .flatten();
+    let c3 = match_pattern(ctx.data, "one lowercase latin letter $", o)
+        .ok()
+        .flatten();
+    let c4 = match_pattern(ctx.data, "$one lowercase latin letter$ $", o)
+        .ok()
+        .flatten();
     let h_orb = c1.as_ref().map(|h| h.remainder.is_empty()).unwrap_or(false);
-    let hyphen_follows =
-        dash == "-" && (h_orb || c2.is_some() || c3.is_some() || c4.is_some());
+    let hyphen_follows = dash == "-" && (h_orb || c2.is_some() || c3.is_some() || c4.is_some());
 
     if hyphen_follows
         && Buffer::is_slot_empty(&buffer.a)
@@ -302,8 +310,9 @@ fn ce_after_od(
         return Ok(ret);
     }
 
-    let digits_d =
-        match_pattern(ctx.data, "digits", buffer.d.as_deref().unwrap_or("")).ok().flatten();
+    let digits_d = match_pattern(ctx.data, "digits", buffer.d.as_deref().unwrap_or(""))
+        .ok()
+        .flatten();
     let d_only = digits_d.map(|h| h.remainder.is_empty()).unwrap_or(false);
     if is_after_d && d_only {
         cat(&mut buffer.d, m);
@@ -315,7 +324,11 @@ fn ce_after_od(
     Ok(ret)
 }
 
-fn ce_output(ctx: &ParserCtx, buffer: &mut Buffer, entity: Option<&Value>) -> MhchemResult<Vec<Value>> {
+fn ce_output(
+    ctx: &ParserCtx,
+    buffer: &mut Buffer,
+    entity: Option<&Value>,
+) -> MhchemResult<Vec<Value>> {
     let entity_follows = entity.and_then(|v| {
         if let Some(n) = v.as_u64() {
             Some(n as i32)
@@ -351,15 +364,25 @@ fn ce_output(ctx: &ParserCtx, buffer: &mut Buffer, entity: Option<&Value>) -> Mh
                 .is_some()
         {
             d_type = Some("oxidation".into());
-        } else if !Buffer::is_slot_empty(&buffer.o) && d_type.as_deref() == Some("kv") && Buffer::is_slot_empty(&buffer.q) {
+        } else if !Buffer::is_slot_empty(&buffer.o)
+            && d_type.as_deref() == Some("kv")
+            && Buffer::is_slot_empty(&buffer.q)
+        {
             d_type = None;
         }
 
-        if Buffer::is_slot_empty(&buffer.o) && Buffer::is_slot_empty(&buffer.q) && Buffer::is_slot_empty(&buffer.d) && Buffer::is_slot_empty(&buffer.b) && Buffer::is_slot_empty(&buffer.p)
+        if Buffer::is_slot_empty(&buffer.o)
+            && Buffer::is_slot_empty(&buffer.q)
+            && Buffer::is_slot_empty(&buffer.d)
+            && Buffer::is_slot_empty(&buffer.b)
+            && Buffer::is_slot_empty(&buffer.p)
             && entity_follows != Some(2)
         {
             buffer.o = buffer.a.take();
-        } else if Buffer::is_slot_empty(&buffer.o) && Buffer::is_slot_empty(&buffer.q) && Buffer::is_slot_empty(&buffer.d) && (!Buffer::is_slot_empty(&buffer.b) || !Buffer::is_slot_empty(&buffer.p))
+        } else if Buffer::is_slot_empty(&buffer.o)
+            && Buffer::is_slot_empty(&buffer.q)
+            && Buffer::is_slot_empty(&buffer.d)
+            && (!Buffer::is_slot_empty(&buffer.b) || !Buffer::is_slot_empty(&buffer.p))
         {
             buffer.o = buffer.a.take();
             buffer.d = buffer.b.take();
@@ -371,7 +394,11 @@ fn ce_output(ctx: &ParserCtx, buffer: &mut Buffer, entity: Option<&Value>) -> Mh
         let p = engine::go_machine(ctx, buffer.p.take().unwrap_or_default().as_str(), "pq")?;
         let o = engine::go_machine(ctx, buffer.o.take().unwrap_or_default().as_str(), "o")?;
         let q = engine::go_machine(ctx, buffer.q.take().unwrap_or_default().as_str(), "pq")?;
-        let d_sm = if d_type.as_deref() == Some("oxidation") { "oxidation" } else { "bd" };
+        let d_sm = if d_type.as_deref() == Some("oxidation") {
+            "oxidation"
+        } else {
+            "bd"
+        };
         let d = engine::go_machine(ctx, buffer.d.take().unwrap_or_default().as_str(), d_sm)?;
 
         let mut chem = serde_json::Map::new();
@@ -654,11 +681,7 @@ fn global_action(
             Ok(vec![])
         }
         "insert" => {
-            let opt = spec
-                .option
-                .as_ref()
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
+            let opt = spec.option.as_ref().and_then(|v| v.as_str()).unwrap_or("");
             Ok(vec![json!({"type_": opt})])
         }
         "insert+p1" => Ok(vec![json!({
@@ -679,7 +702,9 @@ fn global_action(
             })])
         }
         "copy" => Ok(vec![Value::String(token_string(m))]),
-        "rm" => Ok(vec![json!({"type_": "rm", "p1": match_str(m).unwrap_or_default()})]),
+        "rm" => Ok(vec![
+            json!({"type_": "rm", "p1": match_str(m).unwrap_or_default()}),
+        ]),
         "text" => Ok(engine::go_machine(ctx, &token_string(m), "text")?),
         "{text}" => {
             let mut v = vec![Value::String("{".into())];
@@ -688,11 +713,7 @@ fn global_action(
             Ok(v)
         }
         "tex-math" => Ok(engine::go_machine(ctx, &token_string(m), "tex-math")?),
-        "tex-math tight" => Ok(engine::go_machine(
-            ctx,
-            &token_string(m),
-            "tex-math tight",
-        )?),
+        "tex-math tight" => Ok(engine::go_machine(ctx, &token_string(m), "tex-math tight")?),
         "bond" => {
             let kind = spec
                 .option
@@ -707,7 +728,9 @@ fn global_action(
             let MatchToken::A(v) = m else {
                 return Err(MhchemError::msg("color0-output"));
             };
-            Ok(vec![json!({"type_": "color0", "color": v.first().cloned().unwrap_or_default()})])
+            Ok(vec![
+                json!({"type_": "color0", "color": v.first().cloned().unwrap_or_default()}),
+            ])
         }
         "ce" => Ok(engine::go_machine(ctx, &token_string(m), "ce")?),
         "1/2" => half_action(m),

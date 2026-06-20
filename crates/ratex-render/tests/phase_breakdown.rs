@@ -13,16 +13,21 @@ fn phase_breakdown() {
     let formulas: &[(&str, bool)] = &[
         ("x^2 + y^2 = z^2", false),
         ("a+b=c", false),
-        (r"\frac{a}{b} + \int_0^\infty e^{-x} dx + \sum_{i=1}^n i \cdot \sqrt{x}", false),
-        (r"\begin{pmatrix} a & b \\ c & d \end{pmatrix} \cdot \begin{pmatrix} e & f \\ g & h \end{pmatrix}", false),
+        (
+            r"\frac{a}{b} + \int_0^\infty e^{-x} dx + \sum_{i=1}^n i \cdot \sqrt{x}",
+            false,
+        ),
+        (
+            r"\begin{pmatrix} a & b \\ c & d \end{pmatrix} \cdot \begin{pmatrix} e & f \\ g & h \end{pmatrix}",
+            false,
+        ),
         // CJK
         (r"\text{你好世界}\quad x^2 + y^2 = z^2", true),
         // emoji
         (r"\text{😊}\quad x^2 + y^2 = z^2 \quad \text{✅}", true),
     ];
 
-    let font_dir =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fonts");
+    let font_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fonts");
     let font_dir = font_dir.to_string_lossy().to_string();
 
     let layout_opts = LayoutOptions::default();
@@ -36,7 +41,10 @@ fn phase_breakdown() {
     };
 
     println!("\n============ Render Phase Breakdown (release) ============\n");
-    println!("{:<40} {:>6} {:>12} {:>10} {:>10}", "Formula", "Glyphs", "Parse+Layout", "Render", "Total");
+    println!(
+        "{:<40} {:>6} {:>12} {:>10} {:>10}",
+        "Formula", "Glyphs", "Parse+Layout", "Render", "Total"
+    );
     println!("{:-<40} {:-<6} {:-<12} {:-<10} {:-<10}", "", "", "", "", "");
 
     for &(expr, _has_cjk_emoji) in formulas {
@@ -62,7 +70,9 @@ fn phase_breakdown() {
             let dl = to_display_list(&l);
             parse_us += t0.elapsed().as_micros();
 
-            glyph_count = dl.items.iter()
+            glyph_count = dl
+                .items
+                .iter()
                 .filter(|i| matches!(i, ratex_types::display_item::DisplayItem::GlyphPath { .. }))
                 .count();
 
@@ -76,7 +86,11 @@ fn phase_breakdown() {
         let total_avg = parse_avg + render_avg;
 
         // Truncate long formulas for display
-        let label = if expr.len() > 38 { format!("{}…", &expr[..37]) } else { expr.to_string() };
+        let label = if expr.len() > 38 {
+            format!("{}…", &expr[..37])
+        } else {
+            expr.to_string()
+        };
 
         println!(
             "{:<40} {:>6} {:>8} μs  {:>6} μs  {:>6} μs",

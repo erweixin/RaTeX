@@ -9,11 +9,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\hbox"],
         "hbox",
-        1, 0,
+        1,
+        0,
         Some(vec![ArgType::Text]),
         false,
-        true, true,
-        false, true,
+        true,
+        true,
+        false,
+        true,
         handle_hbox,
     );
 }

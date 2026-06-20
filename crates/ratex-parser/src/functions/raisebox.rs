@@ -9,11 +9,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\raisebox"],
         "raisebox",
-        2, 0,
+        2,
+        0,
         Some(vec![ArgType::Size, ArgType::HBox]),
         false,
-        true, true,
-        false, false,
+        true,
+        true,
+        false,
+        false,
         handle_raisebox,
     );
 }

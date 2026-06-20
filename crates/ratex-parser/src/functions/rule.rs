@@ -9,11 +9,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\rule"],
         "rule",
-        2, 1,
+        2,
+        1,
         Some(vec![ArgType::Size, ArgType::Size, ArgType::Size]),
         false,
-        true, true,
-        false, false,
+        true,
+        true,
+        false,
+        false,
         handle_rule,
     );
 }

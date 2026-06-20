@@ -2,8 +2,8 @@
 /// Tests are designed to validate against KaTeX's parsing behavior.
 #[cfg(test)]
 mod core_parsing {
-    use crate::parser::parse;
     use crate::parse_node::ParseNode;
+    use crate::parser::parse;
 
     // ── Basic characters ─────────────────────────────────
 
@@ -177,15 +177,21 @@ mod core_parsing {
 
 #[cfg(test)]
 mod fractions_and_radicals {
-    use crate::parser::parse;
     use crate::parse_node::ParseNode;
+    use crate::parser::parse;
 
     #[test]
     fn simple_frac() {
         let ast = parse("\\frac{a}{b}").unwrap();
         assert_eq!(ast.len(), 1);
         assert_eq!(ast[0].type_name(), "genfrac");
-        if let ParseNode::GenFrac { has_bar_line, numer, denom, .. } = &ast[0] {
+        if let ParseNode::GenFrac {
+            has_bar_line,
+            numer,
+            denom,
+            ..
+        } = &ast[0]
+        {
             assert!(has_bar_line);
             // numer and denom are wrapped in OrdGroup
             if let ParseNode::OrdGroup { body, .. } = numer.as_ref() {
@@ -231,7 +237,13 @@ mod fractions_and_radicals {
         assert_eq!(ast.len(), 1);
         // binom has delimiters and no bar line
         let check = |node: &ParseNode| {
-            if let ParseNode::GenFrac { has_bar_line, left_delim, right_delim, .. } = node {
+            if let ParseNode::GenFrac {
+                has_bar_line,
+                left_delim,
+                right_delim,
+                ..
+            } = node
+            {
                 assert!(!has_bar_line);
                 assert_eq!(left_delim.as_deref(), Some("("));
                 assert_eq!(right_delim.as_deref(), Some(")"));
@@ -281,15 +293,21 @@ mod fractions_and_radicals {
 
 #[cfg(test)]
 mod operators {
-    use crate::parser::parse;
     use crate::parse_node::ParseNode;
+    use crate::parser::parse;
 
     #[test]
     fn sum_symbol() {
         let ast = parse("\\sum").unwrap();
         assert_eq!(ast.len(), 1);
         assert_eq!(ast[0].type_name(), "op");
-        if let ParseNode::Op { symbol, limits, name, .. } = &ast[0] {
+        if let ParseNode::Op {
+            symbol,
+            limits,
+            name,
+            ..
+        } = &ast[0]
+        {
             assert!(symbol);
             assert!(limits);
             assert_eq!(name.as_deref(), Some("\\sum"));
@@ -310,7 +328,13 @@ mod operators {
     fn lim_text_op() {
         let ast = parse("\\lim").unwrap();
         assert_eq!(ast.len(), 1);
-        if let ParseNode::Op { symbol, limits, name, .. } = &ast[0] {
+        if let ParseNode::Op {
+            symbol,
+            limits,
+            name,
+            ..
+        } = &ast[0]
+        {
             assert!(!symbol);
             assert!(limits);
             assert_eq!(name.as_deref(), Some("\\lim"));
@@ -384,15 +408,18 @@ mod operators {
 
 #[cfg(test)]
 mod accents_and_fonts {
-    use crate::parser::parse;
     use crate::parse_node::ParseNode;
+    use crate::parser::parse;
 
     #[test]
     fn hat_accent() {
         let ast = parse("\\hat{x}").unwrap();
         assert_eq!(ast.len(), 1);
         assert_eq!(ast[0].type_name(), "accent");
-        if let ParseNode::Accent { label, is_stretchy, .. } = &ast[0] {
+        if let ParseNode::Accent {
+            label, is_stretchy, ..
+        } = &ast[0]
+        {
             assert_eq!(label, "\\hat");
             assert_eq!(*is_stretchy, Some(false));
         }
@@ -402,7 +429,10 @@ mod accents_and_fonts {
     fn widehat_accent() {
         let ast = parse("\\widehat{ABC}").unwrap();
         assert_eq!(ast.len(), 1);
-        if let ParseNode::Accent { label, is_stretchy, .. } = &ast[0] {
+        if let ParseNode::Accent {
+            label, is_stretchy, ..
+        } = &ast[0]
+        {
             assert_eq!(label, "\\widehat");
             assert_eq!(*is_stretchy, Some(true));
         }
@@ -440,15 +470,18 @@ mod accents_and_fonts {
 
 #[cfg(test)]
 mod delimiters {
-    use crate::parser::parse;
     use crate::parse_node::ParseNode;
+    use crate::parser::parse;
 
     #[test]
     fn left_right_parens() {
         let ast = parse("\\left( x \\right)").unwrap();
         assert_eq!(ast.len(), 1);
         assert_eq!(ast[0].type_name(), "leftright");
-        if let ParseNode::LeftRight { left, right, body, .. } = &ast[0] {
+        if let ParseNode::LeftRight {
+            left, right, body, ..
+        } = &ast[0]
+        {
             assert_eq!(left, "(");
             assert_eq!(right, ")");
             assert!(!body.is_empty());
@@ -472,8 +505,8 @@ mod delimiters {
 
 #[cfg(test)]
 mod colors_and_sizing {
-    use crate::parser::parse;
     use crate::parse_node::ParseNode;
+    use crate::parser::parse;
 
     #[test]
     fn textcolor() {
@@ -505,8 +538,14 @@ mod colors_and_sizing {
         let ast = parse("\\htmlStyle{color: blue; font-size: 20px;}{x^2}").unwrap();
         assert_eq!(ast.len(), 1);
         assert_eq!(ast[0].type_name(), "html");
-        if let ParseNode::Html { attributes, body, .. } = &ast[0] {
-            assert_eq!(attributes.get("style").unwrap(), "color: blue; font-size: 20px;");
+        if let ParseNode::Html {
+            attributes, body, ..
+        } = &ast[0]
+        {
+            assert_eq!(
+                attributes.get("style").unwrap(),
+                "color: blue; font-size: 20px;"
+            );
             assert!(!body.is_empty());
         } else {
             panic!("Expected html node");
@@ -657,8 +696,7 @@ mod environments {
 
     #[test]
     fn pmatrix_wraps_in_leftright() {
-        let ast =
-            parse("\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}").unwrap();
+        let ast = parse("\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}").unwrap();
         assert_eq!(ast.len(), 1);
         assert_eq!(ast[0].type_name(), "leftright");
         if let ParseNode::LeftRight {
@@ -676,13 +714,9 @@ mod environments {
 
     #[test]
     fn bmatrix_wraps_in_leftright() {
-        let ast =
-            parse("\\begin{bmatrix} 1 & 2 \\\\ 3 & 4 \\end{bmatrix}").unwrap();
+        let ast = parse("\\begin{bmatrix} 1 & 2 \\\\ 3 & 4 \\end{bmatrix}").unwrap();
         assert_eq!(ast.len(), 1);
-        if let ParseNode::LeftRight {
-            left, right, ..
-        } = &ast[0]
-        {
+        if let ParseNode::LeftRight { left, right, .. } = &ast[0] {
             assert_eq!(left, "[");
             assert_eq!(right, "]");
         } else {
@@ -692,12 +726,8 @@ mod environments {
 
     #[test]
     fn vmatrix_wraps_in_leftright() {
-        let ast =
-            parse("\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}").unwrap();
-        if let ParseNode::LeftRight {
-            left, right, ..
-        } = &ast[0]
-        {
+        let ast = parse("\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}").unwrap();
+        if let ParseNode::LeftRight { left, right, .. } = &ast[0] {
             assert_eq!(left, "|");
             assert_eq!(right, "|");
         } else {
@@ -707,12 +737,8 @@ mod environments {
 
     #[test]
     fn big_bmatrix_wraps_in_leftright() {
-        let ast =
-            parse("\\begin{Bmatrix} a \\\\ b \\end{Bmatrix}").unwrap();
-        if let ParseNode::LeftRight {
-            left, right, ..
-        } = &ast[0]
-        {
+        let ast = parse("\\begin{Bmatrix} a \\\\ b \\end{Bmatrix}").unwrap();
+        if let ParseNode::LeftRight { left, right, .. } = &ast[0] {
             assert_eq!(left, "\\{");
             assert_eq!(right, "\\}");
         } else {
@@ -722,10 +748,9 @@ mod environments {
 
     #[test]
     fn cases_environment() {
-        let ast = parse(
-            "\\begin{cases} x & \\text{if } x > 0 \\\\ -x & \\text{otherwise} \\end{cases}",
-        )
-        .unwrap();
+        let ast =
+            parse("\\begin{cases} x & \\text{if } x > 0 \\\\ -x & \\text{otherwise} \\end{cases}")
+                .unwrap();
         assert_eq!(ast.len(), 1);
         assert_eq!(ast[0].type_name(), "leftright");
         if let ParseNode::LeftRight {
@@ -761,10 +786,7 @@ mod environments {
         {
             assert_eq!(body.len(), 2);
             assert!(add_jot.unwrap_or(false));
-            assert_eq!(
-                col_separation_type.as_deref(),
-                Some("align")
-            );
+            assert_eq!(col_separation_type.as_deref(), Some("align"));
         } else {
             panic!("Expected Array node for aligned");
         }
@@ -780,8 +802,7 @@ mod environments {
     #[test]
     fn align_with_tag_strips_tag_and_sets_array_tags() {
         use crate::parse_node::ArrayTag;
-        let ast =
-            parse("\\begin{aligned} x &= 1 \\tag{1} \\\\ y &= 2 \\end{aligned}").unwrap();
+        let ast = parse("\\begin{aligned} x &= 1 \\tag{1} \\\\ y &= 2 \\end{aligned}").unwrap();
         if let ParseNode::Array { body, tags, .. } = &ast[0] {
             assert_eq!(body.len(), 2);
             let row0_last = &body[0][body[0].len() - 1];
@@ -816,10 +837,8 @@ mod environments {
 
     #[test]
     fn matrix_3x3() {
-        let ast = parse(
-            "\\begin{matrix} 1 & 2 & 3 \\\\ 4 & 5 & 6 \\\\ 7 & 8 & 9 \\end{matrix}",
-        )
-        .unwrap();
+        let ast =
+            parse("\\begin{matrix} 1 & 2 & 3 \\\\ 4 & 5 & 6 \\\\ 7 & 8 & 9 \\end{matrix}").unwrap();
         if let ParseNode::Array { body, cols, .. } = &ast[0] {
             assert_eq!(body.len(), 3);
             for row in body {
@@ -894,8 +913,7 @@ mod environments {
 
     #[test]
     fn pmatrix_json_structure() {
-        let ast =
-            parse("\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}").unwrap();
+        let ast = parse("\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}").unwrap();
         let json = serde_json::to_value(&ast).unwrap();
         let node = &json[0];
         assert_eq!(node["type"], "leftright");
@@ -917,29 +935,21 @@ mod environments {
 
     #[test]
     fn nested_frac_in_matrix() {
-        let ast = parse(
-            "\\begin{pmatrix} \\frac{1}{2} & 0 \\\\ 0 & \\frac{3}{4} \\end{pmatrix}",
-        )
-        .unwrap();
+        let ast = parse("\\begin{pmatrix} \\frac{1}{2} & 0 \\\\ 0 & \\frac{3}{4} \\end{pmatrix}")
+            .unwrap();
         assert_eq!(ast[0].type_name(), "leftright");
     }
 
     #[test]
     fn matrix_with_expressions() {
-        let ast = parse(
-            "\\begin{bmatrix} a+b & c^2 \\\\ \\sqrt{d} & e_i \\end{bmatrix}",
-        )
-        .unwrap();
+        let ast = parse("\\begin{bmatrix} a+b & c^2 \\\\ \\sqrt{d} & e_i \\end{bmatrix}").unwrap();
         assert_eq!(ast[0].type_name(), "leftright");
     }
 
     #[test]
     fn rcases_environment() {
         let ast = parse("\\begin{rcases} a \\\\ b \\end{rcases}").unwrap();
-        if let ParseNode::LeftRight {
-            left, right, ..
-        } = &ast[0]
-        {
+        if let ParseNode::LeftRight { left, right, .. } = &ast[0] {
             assert_eq!(left, ".");
             assert_eq!(right, "\\}");
         } else {
@@ -964,10 +974,16 @@ mod environments {
 
     #[test]
     fn prooftree_binary_dashed_line() {
-        let ast = parse("\\begin{prooftree}\\AxiomC{P}\\AxiomC{Q}\\dashedLine\\BinaryInfC{R}\\end{prooftree}").unwrap();
+        let ast = parse(
+            "\\begin{prooftree}\\AxiomC{P}\\AxiomC{Q}\\dashedLine\\BinaryInfC{R}\\end{prooftree}",
+        )
+        .unwrap();
         if let ParseNode::ProofTree { tree, .. } = &ast[0] {
             assert_eq!(tree.premises.len(), 2);
-            assert!(matches!(tree.line_style, crate::parse_node::ProofLineStyle::Dashed));
+            assert!(matches!(
+                tree.line_style,
+                crate::parse_node::ProofLineStyle::Dashed
+            ));
         } else {
             panic!("Expected ProofTree node");
         }
@@ -982,8 +998,7 @@ mod environments {
     #[test]
     fn prooftree_fcenter_renders_visible_symbol() {
         let ast =
-            parse("\\begin{prooftree}\\AxiomC{A \\fCenter B}\\UIC{C}\\end{prooftree}")
-                .unwrap();
+            parse("\\begin{prooftree}\\AxiomC{A \\fCenter B}\\UIC{C}\\end{prooftree}").unwrap();
         if let ParseNode::ProofTree { tree, .. } = &ast[0] {
             // The axiom's conclusion contains A \fCenter B, stored in premises[0].conclusion
             let axiom = &tree.premises[0];
@@ -1005,8 +1020,7 @@ mod environments {
     #[test]
     fn prooftree_root_at_top_flag() {
         let ast =
-            parse("\\begin{prooftree}\\AxiomC{P}\\rootAtTop\\UIC{Q}\\end{prooftree}")
-                .unwrap();
+            parse("\\begin{prooftree}\\AxiomC{P}\\rootAtTop\\UIC{Q}\\end{prooftree}").unwrap();
         if let ParseNode::ProofTree { tree, .. } = &ast[0] {
             assert!(tree.root_at_top, "\\rootAtTop should set root_at_top flag");
         } else {
@@ -1016,8 +1030,7 @@ mod environments {
 
     #[test]
     fn prooftree_root_at_bottom_is_default() {
-        let ast =
-            parse("\\begin{prooftree}\\AxiomC{P}\\UIC{Q}\\end{prooftree}").unwrap();
+        let ast = parse("\\begin{prooftree}\\AxiomC{P}\\UIC{Q}\\end{prooftree}").unwrap();
         if let ParseNode::ProofTree { tree, .. } = &ast[0] {
             assert!(!tree.root_at_top, "root_at_top should default to false");
         } else {
@@ -1027,19 +1040,17 @@ mod environments {
 
     #[test]
     fn prooftree_orphan_label_errors() {
-        let result =
-            parse("\\begin{prooftree}\\AxiomC{P}\\LeftLabel{L}\\end{prooftree}");
-        assert!(result.is_err(), "orphan \\LeftLabel should produce an error");
+        let result = parse("\\begin{prooftree}\\AxiomC{P}\\LeftLabel{L}\\end{prooftree}");
+        assert!(
+            result.is_err(),
+            "orphan \\LeftLabel should produce an error"
+        );
     }
 
     #[test]
     fn vmatrix_double_wraps() {
-        let ast =
-            parse("\\begin{Vmatrix} a & b \\\\ c & d \\end{Vmatrix}").unwrap();
-        if let ParseNode::LeftRight {
-            left, right, ..
-        } = &ast[0]
-        {
+        let ast = parse("\\begin{Vmatrix} a & b \\\\ c & d \\end{Vmatrix}").unwrap();
+        if let ParseNode::LeftRight { left, right, .. } = &ast[0] {
             assert_eq!(left, "\\Vert");
             assert_eq!(right, "\\Vert");
         } else {

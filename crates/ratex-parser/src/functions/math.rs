@@ -9,8 +9,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\(", "$"],
         "styling",
-        0, 0, None,
-        false, true, false, false, false,
+        0,
+        0,
+        None,
+        false,
+        true,
+        false,
+        false,
+        false,
         handle_math_switch,
     );
 
@@ -18,8 +24,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\)", "\\]"],
         "text",
-        0, 0, None,
-        false, true, false, false, false,
+        0,
+        0,
+        None,
+        false,
+        true,
+        false,
+        false,
+        false,
         handle_math_close,
     );
 }

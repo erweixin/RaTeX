@@ -168,9 +168,9 @@ fn regex_match_token(re: &Regex, input: &str) -> Option<(MatchToken, usize)> {
     Some((MatchToken::S(m0.as_str().to_string()), end))
 }
 
-static RE_AGG_OPEN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\([a-z]{1,3}(?=[\),])").unwrap());
-static RE_CMD_BRACE: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^\\[a-zA-Z]+\{").unwrap());
+static RE_AGG_OPEN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^\([a-z]{1,3}(?=[\),])").unwrap());
+static RE_CMD_BRACE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^\\[a-zA-Z]+\{").unwrap());
 static RE_BEFORE_BRACE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^(?=\{)").unwrap());
 static RE_NEG_POW: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
@@ -194,7 +194,8 @@ static RE_AMOUNT_MAIN: LazyLock<Regex> = LazyLock::new(|| {
 static RE_AMOUNT_DOLLAR: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"^\$(?:\(?[+\-]?(?:[0-9]*[a-z]?[+\-])?[0-9]*[a-z](?:[+\-][0-9]*[a-z]?)?\)?|\+|-)\$$",
-    ).unwrap()
+    )
+    .unwrap()
 });
 static RE_FORMULA_PAREN_ONLY: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^\([a-z]+\)$").unwrap());
@@ -247,7 +248,8 @@ fn pattern_state_of_agg(input: &str) -> MhchemResult<Option<PatternHit>> {
         None,
         false,
     )? {
-        if RE_SOA_REMAINDER.find(&h.remainder)
+        if RE_SOA_REMAINDER
+            .find(&h.remainder)
             .ok()
             .flatten()
             .filter(|m| m.start() == 0)
@@ -273,7 +275,8 @@ fn pattern_amount(input: &str) -> MhchemResult<Option<PatternHit>> {
             remainder: input[m.end()..].to_string(),
         }));
     }
-    let Some(h) = find_observe_groups(input, "", Beg::Str("$"), "$", End::Str(""), None, false)? else {
+    let Some(h) = find_observe_groups(input, "", Beg::Str("$"), "$", End::Str(""), None, false)?
+    else {
         return Ok(None);
     };
     let MatchToken::S(ref s) = h.token else {
@@ -293,21 +296,33 @@ fn pattern_formula(input: &str) -> MhchemResult<Option<PatternHit>> {
     if RE_FORMULA_PAREN_ONLY.is_match(input).unwrap_or(false) {
         return Ok(None);
     }
-    Ok(RE_FORMULA_MAIN.find(input).ok().flatten().map(|m| PatternHit {
-        token: MatchToken::S(m.as_str().to_string()),
-        remainder: input[m.end()..].to_string(),
-    }))
+    Ok(RE_FORMULA_MAIN
+        .find(input)
+        .ok()
+        .flatten()
+        .map(|m| PatternHit {
+            token: MatchToken::S(m.as_str().to_string()),
+            remainder: input[m.end()..].to_string(),
+        }))
 }
 
-pub fn match_pattern(data: &MhchemData, pattern_name: &str, input: &str) -> MhchemResult<Option<PatternHit>> {
+pub fn match_pattern(
+    data: &MhchemData,
+    pattern_name: &str,
+    input: &str,
+) -> MhchemResult<Option<PatternHit>> {
     match pattern_name {
         "(-)(9)^(-9)" => pattern_neg_pow(input),
         "(-)(9.,9)(e)(99)" => pattern_sci(input),
         "state of aggregation $" => pattern_state_of_agg(input),
         "amount" | "amount2" => pattern_amount(input),
         "formula$" => pattern_formula(input),
-        "^{(...)}" => find_observe_groups(input, "^{", Beg::Str(""), "", End::Str("}"), None, false),
-        "^($...$)" => find_observe_groups(input, "^", Beg::Str("$"), "$", End::Str(""), None, false),
+        "^{(...)}" => {
+            find_observe_groups(input, "^{", Beg::Str(""), "", End::Str("}"), None, false)
+        }
+        "^($...$)" => {
+            find_observe_groups(input, "^", Beg::Str("$"), "$", End::Str(""), None, false)
+        }
         "^\\x{}{}" => find_observe_groups(
             input,
             "^",
@@ -326,8 +341,12 @@ pub fn match_pattern(data: &MhchemData, pattern_name: &str, input: &str) -> Mhch
             None,
             false,
         ),
-        "_{(...)}" => find_observe_groups(input, "_{", Beg::Str(""), "", End::Str("}"), None, false),
-        "_($...$)" => find_observe_groups(input, "_", Beg::Str("$"), "$", End::Str(""), None, false),
+        "_{(...)}" => {
+            find_observe_groups(input, "_{", Beg::Str(""), "", End::Str("}"), None, false)
+        }
+        "_($...$)" => {
+            find_observe_groups(input, "_", Beg::Str("$"), "$", End::Str(""), None, false)
+        }
         "_\\x{}{}" => find_observe_groups(
             input,
             "_",
@@ -349,9 +368,19 @@ pub fn match_pattern(data: &MhchemData, pattern_name: &str, input: &str) -> Mhch
         "{...}" => find_observe_groups(input, "", Beg::Str("{"), "}", End::Str(""), None, false),
         "{(...)}" => find_observe_groups(input, "{", Beg::Str(""), "", End::Str("}"), None, false),
         "$...$" => find_observe_groups(input, "", Beg::Str("$"), "$", End::Str(""), None, false),
-        "${(...)}$" => find_observe_groups(input, "${", Beg::Str(""), "", End::Str("}$"), None, false),
+        "${(...)}$" => {
+            find_observe_groups(input, "${", Beg::Str(""), "", End::Str("}$"), None, false)
+        }
         "$(...)$" => find_observe_groups(input, "$", Beg::Str(""), "", End::Str("$"), None, false),
-        "\\bond{(...)}" => find_observe_groups(input, "\\bond{", Beg::Str(""), "", End::Str("}"), None, false),
+        "\\bond{(...)}" => find_observe_groups(
+            input,
+            "\\bond{",
+            Beg::Str(""),
+            "",
+            End::Str("}"),
+            None,
+            false,
+        ),
         "[(...)]" => find_observe_groups(input, "[", Beg::Str(""), "", End::Str("]"), None, false),
         "\\x{}{}" => find_observe_groups(
             input,
@@ -434,10 +463,14 @@ pub fn match_pattern(data: &MhchemData, pattern_name: &str, input: &str) -> Mhch
             Some(("{", Beg::Str(""), "", End::Str("}"))),
             false,
         ),
-        "\\ce{(...)}" => find_observe_groups(input, "\\ce{", Beg::Str(""), "", End::Str("}"), None, false),
+        "\\ce{(...)}" => {
+            find_observe_groups(input, "\\ce{", Beg::Str(""), "", End::Str("}"), None, false)
+        }
         _ => {
             let Some(re) = data.regexes.map.get(pattern_name) else {
-                return Err(MhchemError::msg(format!("mhchem bug P: unknown pattern ({pattern_name})")));
+                return Err(MhchemError::msg(format!(
+                    "mhchem bug P: unknown pattern ({pattern_name})"
+                )));
             };
             Ok(regex_match_token(re, input).map(|(t, n)| PatternHit {
                 token: t,
@@ -455,9 +488,7 @@ mod fog_tests {
     fn x_double_brace_second_group_includes_nested_ce_close() {
         use crate::mhchem::data::data;
         let input = r"\underset{\mathrm{red}}{\ce{HgI2}}";
-        let hit = match_pattern(data(), r"\x{}{}", input)
-            .unwrap()
-            .unwrap();
+        let hit = match_pattern(data(), r"\x{}{}", input).unwrap().unwrap();
         let MatchToken::S(s) = hit.token else {
             panic!("expected combined S");
         };

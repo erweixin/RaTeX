@@ -26,11 +26,7 @@ pub fn font_and_metric_for_mathematical_alphanumeric(cp: u32) -> Option<(FontId,
     for &(base, fid) in BASES_LETTERS {
         if cp >= base && cp < base + LETTERS52 {
             let i = cp - base;
-            let metric = if i < 26 {
-                0x41 + i
-            } else {
-                0x61 + (i - 26)
-            };
+            let metric = if i < 26 { 0x41 + i } else { 0x61 + (i - 26) };
             return Some((fid, metric));
         }
     }
@@ -61,7 +57,8 @@ pub fn font_and_metric_for_mathematical_alphanumeric(cp: u32) -> Option<(FontId,
 /// The display list keeps the real Unicode scalar in `char_code` (for web canvas / SVG `<text>`).
 /// Outlines in shipped KaTeX fonts are keyed by ASCII letters and digits for these ranges.
 pub fn katex_ttf_glyph_char(font_id: FontId, display_char_code: u32) -> char {
-    if let Some((mapped_font, metric)) = font_and_metric_for_mathematical_alphanumeric(display_char_code)
+    if let Some((mapped_font, metric)) =
+        font_and_metric_for_mathematical_alphanumeric(display_char_code)
     {
         if mapped_font == font_id {
             return char::from_u32(metric).unwrap_or('\u{fffd}');

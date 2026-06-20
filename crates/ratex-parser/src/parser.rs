@@ -558,9 +558,9 @@ impl<'a> Parser<'a> {
         token: Option<Token>,
         break_on_token_text: Option<&str>,
     ) -> ParseResult<ParseNode> {
-        let func = FUNCTIONS.get(name).ok_or_else(|| {
-            ParseError::msg(format!("No function handler for {}", name))
-        })?;
+        let func = FUNCTIONS
+            .get(name)
+            .ok_or_else(|| ParseError::msg(format!("No function handler for {}", name)))?;
 
         let mut ctx = FunctionContext {
             func_name: name.to_string(),
@@ -594,8 +594,11 @@ impl<'a> Parser<'a> {
             let is_optional = i < func_data.num_optional_args;
 
             let effective_type = if (func_data.primitive && arg_type.is_none())
-                || (func_data.node_type == "sqrt" && i == 1
-                    && opt_args.first().is_some_and(|o: &Option<ParseNode>| o.is_none()))
+                || (func_data.node_type == "sqrt"
+                    && i == 1
+                    && opt_args
+                        .first()
+                        .is_some_and(|o: &Option<ParseNode>| o.is_none()))
             {
                 Some(ArgType::Primitive)
             } else {
@@ -613,7 +616,9 @@ impl<'a> Parser<'a> {
             } else if let Some(a) = arg {
                 args.push(a);
             } else {
-                return Err(ParseError::msg("Null argument, please report this as a bug"));
+                return Err(ParseError::msg(
+                    "Null argument, please report this as a bug",
+                ));
             }
         }
 
@@ -637,10 +642,7 @@ impl<'a> Parser<'a> {
                 let group = self.parse_group(name, None)?;
                 match group {
                     Some(g) => Ok(Some(g)),
-                    None => Err(ParseError::new(
-                        format!("Expected group as {}", name),
-                        None,
-                    )),
+                    None => Err(ParseError::new(format!("Expected group as {}", name), None)),
                 }
             }
             Some(ArgType::Math) | Some(ArgType::Text) => {
@@ -720,11 +722,13 @@ impl<'a> Parser<'a> {
 
         self.gullet.consume_spaces();
         let res = if !optional && self.gullet.future().text != "{" {
-            Some(self.parse_regex_group(
-                &regex_lite::Regex::new(r"^[-+]? *(?:$|\d+|\d+\.\d*|\.\d*) *[a-z]{0,2} *$")
-                    .unwrap(),
-                "size",
-            )?)
+            Some(
+                self.parse_regex_group(
+                    &regex_lite::Regex::new(r"^[-+]? *(?:$|\d+|\d+\.\d*|\.\d*) *[a-z]{0,2} *$")
+                        .unwrap(),
+                    "size",
+                )?,
+            )
         } else {
             self.parse_string_group("size", optional)?
         };
@@ -742,9 +746,9 @@ impl<'a> Parser<'a> {
 
         let size_re =
             regex_lite::Regex::new(r"([-+]?) *(\d+(?:\.\d*)?|\.\d+) *([a-z]{2})").unwrap();
-        let m = size_re.captures(&text).ok_or_else(|| {
-            ParseError::new(format!("Invalid size: '{}'", text), Some(&res))
-        })?;
+        let m = size_re
+            .captures(&text)
+            .ok_or_else(|| ParseError::new(format!("Invalid size: '{}'", text), Some(&res)))?;
 
         let sign = m.get(1).map_or("", |m| m.as_str());
         let magnitude = m.get(2).map_or("", |m| m.as_str());
@@ -1096,15 +1100,17 @@ impl<'a> Parser<'a> {
                 }
             }
         } else {
-            return self.try_parse_unicode_accent(&base_str, nucleus).map(|opt| {
-                opt.or_else(|| {
-                    Some(ParseNode::TextOrd {
-                        mode: Mode::Text,
-                        text: base_str.clone(),
-                        loc: loc.clone(),
+            return self
+                .try_parse_unicode_accent(&base_str, nucleus)
+                .map(|opt| {
+                    opt.or_else(|| {
+                        Some(ParseNode::TextOrd {
+                            mode: Mode::Text,
+                            text: base_str.clone(),
+                            loc: loc.clone(),
+                        })
                     })
-                })
-            });
+                });
         };
 
         // Wrap in accent nodes from innermost to outermost
@@ -1127,8 +1133,7 @@ impl<'a> Parser<'a> {
     pub fn subparse(&mut self, tokens: Vec<Token>) -> ParseResult<Vec<ParseNode>> {
         let old_token = self.next_token.take();
 
-        self.gullet
-            .push_token(Token::new("}", 0, 0));
+        self.gullet.push_token(Token::new("}", 0, 0));
         self.gullet.push_tokens(tokens);
         let parse = self.parse_expression(false, None)?;
         self.expect("}", true)?;
@@ -1158,9 +1163,18 @@ fn is_latin_base_char(ch: char) -> bool {
 fn is_supported_combining_accent(ch: char) -> bool {
     matches!(
         ch,
-        '\u{0300}' | '\u{0301}' | '\u{0302}' | '\u{0303}' | '\u{0304}'
-        | '\u{0306}' | '\u{0307}' | '\u{0308}' | '\u{030A}' | '\u{030B}' | '\u{030C}'
-        | '\u{0327}'
+        '\u{0300}'
+            | '\u{0301}'
+            | '\u{0302}'
+            | '\u{0303}'
+            | '\u{0304}'
+            | '\u{0306}'
+            | '\u{0307}'
+            | '\u{0308}'
+            | '\u{030A}'
+            | '\u{030B}'
+            | '\u{030C}'
+            | '\u{0327}'
     )
 }
 
@@ -1202,8 +1216,20 @@ fn combining_to_accent_label(ch: char, mode: Mode) -> String {
 fn is_valid_unit(unit: &str) -> bool {
     matches!(
         unit,
-        "pt" | "mm" | "cm" | "in" | "bp" | "pc" | "dd" | "cc" | "nd" | "nc" | "sp" | "px"
-            | "ex" | "em" | "mu"
+        "pt" | "mm"
+            | "cm"
+            | "in"
+            | "bp"
+            | "pc"
+            | "dd"
+            | "cc"
+            | "nd"
+            | "nc"
+            | "sp"
+            | "px"
+            | "ex"
+            | "em"
+            | "mu"
     )
 }
 

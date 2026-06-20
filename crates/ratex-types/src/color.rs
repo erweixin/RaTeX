@@ -92,7 +92,11 @@ impl Color {
             "cmyk" => {
                 let p = parse_csv_f32(value, 4)?;
                 let (c, m, y, k) = (p[0], p[1], p[2], p[3]);
-                Some(Self::rgb((1.0 - c) * (1.0 - k), (1.0 - m) * (1.0 - k), (1.0 - y) * (1.0 - k)))
+                Some(Self::rgb(
+                    (1.0 - c) * (1.0 - k),
+                    (1.0 - m) * (1.0 - k),
+                    (1.0 - y) * (1.0 - k),
+                ))
             }
             _ => None,
         }

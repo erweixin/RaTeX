@@ -40,10 +40,7 @@ pub fn get_or_compute_outline(
     // Slow path: compute outline + write-lock.
     // For variable fonts, clone + pin to wght=400; non-variable fonts use the original directly.
     // Keep in sync with `variable_weight` in ratex-pdf/src/fonts.rs.
-    let needs_variation = font
-        .variations()
-        .iter()
-        .any(|axis| &axis.tag == b"wght");
+    let needs_variation = font.variations().iter().any(|axis| &axis.tag == b"wght");
 
     let outline = if needs_variation {
         let mut instance = font.clone();

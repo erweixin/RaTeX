@@ -63,14 +63,20 @@ pub struct ArrayConfig {
     pub auto_number: bool,
 }
 
-
 // ── parseArray ───────────────────────────────────────────────────────────
 
 /// Pull a trailing `\\tag{…}` or `\\nonumber`/`\\notag` off the last cell of a row.
 /// Returns `Auto(true)` when the row is eligible for auto-numbering.
 /// The `auto_number` parameter controls the default when no marker is found.
-fn extract_trailing_tag_from_last_cell(row: &mut [ParseNode], auto_number: bool) -> ParseResult<ArrayTag> {
-    let default_tag = if auto_number { ArrayTag::Auto(true) } else { ArrayTag::Auto(false) };
+fn extract_trailing_tag_from_last_cell(
+    row: &mut [ParseNode],
+    auto_number: bool,
+) -> ParseResult<ArrayTag> {
+    let default_tag = if auto_number {
+        ArrayTag::Auto(true)
+    } else {
+        ArrayTag::Auto(false)
+    };
     let Some(last) = row.last_mut() else {
         return Ok(default_tag);
     };
@@ -188,9 +194,7 @@ pub fn parse_array(
     parser.gullet.begin_group();
 
     if !config.single_row {
-        parser
-            .gullet
-            .set_text_macro("\\cr", "\\\\\\relax");
+        parser.gullet.set_text_macro("\\cr", "\\\\\\relax");
     }
 
     let arraystretch = config.arraystretch.unwrap_or_else(|| {
@@ -200,7 +204,11 @@ pub fn parse_array(
                 MacroDefinition::Text(s) => s.clone(),
                 MacroDefinition::Tokens { tokens, .. } => {
                     // Tokens are stored in reverse order (stack convention for expansion)
-                    tokens.iter().rev().map(|t| t.text.as_str()).collect::<String>()
+                    tokens
+                        .iter()
+                        .rev()
+                        .map(|t| t.text.as_str())
+                        .collect::<String>()
                 }
                 MacroDefinition::Function(_) => String::new(),
             };
@@ -257,10 +265,7 @@ pub fn parse_array(
             let is_empty_trailing = if let Some(s) = style {
                 if s == StyleStr::Text || s == StyleStr::Display {
                     if let ParseNode::Styling { body: ref sb, .. } = cell {
-                        if let Some(ParseNode::OrdGroup {
-                            body: ref ob, ..
-                        }) = sb.first()
-                        {
+                        if let Some(ParseNode::OrdGroup { body: ref ob, .. }) = sb.first() {
                             ob.is_empty()
                         } else {
                             false
@@ -281,9 +286,7 @@ pub fn parse_array(
             row_tags.push(row_tag);
             body.push(row);
 
-            if is_empty_trailing
-                && (body.len() > 1 || !config.empty_single_row)
-            {
+            if is_empty_trailing && (body.len() > 1 || !config.empty_single_row) {
                 body.pop();
                 row_tags.pop();
             }
@@ -370,12 +373,17 @@ pub fn parse_array(
                 }
             }
         }
-        if any_visible { Some(processed) } else { None }
+        if any_visible {
+            Some(processed)
+        } else {
+            None
+        }
     } else {
         // Not an auto-numbering environment: keep original behavior
-        if row_tags.iter().any(|t| {
-            matches!(t, ArrayTag::Explicit(nodes) if !nodes.is_empty())
-        }) {
+        if row_tags
+            .iter()
+            .any(|t| matches!(t, ArrayTag::Explicit(nodes) if !nodes.is_empty()))
+        {
             Some(row_tags)
         } else {
             None
@@ -437,12 +445,7 @@ fn register_array(map: &mut HashMap<&'static str, EnvSpec>) {
                     pregap: None,
                     postgap: None,
                 }),
-                _ => {
-                    return Err(ParseError::msg(format!(
-                        "Unknown column alignment: {}",
-                        ca
-                    )))
-                }
+                _ => return Err(ParseError::msg(format!("Unknown column alignment: {}", ca))),
             }
         }
 
@@ -506,10 +509,7 @@ fn register_matrix(map: &mut HashMap<&'static str, EnvSpec>) {
                 ctx.parser.gullet.consume_spaces();
                 let close = ctx.parser.gullet.pop_token();
                 if close.text != "]" {
-                    return Err(ParseError::new(
-                        "Expected ]".to_string(),
-                        Some(&close),
-                    ));
+                    return Err(ParseError::new("Expected ]".to_string(), Some(&close)));
                 }
             }
         }
@@ -561,8 +561,8 @@ fn register_matrix(map: &mut HashMap<&'static str, EnvSpec>) {
     }
 
     for name in &[
-        "matrix", "pmatrix", "bmatrix", "Bmatrix", "vmatrix", "Vmatrix",
-        "matrix*", "pmatrix*", "bmatrix*", "Bmatrix*", "vmatrix*", "Vmatrix*",
+        "matrix", "pmatrix", "bmatrix", "Bmatrix", "vmatrix", "Vmatrix", "matrix*", "pmatrix*",
+        "bmatrix*", "Bmatrix*", "vmatrix*", "Vmatrix*",
     ] {
         map.insert(
             name,
@@ -639,128 +639,126 @@ fn handle_aligned(
     args: Vec<ParseNode>,
     _opt_args: Vec<Option<ParseNode>>,
 ) -> ParseResult<ParseNode> {
-        let is_split = ctx.env_name == "split";
-        let is_alignat = ctx.env_name.contains("at");
-        let sep_type = if is_alignat { "alignat" } else { "align" };
-        let auto_number = !ctx.env_name.ends_with('*')
-            && !is_split
-            && ctx.env_name != "aligned"
-            && ctx.env_name != "alignedat";
+    let is_split = ctx.env_name == "split";
+    let is_alignat = ctx.env_name.contains("at");
+    let sep_type = if is_alignat { "alignat" } else { "align" };
+    let auto_number = !ctx.env_name.ends_with('*')
+        && !is_split
+        && ctx.env_name != "aligned"
+        && ctx.env_name != "alignedat";
 
-        let config = ArrayConfig {
-            add_jot: Some(true),
-            empty_single_row: true,
-            col_separation_type: Some(sep_type.to_string()),
-            max_num_cols: if is_split { Some(2) } else { None },
-            auto_number,
-            ..Default::default()
-        };
+    let config = ArrayConfig {
+        add_jot: Some(true),
+        empty_single_row: true,
+        col_separation_type: Some(sep_type.to_string()),
+        max_num_cols: if is_split { Some(2) } else { None },
+        auto_number,
+        ..Default::default()
+    };
 
-        let mut res = parse_array(ctx.parser, config, Some(StyleStr::Display))?;
+    let mut res = parse_array(ctx.parser, config, Some(StyleStr::Display))?;
 
-        // Extract explicit column count from first arg (alignat only)
-        let mut num_maths = 0usize;
-        let mut explicit_cols = 0usize;
-        if let Some(ParseNode::OrdGroup { body, .. }) = args.first() {
-            let mut arg_str = String::new();
-            for node in body {
-                if let Some(t) = node.symbol_text() {
-                    arg_str.push_str(t);
-                }
-            }
-            if let Ok(n) = arg_str.parse::<usize>() {
-                num_maths = n;
-                explicit_cols = n * 2;
+    // Extract explicit column count from first arg (alignat only)
+    let mut num_maths = 0usize;
+    let mut explicit_cols = 0usize;
+    if let Some(ParseNode::OrdGroup { body, .. }) = args.first() {
+        let mut arg_str = String::new();
+        for node in body {
+            if let Some(t) = node.symbol_text() {
+                arg_str.push_str(t);
             }
         }
-        let is_aligned = explicit_cols == 0;
+        if let Ok(n) = arg_str.parse::<usize>() {
+            num_maths = n;
+            explicit_cols = n * 2;
+        }
+    }
+    let is_aligned = explicit_cols == 0;
 
-        // Determine actual number of columns
-        let mut num_cols = if let ParseNode::Array { ref body, .. } = res {
-            body.iter().map(|r| r.len()).max().unwrap_or(0)
-        } else {
-            0
-        };
+    // Determine actual number of columns
+    let mut num_cols = if let ParseNode::Array { ref body, .. } = res {
+        body.iter().map(|r| r.len()).max().unwrap_or(0)
+    } else {
+        0
+    };
 
-        if let ParseNode::Array {
-            body: ref mut array_body,
-            ..
-        } = res
-        {
-            for row in array_body.iter_mut() {
-                // Prepend empty group at every even-indexed cell (2nd, 4th, ...)
-                let mut i = 1;
-                while i < row.len() {
-                    if let ParseNode::Styling {
-                        body: ref mut styling_body,
+    if let ParseNode::Array {
+        body: ref mut array_body,
+        ..
+    } = res
+    {
+        for row in array_body.iter_mut() {
+            // Prepend empty group at every even-indexed cell (2nd, 4th, ...)
+            let mut i = 1;
+            while i < row.len() {
+                if let ParseNode::Styling {
+                    body: ref mut styling_body,
+                    ..
+                } = row[i]
+                {
+                    if let Some(ParseNode::OrdGroup {
+                        body: ref mut og_body,
                         ..
-                    } = row[i]
+                    }) = styling_body.first_mut()
                     {
-                        if let Some(ParseNode::OrdGroup {
-                            body: ref mut og_body,
-                            ..
-                        }) = styling_body.first_mut()
-                        {
-                            og_body.insert(
-                                0,
-                                ParseNode::OrdGroup {
-                                    mode: ctx.mode,
-                                    body: vec![],
-                                    semisimple: None,
-                                    loc: None,
-                                },
-                            );
-                        }
+                        og_body.insert(
+                            0,
+                            ParseNode::OrdGroup {
+                                mode: ctx.mode,
+                                body: vec![],
+                                semisimple: None,
+                                loc: None,
+                            },
+                        );
                     }
-                    i += 2;
                 }
+                i += 2;
+            }
 
-                if !is_aligned {
-                    let cur_maths = row.len() / 2;
-                    if num_maths < cur_maths {
-                        return Err(ParseError::msg(format!(
-                            "Too many math in a row: expected {}, but got {}",
-                            num_maths, cur_maths
-                        )));
-                    }
-                } else if num_cols < row.len() {
-                    num_cols = row.len();
+            if !is_aligned {
+                let cur_maths = row.len() / 2;
+                if num_maths < cur_maths {
+                    return Err(ParseError::msg(format!(
+                        "Too many math in a row: expected {}, but got {}",
+                        num_maths, cur_maths
+                    )));
                 }
+            } else if num_cols < row.len() {
+                num_cols = row.len();
             }
         }
+    }
 
-        if !is_aligned {
-            num_cols = explicit_cols;
-        }
+    if !is_aligned {
+        num_cols = explicit_cols;
+    }
 
-        let mut cols = Vec::new();
-        for i in 0..num_cols {
-            let (align, pregap) = if i % 2 == 1 {
-                ("l", 0.0)
-            } else if i > 0 && is_aligned {
-                ("r", 1.0)
-            } else {
-                ("r", 0.0)
-            };
-            cols.push(AlignSpec {
-                align_type: AlignType::Align,
-                align: Some(align.to_string()),
-                pregap: Some(pregap),
-                postgap: Some(0.0),
-            });
-        }
+    let mut cols = Vec::new();
+    for i in 0..num_cols {
+        let (align, pregap) = if i % 2 == 1 {
+            ("l", 0.0)
+        } else if i > 0 && is_aligned {
+            ("r", 1.0)
+        } else {
+            ("r", 0.0)
+        };
+        cols.push(AlignSpec {
+            align_type: AlignType::Align,
+            align: Some(align.to_string()),
+            pregap: Some(pregap),
+            postgap: Some(0.0),
+        });
+    }
 
-        if let ParseNode::Array {
-            cols: ref mut array_cols,
-            col_separation_type: ref mut array_sep_type,
-            ..
-        } = res
-        {
-            *array_cols = Some(cols);
-            *array_sep_type = Some(
-                if is_aligned { "align" } else { "alignat" }.to_string(),
-            );
-        }
+    if let ParseNode::Array {
+        cols: ref mut array_cols,
+        col_separation_type: ref mut array_sep_type,
+        ..
+    } = res
+    {
+        *array_cols = Some(cols);
+        *array_sep_type = Some(if is_aligned { "align" } else { "alignat" }.to_string());
+    }
 
     Ok(res)
 }
@@ -1201,12 +1199,7 @@ fn register_subarray(map: &mut HashMap<&'static str, EnvSpec>) {
                     pregap: None,
                     postgap: None,
                 }),
-                _ => {
-                    return Err(ParseError::msg(format!(
-                        "Unknown column alignment: {}",
-                        ca
-                    )))
-                }
+                _ => return Err(ParseError::msg(format!("Unknown column alignment: {}", ca))),
             }
         }
 
@@ -1283,9 +1276,9 @@ fn proof_command_arity(name: &str) -> Option<usize> {
 }
 
 fn parse_prooftree_arg(parser: &mut Parser, command: &str) -> ParseResult<Vec<ParseNode>> {
-    let arg = parser.parse_argument_group(false, None)?.ok_or_else(|| {
-        ParseError::msg(format!("Expected argument for {}", command))
-    })?;
+    let arg = parser
+        .parse_argument_group(false, None)?
+        .ok_or_else(|| ParseError::msg(format!("Expected argument for {}", command)))?;
     Ok(ParseNode::ord_argument(arg))
 }
 

@@ -16,8 +16,7 @@ fn font_cache_speedup() {
         r"\begin{pmatrix} a & b \\ c & d \end{pmatrix}",
     ];
 
-    let font_dir =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fonts");
+    let font_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fonts");
     let font_dir = font_dir.to_string_lossy().to_string();
 
     let layout_opts = LayoutOptions::default();

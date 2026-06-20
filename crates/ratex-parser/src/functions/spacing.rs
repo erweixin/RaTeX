@@ -8,16 +8,26 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
     define_function_full(
         map,
         &[
-            "\\quad", "\\qquad", "\\enspace", "\\thinspace", "\\medspace",
-            "\\thickspace", "\\negthinspace", "\\negmedspace", "\\negthickspace",
+            "\\quad",
+            "\\qquad",
+            "\\enspace",
+            "\\thinspace",
+            "\\medspace",
+            "\\thickspace",
+            "\\negthinspace",
+            "\\negmedspace",
+            "\\negthickspace",
             "\\nobreakspace",
         ],
         "spacing",
-        0, 0, None,
-        true,  // allowed_in_argument
-        true,  // allowed_in_text
+        0,
+        0,
+        None,
+        true, // allowed_in_argument
+        true, // allowed_in_text
         true,
-        false, false,
+        false,
+        false,
         handle_spacing,
     );
 
@@ -25,12 +35,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\hspace"],
         "kern",
-        1, 0,
+        1,
+        0,
         Some(vec![crate::functions::ArgType::Size]),
         false,
         true,
         true,
-        false, false,
+        false,
+        false,
         handle_hspace,
     );
 
@@ -39,8 +51,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\hfill"],
         "spacing",
-        0, 0, None,
-        false, true, true, false, false,
+        0,
+        0,
+        None,
+        false,
+        true,
+        true,
+        false,
+        false,
         handle_spacing,
     );
 }

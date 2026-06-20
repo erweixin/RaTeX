@@ -5,11 +5,11 @@
 //!
 //! Compiled only when `target_os = "android"` (see lib.rs).
 
-use jni::objects::{JClass, JString, JFloatArray};
-use jni::sys::{jboolean, jstring, jobject, JNI_TRUE};
+use jni::objects::{JClass, JFloatArray, JString};
+use jni::sys::{jboolean, jobject, jstring, JNI_TRUE};
 use jni::JNIEnv;
 
-use crate::{ratex_parse_and_layout, ratex_get_last_error, RatexOptions, RatexColor};
+use crate::{ratex_get_last_error, ratex_parse_and_layout, RatexColor, RatexOptions};
 use std::ffi::CString;
 
 /// JNI entry point for `RaTeXEngine.nativeParseAndLayout(latex: String, displayMode: Boolean, rgba: FloatArray): String?`
@@ -30,8 +30,10 @@ pub extern "system" fn Java_io_ratex_RaTeXEngine_nativeParseAndLayout(
     let latex_str: String = match env.get_string(&latex) {
         Ok(s) => s.into(),
         Err(e) => {
-            let _ = env.throw_new("java/lang/IllegalArgumentException",
-                                  format!("invalid latex string: {e}"));
+            let _ = env.throw_new(
+                "java/lang/IllegalArgumentException",
+                format!("invalid latex string: {e}"),
+            );
             return std::ptr::null_mut();
         }
     };
@@ -39,8 +41,10 @@ pub extern "system" fn Java_io_ratex_RaTeXEngine_nativeParseAndLayout(
     let c_latex = match CString::new(latex_str) {
         Ok(cs) => cs,
         Err(e) => {
-            let _ = env.throw_new("java/lang/IllegalArgumentException",
-                                  format!("latex contains null byte: {e}"));
+            let _ = env.throw_new(
+                "java/lang/IllegalArgumentException",
+                format!("latex contains null byte: {e}"),
+            );
             return std::ptr::null_mut();
         }
     };
@@ -91,14 +95,20 @@ pub extern "system" fn Java_io_ratex_RaTeXEngine_nativeParseAndLayout(
         return std::ptr::null_mut();
     }
 
-    let json = unsafe { std::ffi::CStr::from_ptr(result.data).to_string_lossy().into_owned() };
+    let json = unsafe {
+        std::ffi::CStr::from_ptr(result.data)
+            .to_string_lossy()
+            .into_owned()
+    };
     unsafe { crate::ratex_free_display_list(result.data) };
 
     match env.new_string(json) {
         Ok(s) => s.into_raw(),
         Err(e) => {
-            let _ = env.throw_new("java/lang/RuntimeException",
-                                  format!("failed to create Java string: {e}"));
+            let _ = env.throw_new(
+                "java/lang/RuntimeException",
+                format!("failed to create Java string: {e}"),
+            );
             std::ptr::null_mut()
         }
     }

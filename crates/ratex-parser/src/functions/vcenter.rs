@@ -9,11 +9,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\vcenter"],
         "vcenter",
-        1, 0,
+        1,
+        0,
         Some(vec![ArgType::Original]),
         false,
-        false, true,
-        false, false,
+        false,
+        true,
+        false,
+        false,
         handle_vcenter,
     );
 }

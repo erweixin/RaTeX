@@ -37,9 +37,8 @@ impl MhchemData {
             let src = src_val
                 .as_str()
                 .ok_or_else(|| MhchemError::msg("pattern not string"))?;
-            let re = Regex::new(src).map_err(|e| {
-                MhchemError::msg(format!("regex compile {:?}: {}", k, e))
-            })?;
+            let re = Regex::new(src)
+                .map_err(|e| MhchemError::msg(format!("regex compile {:?}: {}", k, e)))?;
             map.insert(k.clone(), re);
         }
 

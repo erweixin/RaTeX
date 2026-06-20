@@ -9,8 +9,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\operatorname@", "\\operatornamewithlimits"],
         "operatorname",
-        1, 0, None,
-        false, false, true, false, false,
+        1,
+        0,
+        None,
+        false,
+        false,
+        true,
+        false,
+        false,
         handle_operatorname,
     );
 }

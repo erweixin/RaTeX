@@ -180,7 +180,9 @@ impl<'a> Lexer<'a> {
 
             if Self::is_control_word_char(next_byte) {
                 // Control word: \<letters or @>
-                while self.pos < self.bytes.len() && Self::is_control_word_char(self.bytes[self.pos]) {
+                while self.pos < self.bytes.len()
+                    && Self::is_control_word_char(self.bytes[self.pos])
+                {
                     self.pos += 1;
                 }
                 let text = &self.input[start..self.pos];
@@ -257,11 +259,7 @@ mod tests {
 
     fn lex_texts(input: &str) -> Vec<String> {
         let mut lexer = Lexer::new(input);
-        lexer
-            .lex_all()
-            .into_iter()
-            .map(|t| t.text)
-            .collect()
+        lexer.lex_all().into_iter().map(|t| t.text).collect()
     }
 
     // === Basic character tokens ===
@@ -419,10 +417,7 @@ mod tests {
     #[test]
     fn test_sqrt_with_optional() {
         let tokens = lex_texts("\\sqrt[3]{x}");
-        assert_eq!(
-            tokens,
-            vec!["\\sqrt", "[", "3", "]", "{", "x", "}", "EOF"]
-        );
+        assert_eq!(tokens, vec!["\\sqrt", "[", "3", "]", "{", "x", "}", "EOF"]);
     }
 
     #[test]
@@ -431,8 +426,8 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                "\\frac", "{", "a", " ", "+", " ", "b", "}",
-                "{", "c", " ", "-", " ", "d", "}", "EOF"
+                "\\frac", "{", "a", " ", "+", " ", "b", "}", "{", "c", " ", "-", " ", "d", "}",
+                "EOF"
             ]
         );
     }
@@ -442,9 +437,7 @@ mod tests {
         let tokens = lex_texts("\\sum_{i=0}^{n}");
         assert_eq!(
             tokens,
-            vec![
-                "\\sum", "_", "{", "i", "=", "0", "}", "^", "{", "n", "}", "EOF"
-            ]
+            vec!["\\sum", "_", "{", "i", "=", "0", "}", "^", "{", "n", "}", "EOF"]
         );
     }
 
@@ -463,8 +456,8 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                "\\frac", "{", "\\sqrt", "{", "a", "^", "2", "+", "b", "^", "2",
-                "}", "}", "{", "c", "}", "EOF"
+                "\\frac", "{", "\\sqrt", "{", "a", "^", "2", "+", "b", "^", "2", "}", "}", "{",
+                "c", "}", "EOF"
             ]
         );
     }
@@ -581,7 +574,10 @@ mod tests {
         // Comment and everything after % until \n is removed; \n consumed by comment
         assert_eq!(
             tokens,
-            vec!["a", "^", "2", " ", "+", " ", "b", "^", "2", " ", "=", " ", "c", "^", "2", " ", "EOF"]
+            vec![
+                "a", "^", "2", " ", "+", " ", "b", "^", "2", " ", "=", " ", "c", "^", "2", " ",
+                "EOF"
+            ]
         );
     }
 
@@ -618,15 +614,9 @@ mod tests {
         // % comment\n → skipped
         // ^ → "^"
         // 2 → "2"
-        assert_eq!(
-            with_comment,
-            vec!["x", "_", "3", " ", "^", "2", "EOF"]
-        );
+        assert_eq!(with_comment, vec!["x", "_", "3", " ", "^", "2", "EOF"]);
         // Without comment: x_3^2
-        assert_eq!(
-            without_comment,
-            vec!["x", "_", "3", "^", "2", "EOF"]
-        );
+        assert_eq!(without_comment, vec!["x", "_", "3", "^", "2", "EOF"]);
         // The parser would ignore the space; lexer correctly produces it.
     }
 
@@ -634,10 +624,7 @@ mod tests {
     #[test]
     fn katex_comment_after_caret() {
         let tokens = lex_texts("x^ %comment\n{2}");
-        assert_eq!(
-            tokens,
-            vec!["x", "^", " ", "{", "2", "}", "EOF"]
-        );
+        assert_eq!(tokens, vec!["x", "^", " ", "{", "2", "}", "EOF"]);
     }
 
     /// KaTeX: `"x^ %comment\n\\frac{1}{2}"` parseLike `"x^\\frac{1}{2}"`
@@ -655,30 +642,21 @@ mod tests {
     #[test]
     fn katex_comment_in_kern() {
         let tokens = lex_texts("\\kern{1 %kern\nem}");
-        assert_eq!(
-            tokens,
-            vec!["\\kern", "{", "1", " ", "e", "m", "}", "EOF"]
-        );
+        assert_eq!(tokens, vec!["\\kern", "{", "1", " ", "e", "m", "}", "EOF"]);
     }
 
     /// KaTeX: `"\\kern1 %kern\nem"`
     #[test]
     fn katex_comment_in_kern_no_brace() {
         let tokens = lex_texts("\\kern1 %kern\nem");
-        assert_eq!(
-            tokens,
-            vec!["\\kern", "1", " ", "e", "m", "EOF"]
-        );
+        assert_eq!(tokens, vec!["\\kern", "1", " ", "e", "m", "EOF"]);
     }
 
     /// KaTeX: `"\\color{#f00%red\n}"`
     #[test]
     fn katex_comment_in_color() {
         let tokens = lex_texts("\\color{#f00%red\n}");
-        assert_eq!(
-            tokens,
-            vec!["\\color", "{", "#", "f", "0", "0", "}", "EOF"]
-        );
+        assert_eq!(tokens, vec!["\\color", "{", "#", "f", "0", "0", "}", "EOF"]);
     }
 
     /// KaTeX: `it("should parse comments before an expression")`
@@ -829,7 +807,10 @@ mod tests {
     #[test]
     fn test_verb_in_expression() {
         let tokens = lex_texts("x + \\verb|y| + z");
-        assert_eq!(tokens, vec!["x", " ", "+", " ", "\\verb|y|", " ", "+", " ", "z", "EOF"]);
+        assert_eq!(
+            tokens,
+            vec!["x", " ", "+", " ", "\\verb|y|", " ", "+", " ", "z", "EOF"]
+        );
     }
 
     /// Quadratic formula
@@ -839,9 +820,8 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                "\\frac", "{", "-", "b", " ", "\\pm", "\\sqrt", "{",
-                "b", "^", "2", "-", "4", "a", "c", "}", "}", "{",
-                "2", "a", "}", "EOF"
+                "\\frac", "{", "-", "b", " ", "\\pm", "\\sqrt", "{", "b", "^", "2", "-", "4", "a",
+                "c", "}", "}", "{", "2", "a", "}", "EOF"
             ]
         );
     }
@@ -853,11 +833,9 @@ mod tests {
         assert_eq!(
             tokens,
             vec![
-                "\\begin", "{", "p", "m", "a", "t", "r", "i", "x", "}",
-                " ", "a", " ", "&", " ", "b", " ", "\\\\", " ",
-                "c", " ", "&", " ", "d", " ",
-                "\\end", "{", "p", "m", "a", "t", "r", "i", "x", "}",
-                "EOF"
+                "\\begin", "{", "p", "m", "a", "t", "r", "i", "x", "}", " ", "a", " ", "&", " ",
+                "b", " ", "\\\\", " ", "c", " ", "&", " ", "d", " ", "\\end", "{", "p", "m", "a",
+                "t", "r", "i", "x", "}", "EOF"
             ]
         );
     }

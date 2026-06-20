@@ -106,7 +106,10 @@ fn symbol_maps() -> &'static SymbolMaps {
                 by_codepoint.entry((mode, ch)).or_insert(i);
             }
         }
-        SymbolMaps { by_name, by_codepoint }
+        SymbolMaps {
+            by_name,
+            by_codepoint,
+        }
     })
 }
 
@@ -115,7 +118,11 @@ fn entry_to_info(idx: usize, mode: Mode) -> SymbolInfo {
     SymbolInfo {
         name: n,
         mode,
-        font: if f == 0 { SymbolFont::Main } else { SymbolFont::Ams },
+        font: if f == 0 {
+            SymbolFont::Main
+        } else {
+            SymbolFont::Ams
+        },
         group: Group::parse(g).unwrap_or(Group::MathOrd),
         codepoint: cp,
     }

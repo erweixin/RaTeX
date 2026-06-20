@@ -9,10 +9,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\mathllap", "\\mathrlap", "\\mathclap"],
         "lap",
-        1, 0, None,
+        1,
+        0,
+        None,
         false,
-        true, true,
-        false, false,
+        true,
+        true,
+        false,
+        false,
         handle_lap,
     );
 }

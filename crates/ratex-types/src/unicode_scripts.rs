@@ -129,7 +129,10 @@ mod tests {
     fn test_cyrillic() {
         assert!(supported_codepoint('А' as u32)); // Cyrillic А = 0x0410
         assert!(supported_codepoint('я' as u32)); // Cyrillic я = 0x044F
-        assert_eq!(script_from_codepoint('А' as u32), Some(UnicodeScript::Cyrillic));
+        assert_eq!(
+            script_from_codepoint('А' as u32),
+            Some(UnicodeScript::Cyrillic)
+        );
     }
 
     #[test]

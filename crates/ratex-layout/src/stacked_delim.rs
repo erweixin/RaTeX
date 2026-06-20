@@ -4,9 +4,9 @@
 use ratex_font::{get_char_metrics, CharMetrics, FontId};
 use ratex_types::path_command::PathCommand;
 
-use crate::layout_options::LayoutOptions;
 use crate::katex_svg::parse_svg_path_data;
 use crate::layout_box::{BoxContent, LayoutBox, VBoxChild, VBoxChildKind};
+use crate::layout_options::LayoutOptions;
 use crate::vbox::make_vbox;
 
 const LAP: f64 = 0.008;
@@ -195,11 +195,26 @@ fn shift_path_y(cmds: Vec<PathCommand>, dy: f64) -> Vec<PathCommand> {
         .map(|c| match c {
             PathCommand::MoveTo { x, y } => PathCommand::MoveTo { x, y: y + dy },
             PathCommand::LineTo { x, y } => PathCommand::LineTo { x, y: y + dy },
-            PathCommand::CubicTo { x1, y1, x2, y2, x, y } => PathCommand::CubicTo {
-                x1, y1: y1 + dy, x2, y2: y2 + dy, x, y: y + dy,
+            PathCommand::CubicTo {
+                x1,
+                y1,
+                x2,
+                y2,
+                x,
+                y,
+            } => PathCommand::CubicTo {
+                x1,
+                y1: y1 + dy,
+                x2,
+                y2: y2 + dy,
+                x,
+                y: y + dy,
             },
             PathCommand::QuadTo { x1, y1, x, y } => PathCommand::QuadTo {
-                x1, y1: y1 + dy, x, y: y + dy,
+                x1,
+                y1: y1 + dy,
+                x,
+                y: y + dy,
             },
             PathCommand::Close => PathCommand::Close,
         })
@@ -210,14 +225,8 @@ fn scale_path_to_em(cmds: &[PathCommand]) -> Vec<PathCommand> {
     let s = 0.001;
     cmds.iter()
         .map(|c| match *c {
-            PathCommand::MoveTo { x, y } => PathCommand::MoveTo {
-                x: x * s,
-                y: y * s,
-            },
-            PathCommand::LineTo { x, y } => PathCommand::LineTo {
-                x: x * s,
-                y: y * s,
-            },
+            PathCommand::MoveTo { x, y } => PathCommand::MoveTo { x: x * s, y: y * s },
+            PathCommand::LineTo { x, y } => PathCommand::LineTo { x: x * s, y: y * s },
             PathCommand::CubicTo {
                 x1,
                 y1,
@@ -244,7 +253,11 @@ fn scale_path_to_em(cmds: &[PathCommand]) -> Vec<PathCommand> {
         .collect()
 }
 
-fn make_tall_svg_delim(kind: StackDelimKind, height_total: f64, options: &LayoutOptions) -> Option<LayoutBox> {
+fn make_tall_svg_delim(
+    kind: StackDelimKind,
+    height_total: f64,
+    options: &LayoutOptions,
+) -> Option<LayoutBox> {
     let label = svg_label_for(kind);
     if label.is_empty() {
         return None;
@@ -262,8 +275,12 @@ fn make_tall_svg_delim(kind: StackDelimKind, height_total: f64, options: &Layout
         _ => return None,
     };
 
-    let top_m = get_char_metrics(FontId::Size4Regular, top_c).map(|m| height_depth(&m)).unwrap_or(0.0);
-    let bot_m = get_char_metrics(FontId::Size4Regular, bot_c).map(|m| height_depth(&m)).unwrap_or(0.0);
+    let top_m = get_char_metrics(FontId::Size4Regular, top_c)
+        .map(|m| height_depth(&m))
+        .unwrap_or(0.0);
+    let bot_m = get_char_metrics(FontId::Size4Regular, bot_c)
+        .map(|m| height_depth(&m))
+        .unwrap_or(0.0);
     let min_h = top_m + bot_m;
     let mid_em = (height_total - min_h).max(0.0);
     let mid_th = (mid_em * 1000.0).round() as i64;
@@ -294,7 +311,11 @@ fn make_tall_svg_delim(kind: StackDelimKind, height_total: f64, options: &Layout
     Some(axis_center_stacked_vbox(inner, options))
 }
 
-fn make_glyph_stack_delim(kind: StackDelimKind, height_total: f64, options: &LayoutOptions) -> Option<LayoutBox> {
+fn make_glyph_stack_delim(
+    kind: StackDelimKind,
+    height_total: f64,
+    options: &LayoutOptions,
+) -> Option<LayoutBox> {
     let lap_kern = |k: f64| VBoxChild {
         kind: VBoxChildKind::Kern(-k),
         shift: 0.0,

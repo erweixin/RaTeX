@@ -3,14 +3,14 @@
 /// From TeXbook pp. 170-171. Also matches KaTeX's DomEnum.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MathClass {
-    Ord,    // ordinary
-    Op,     // large operator
-    Bin,    // binary operation
-    Rel,    // relation
-    Open,   // opening delimiter
-    Close,  // closing delimiter
-    Punct,  // punctuation
-    Inner,  // inner (fractions, etc.)
+    Ord,   // ordinary
+    Op,    // large operator
+    Bin,   // binary operation
+    Rel,   // relation
+    Open,  // opening delimiter
+    Close, // closing delimiter
+    Punct, // punctuation
+    Inner, // inner (fractions, etc.)
 }
 
 /// Spacing between adjacent math atoms, in mu (1mu = 1/18 em).
@@ -69,7 +69,11 @@ impl MathClass {
 /// `tight` should be true for script and scriptscript styles.
 /// Returns the spacing in mu units (1mu = 1/18 em).
 pub fn atom_spacing(left: MathClass, right: MathClass, tight: bool) -> f64 {
-    let table = if tight { &TIGHT_SPACING_TABLE } else { &SPACING_TABLE };
+    let table = if tight {
+        &TIGHT_SPACING_TABLE
+    } else {
+        &SPACING_TABLE
+    };
     table[left.index()][right.index()] as f64
 }
 

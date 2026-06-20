@@ -34,10 +34,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\global", "\\long", "\\\\globallong"],
         "internal",
-        0, 0, None,
+        0,
+        0,
+        None,
         false,
-        true, true,
-        false, false,
+        true,
+        true,
+        false,
+        false,
         handle_prefix,
     );
 
@@ -46,10 +50,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\def", "\\gdef", "\\edef", "\\xdef"],
         "internal",
-        0, 0, None,
+        0,
+        0,
+        None,
         false,
-        true, true,
-        false, true,
+        true,
+        true,
+        false,
+        true,
         handle_def,
     );
 
@@ -58,10 +66,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\let", "\\\\globallet"],
         "internal",
-        0, 0, None,
+        0,
+        0,
+        None,
         false,
-        true, true,
-        false, true,
+        true,
+        true,
+        false,
+        true,
         handle_let,
     );
 
@@ -70,10 +82,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\futurelet", "\\\\globalfuture"],
         "internal",
-        0, 0, None,
+        0,
+        0,
+        None,
         false,
-        true, true,
-        false, true,
+        true,
+        true,
+        false,
+        true,
         handle_futurelet,
     );
 }
@@ -221,7 +237,12 @@ fn handle_futurelet(
     })
 }
 
-fn let_command(ctx: &mut FunctionContext, name: &str, mut tok: ratex_lexer::token::Token, global: bool) {
+fn let_command(
+    ctx: &mut FunctionContext,
+    name: &str,
+    mut tok: ratex_lexer::token::Token,
+    global: bool,
+) {
     let macro_def = ctx.parser.gullet.get_macro(&tok.text).cloned();
     let def = match macro_def {
         Some(d) => d,

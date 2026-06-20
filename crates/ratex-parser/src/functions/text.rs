@@ -7,15 +7,28 @@ use crate::parse_node::ParseNode;
 pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
     define_function_full(
         map,
-        &["\\text", "\\textrm", "\\textsf", "\\texttt", "\\textnormal",
-          "\\textbf", "\\textit", "\\textmd", "\\textup", "\\textsl", "\\textsc"],
+        &[
+            "\\text",
+            "\\textrm",
+            "\\textsf",
+            "\\texttt",
+            "\\textnormal",
+            "\\textbf",
+            "\\textit",
+            "\\textmd",
+            "\\textup",
+            "\\textsl",
+            "\\textsc",
+        ],
         "text",
-        1, 0,
+        1,
+        0,
         Some(vec![ArgType::Text]),
-        true,  // allowed_in_argument
-        true,  // allowed_in_text
+        true, // allowed_in_argument
+        true, // allowed_in_text
         true,
-        false, false,
+        false,
+        false,
         handle_text,
     );
 }

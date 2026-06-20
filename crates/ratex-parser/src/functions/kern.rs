@@ -9,10 +9,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\kern", "\\mkern", "\\hskip", "\\mskip"],
         "kern",
-        1, 0,
+        1,
+        0,
         Some(vec![ArgType::Size]),
-        true,  // allowed_in_argument
-        true, true, false, false,
+        true, // allowed_in_argument
+        true,
+        true,
+        false,
+        false,
         handle_kern,
     );
 }

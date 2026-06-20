@@ -79,11 +79,7 @@ mod tests {
     #[test]
     fn reaction_arrow() {
         let t = chem_parse_str("2H + O -> H2O", "ce").expect("mhchem");
-        assert!(
-            t.contains("rightarrow") || t.contains("->"),
-            "{}",
-            t
-        );
+        assert!(t.contains("rightarrow") || t.contains("->"), "{}", t);
     }
 
     #[test]
@@ -116,5 +112,4 @@ mod tests {
         let tex = chem_parse_str(inner, "ce").expect("mhchem");
         crate::parser::parse(&tex).expect("mhchem TeX should parse");
     }
-
 }

@@ -117,7 +117,11 @@ fn go2(buf: &Value) -> MhchemResult<String> {
             format!("\\mathrm{{{p1}}}")
         }
         "text" => {
-            let mut p1 = buf.get("p1").and_then(|x| x.as_str()).unwrap_or("").to_string();
+            let mut p1 = buf
+                .get("p1")
+                .and_then(|x| x.as_str())
+                .unwrap_or("")
+                .to_string();
             if p1.contains('^') || p1.contains('_') {
                 p1 = p1.replace(' ', "~").replace('-', "\\text{-}");
                 format!("\\mathrm{{{p1}}}")
@@ -270,8 +274,12 @@ fn get_bond(a: &str) -> Option<&'static str> {
         "~" => "{\\tripledash}",
         "~-" => "{\\mathrlap{\\raisebox{-.1em}{$-$}}\\raisebox{.1em}{$\\tripledash$}}",
         "~=" => "{\\mathrlap{\\raisebox{-.2em}{$-$}}\\mathrlap{\\raisebox{.2em}{$\\tripledash$}}-}",
-        "~--" => "{\\mathrlap{\\raisebox{-.2em}{$-$}}\\mathrlap{\\raisebox{.2em}{$\\tripledash$}}-}",
-        "-~-" => "{\\mathrlap{\\raisebox{-.2em}{$-$}}\\mathrlap{\\raisebox{.2em}{$-$}}\\tripledash}",
+        "~--" => {
+            "{\\mathrlap{\\raisebox{-.2em}{$-$}}\\mathrlap{\\raisebox{.2em}{$\\tripledash$}}-}"
+        }
+        "-~-" => {
+            "{\\mathrlap{\\raisebox{-.2em}{$-$}}\\mathrlap{\\raisebox{.2em}{$-$}}\\tripledash}"
+        }
         "..." => "{{\\cdot}{\\cdot}{\\cdot}}",
         "...." => "{{\\cdot}{\\cdot}{\\cdot}{\\cdot}}",
         "->" => "{\\rightarrow}",

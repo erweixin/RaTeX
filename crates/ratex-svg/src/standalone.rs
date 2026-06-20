@@ -78,7 +78,8 @@ pub(crate) fn standalone_glyph(
         if let Some(fb) = font_cache.get(&FontId::CjkFallback) {
             let fid = fb.glyph_id(ch);
             if fid.0 != 0 {
-                return outline_to_d(px, py, glyph_em, FontId::CjkFallback, fb, fid).map(StandaloneGlyph::Path);
+                return outline_to_d(px, py, glyph_em, FontId::CjkFallback, fb, fid)
+                    .map(StandaloneGlyph::Path);
             }
         }
         return None;
@@ -193,7 +194,8 @@ fn try_system_unicode_fallback_svg(
     if let Some(fb) = font_cache.get(&FontId::CjkFallback) {
         let fid = fb.glyph_id(ch);
         if fid.0 != 0 {
-            return outline_to_d(px, py, em, FontId::CjkFallback, fb, fid).map(StandaloneGlyph::Path);
+            return outline_to_d(px, py, em, FontId::CjkFallback, fb, fid)
+                .map(StandaloneGlyph::Path);
         }
     }
     None
@@ -207,9 +209,7 @@ fn outline_to_d(
     font: &FontRef<'_>,
     glyph_id: ab_glyph::GlyphId,
 ) -> Option<String> {
-    let curves = ratex_font_loader::outline_cache::get_or_compute_outline(
-        font_id, font, glyph_id,
-    )?;
+    let curves = ratex_font_loader::outline_cache::get_or_compute_outline(font_id, font, glyph_id)?;
     let units_per_em = font.units_per_em().unwrap_or(1000.0);
     let mut scale = em / units_per_em;
 

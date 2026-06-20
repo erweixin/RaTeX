@@ -78,14 +78,20 @@ fn main() {
     };
 
     let inline = args.contains(&"--inline".to_string());
-    let style = if inline { MathStyle::Text } else { MathStyle::Display };
+    let style = if inline {
+        MathStyle::Text
+    } else {
+        MathStyle::Display
+    };
     let layout_opts = LayoutOptions::default().with_style(style).with_color(color);
 
     let mut idx = 0;
     let reader: Box<dyn BufRead> = match input_file {
-        Some(path) => Box::new(io::BufReader::new(
-            File::open(&path).unwrap_or_else(|e| panic!("Failed to open input file '{}': {}", path, e)),
-        )),
+        Some(path) => {
+            Box::new(io::BufReader::new(File::open(&path).unwrap_or_else(|e| {
+                panic!("Failed to open input file '{}': {}", path, e)
+            })))
+        }
         None => Box::new(io::BufReader::new(io::stdin())),
     };
     for line in reader.lines() {
@@ -124,12 +130,7 @@ fn svg_formula(
 
 fn default_font_dir() -> String {
     const MARKER: &str = "KaTeX_Main-Regular.ttf";
-    let candidates = [
-        "fonts",
-        "../fonts",
-        "../../fonts",
-        "../../../fonts",
-    ];
+    let candidates = ["fonts", "../fonts", "../../fonts", "../../../fonts"];
     for c in &candidates {
         let p = std::path::Path::new(c);
         if p.join(MARKER).is_file() {

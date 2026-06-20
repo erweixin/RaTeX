@@ -21,10 +21,7 @@ pub enum MacroDefinition {
     /// Simple string expansion (e.g., `\def\foo{bar}` → "bar")
     Text(String),
     /// Pre-tokenized expansion with argument count
-    Tokens {
-        tokens: Vec<Token>,
-        num_args: usize,
-    },
+    Tokens { tokens: Vec<Token>, num_args: usize },
     /// Function-based macro (consumes tokens directly, returns expansion)
     Function(FnMacroHandler),
 }
@@ -84,7 +81,8 @@ impl MacroNamespace {
 
     fn set(&mut self, name: String, def: MacroDefinition) {
         if let Some(undo) = self.group_stack.last_mut() {
-            undo.entry(name.clone()).or_insert_with(|| self.current.get(&name).cloned());
+            undo.entry(name.clone())
+                .or_insert_with(|| self.current.get(&name).cloned());
         }
         self.current.insert(name, def);
     }
@@ -105,8 +103,12 @@ impl MacroNamespace {
         if let Some(undo) = self.group_stack.pop() {
             for (name, old_val) in undo {
                 match old_val {
-                    Some(def) => { self.current.insert(name, def); }
-                    None => { self.current.remove(&name); }
+                    Some(def) => {
+                        self.current.insert(name, def);
+                    }
+                    None => {
+                        self.current.remove(&name);
+                    }
                 }
             }
         }
@@ -693,9 +695,7 @@ impl<'a> MacroExpander<'a> {
         // \operatorname: \@ifstar\operatornamewithlimits\operatorname@
         self.macros.set(
             "\\operatorname".to_string(),
-            MacroDefinition::Text(
-                "\\@ifstar\\operatornamewithlimits\\operatorname@".to_string(),
-            ),
+            MacroDefinition::Text("\\@ifstar\\operatornamewithlimits\\operatorname@".to_string()),
         );
 
         // \message{...}: consume argument and discard (no-op)
@@ -815,9 +815,11 @@ impl<'a> MacroExpander<'a> {
                 // Tokens are reversed (last token first in vec), scan in logical order
                 for i in (0..content.len()).rev() {
                     let t = &content[i];
-                    if t.text == "{" { depth += 1; }
-                    else if t.text == "}" { depth -= 1; }
-                    else if depth == 0 && t.text == "|" {
+                    if t.text == "{" {
+                        depth += 1;
+                    } else if t.text == "}" {
+                        depth -= 1;
+                    } else if depth == 0 && t.text == "|" {
                         // Check for || (double pipe) → middleDouble
                         if !middle_double.is_empty() && i > 0 && content[i - 1].text == "|" {
                             _first_pipe_idx = Some(i);
@@ -885,10 +887,8 @@ impl<'a> MacroExpander<'a> {
     }
 
     pub fn set_text_macro(&mut self, name: &str, text: &str) {
-        self.macros.set(
-            name.to_string(),
-            MacroDefinition::Text(text.to_string()),
-        );
+        self.macros
+            .set(name.to_string(), MacroDefinition::Text(text.to_string()));
     }
 
     pub fn get_macro(&self, name: &str) -> Option<&MacroDefinition> {
@@ -1278,7 +1278,10 @@ fn handle_newcommand(
 ) -> ParseResult<Vec<Token>> {
     let name_arg = me.consume_arg(None)?;
     // name_arg.tokens is reversed (stack order); last element = first token in original
-    let name = name_arg.tokens.last().map_or_else(String::new, |t| t.text.clone());
+    let name = name_arg
+        .tokens
+        .last()
+        .map_or_else(String::new, |t| t.text.clone());
 
     let exists = me.is_defined(&name);
     if exists && !exists_ok {

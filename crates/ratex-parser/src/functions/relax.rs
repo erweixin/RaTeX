@@ -9,11 +9,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\relax"],
         "internal",
-        0, 0, None,
-        true,  // allowed_in_argument
-        true,  // allowed_in_text
+        0,
+        0,
+        None,
+        true, // allowed_in_argument
+        true, // allowed_in_text
         true,
-        false, false,
+        false,
+        false,
         handle_relax,
     );
 }

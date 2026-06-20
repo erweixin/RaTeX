@@ -66,10 +66,9 @@ impl MathStyle {
             Self::Display | Self::DisplayCramped | Self::Text | Self::TextCramped => {
                 Self::ScriptCramped
             }
-            Self::Script
-            | Self::ScriptCramped
-            | Self::ScriptScript
-            | Self::ScriptScriptCramped => Self::ScriptScriptCramped,
+            Self::Script | Self::ScriptCramped | Self::ScriptScript | Self::ScriptScriptCramped => {
+                Self::ScriptScriptCramped
+            }
         }
     }
 
@@ -115,10 +114,7 @@ impl MathStyle {
     pub fn is_tight(self) -> bool {
         matches!(
             self,
-            Self::Script
-                | Self::ScriptCramped
-                | Self::ScriptScript
-                | Self::ScriptScriptCramped
+            Self::Script | Self::ScriptCramped | Self::ScriptScript | Self::ScriptScriptCramped
         )
     }
 

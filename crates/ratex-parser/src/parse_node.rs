@@ -942,13 +942,11 @@ mod tests {
     fn test_serialize_ordgroup() {
         let node = ParseNode::OrdGroup {
             mode: Mode::Math,
-            body: vec![
-                ParseNode::MathOrd {
-                    mode: Mode::Math,
-                    text: "a".to_string(),
-                    loc: None,
-                },
-            ],
+            body: vec![ParseNode::MathOrd {
+                mode: Mode::Math,
+                text: "a".to_string(),
+                loc: None,
+            }],
             semisimple: None,
             loc: None,
         };

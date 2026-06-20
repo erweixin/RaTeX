@@ -9,17 +9,25 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\pmb"],
         "pmb",
-        1, 0, None,
+        1,
+        0,
+        None,
         false,
-        true, true,
-        false, false,
+        true,
+        true,
+        false,
+        false,
         handle_pmb,
     );
 }
 
 fn binrel_class(arg: &ParseNode) -> String {
     let atom = if let ParseNode::OrdGroup { body, .. } = arg {
-        if !body.is_empty() { &body[0] } else { arg }
+        if !body.is_empty() {
+            &body[0]
+        } else {
+            arg
+        }
     } else {
         arg
     };

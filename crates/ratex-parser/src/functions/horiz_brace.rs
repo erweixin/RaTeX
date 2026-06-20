@@ -14,8 +14,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
             "\\underbracket",
         ],
         "horizBrace",
-        1, 0, None,
-        false, false, true, false, false,
+        1,
+        0,
+        None,
+        false,
+        false,
+        true,
+        false,
+        false,
         handle_horiz_brace,
     );
 }

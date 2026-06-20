@@ -142,7 +142,14 @@ fn emit_box(
                 match &child.kind {
                     VBoxChildKind::Box(b) => {
                         cur_y += b.height * scale;
-                        emit_box(b, x + child.shift * scale, cur_y, scale, items, font_str_cache);
+                        emit_box(
+                            b,
+                            x + child.shift * scale,
+                            cur_y,
+                            scale,
+                            items,
+                            font_str_cache,
+                        );
                         cur_y += b.depth * scale;
                     }
                     VBoxChildKind::Kern(k) => {
@@ -192,10 +199,24 @@ fn emit_box(
             let child_denom_scale = scale * d_sc;
 
             let frac_x = x + (lbox.width * scale - numer.width * child_numer_scale) / 2.0;
-            emit_box(numer, frac_x, y - numer_shift * scale, child_numer_scale, items, font_str_cache);
+            emit_box(
+                numer,
+                frac_x,
+                y - numer_shift * scale,
+                child_numer_scale,
+                items,
+                font_str_cache,
+            );
 
             let frac_x = x + (lbox.width * scale - denom.width * child_denom_scale) / 2.0;
-            emit_box(denom, frac_x, y + denom_shift * scale, child_denom_scale, items, font_str_cache);
+            emit_box(
+                denom,
+                frac_x,
+                y + denom_shift * scale,
+                child_denom_scale,
+                items,
+                font_str_cache,
+            );
 
             if *bar_thickness > 0.0 {
                 let metrics = ratex_font::get_global_metrics(0);
@@ -235,7 +256,14 @@ fn emit_box(
                 } else {
                     base_x + (base.width + italic_correction) * scale
                 };
-                emit_box(sup_box, sup_x, y - sup_shift * scale, child_scale, items, font_str_cache);
+                emit_box(
+                    sup_box,
+                    sup_x,
+                    y - sup_shift * scale,
+                    child_scale,
+                    items,
+                    font_str_cache,
+                );
             }
             if let Some(sub_box) = sub {
                 let child_scale = scale * bs;
@@ -244,7 +272,14 @@ fn emit_box(
                 } else {
                     base_x + base.width * scale + sub_h_kern * scale
                 };
-                emit_box(sub_box, sub_x, y + sub_shift * scale, child_scale, items, font_str_cache);
+                emit_box(
+                    sub_box,
+                    sub_x,
+                    y + sub_shift * scale,
+                    child_scale,
+                    items,
+                    font_str_cache,
+                );
             }
         }
 
@@ -314,7 +349,14 @@ fn emit_box(
                 dashed: false,
             });
 
-            emit_box(body, surd_x + radical_width * scale, y, scale, items, font_str_cache);
+            emit_box(
+                body,
+                surd_x + radical_width * scale,
+                y,
+                scale,
+                items,
+                font_str_cache,
+            );
         }
 
         BoxContent::OpLimits {
@@ -329,18 +371,34 @@ fn emit_box(
             sub_scale: bs,
         } => {
             let base_x = x + (lbox.width - base.width) * scale / 2.0;
-            emit_box(base, base_x, y + base_shift * scale, scale, items, font_str_cache);
+            emit_box(
+                base,
+                base_x,
+                y + base_shift * scale,
+                scale,
+                items,
+                font_str_cache,
+            );
 
             if let Some(sup_box) = sup {
                 let child_scale = scale * ss;
-                let sup_x = x + (lbox.width * scale - sup_box.width * child_scale) / 2.0 + slant * scale / 2.0;
-                let sup_y = y - (base.height - base_shift) * scale - sup_kern * scale - sup_box.depth * child_scale;
+                let sup_x = x
+                    + (lbox.width * scale - sup_box.width * child_scale) / 2.0
+                    + slant * scale / 2.0;
+                let sup_y = y
+                    - (base.height - base_shift) * scale
+                    - sup_kern * scale
+                    - sup_box.depth * child_scale;
                 emit_box(sup_box, sup_x, sup_y, child_scale, items, font_str_cache);
             }
             if let Some(sub_box) = sub {
                 let child_scale = scale * bs;
-                let sub_x = x + (lbox.width * scale - sub_box.width * child_scale) / 2.0 - slant * scale / 2.0;
-                let sub_y = y + (base.depth + base_shift) * scale + sub_kern * scale + sub_box.height * child_scale;
+                let sub_x = x + (lbox.width * scale - sub_box.width * child_scale) / 2.0
+                    - slant * scale / 2.0;
+                let sub_y = y
+                    + (base.depth + base_shift) * scale
+                    + sub_kern * scale
+                    + sub_box.height * child_scale;
                 emit_box(sub_box, sub_x, sub_y, child_scale, items, font_str_cache);
             }
         }
@@ -356,8 +414,7 @@ fn emit_box(
             emit_box(base, x, y, scale, items, font_str_cache);
             if *is_below {
                 let accent_x = x + (base.width - accent.width) * scale / 2.0;
-                let accent_y =
-                    y + (base.depth + under_gap_em) * scale + accent.height * scale;
+                let accent_y = y + (base.depth + under_gap_em) * scale + accent.height * scale;
                 emit_box(accent, accent_x, accent_y, scale, items, font_str_cache);
             } else {
                 let accent_x = x + (base.width - accent.width) * scale / 2.0 + skew * scale;
@@ -510,8 +567,7 @@ fn emit_box(
                 if *tag_col_width > 0.0 {
                     if let Some(tb) = row_tags.get(r).and_then(|o| o.as_ref()) {
                         let tag_start_em = array_inner_width - content_x_offset + tag_gap_em;
-                        let tag_x =
-                            x + tag_start_em * scale + (tag_col_width - tb.width) * scale;
+                        let tag_x = x + tag_start_em * scale + (tag_col_width - tb.width) * scale;
                         emit_box(tb, tag_x, cur_y, scale, items, font_str_cache);
                     }
                 }
@@ -607,7 +663,10 @@ fn emit_box(
             emit_box(body, x, y, scale * child_scale, items, font_str_cache);
         }
 
-        BoxContent::Angl { path_commands, body } => {
+        BoxContent::Angl {
+            path_commands,
+            body,
+        } => {
             let scaled: Vec<PathCommand> = path_commands
                 .iter()
                 .map(|c| scale_path_command(c, scale))
@@ -622,7 +681,10 @@ fn emit_box(
             emit_box(body, x, y, scale, items, font_str_cache);
         }
 
-        BoxContent::Overline { body, rule_thickness } => {
+        BoxContent::Overline {
+            body,
+            rule_thickness,
+        } => {
             emit_box(body, x, y, scale, items, font_str_cache);
             // Rule center is at 2.5 * rule_thickness above the body's top
             let rule_center_y = y - (body.height + 2.5 * rule_thickness) * scale;
@@ -636,7 +698,10 @@ fn emit_box(
             });
         }
 
-        BoxContent::Underline { body, rule_thickness } => {
+        BoxContent::Underline {
+            body,
+            rule_thickness,
+        } => {
             emit_box(body, x, y, scale, items, font_str_cache);
             // Rule center is at 2.5 * rule_thickness below the body's bottom
             let rule_center_y = y + (body.depth + 2.5 * rule_thickness) * scale;
@@ -688,7 +753,14 @@ fn scale_path_command(cmd: &PathCommand, scale: f64) -> PathCommand {
             x: x * scale,
             y: y * scale,
         },
-        PathCommand::CubicTo { x1, y1, x2, y2, x, y } => PathCommand::CubicTo {
+        PathCommand::CubicTo {
+            x1,
+            y1,
+            x2,
+            y2,
+            x,
+            y,
+        } => PathCommand::CubicTo {
             x1: x1 * scale,
             y1: y1 * scale,
             x2: x2 * scale,
@@ -739,13 +811,25 @@ fn compute_visual_bounds(items: &[DisplayItem]) -> (f64, f64, f64, f64) {
                 min_y = min_y.min(y - h * scale);
                 max_y = max_y.max(y + d * scale);
             }
-            DisplayItem::Line { x, y, width, thickness, .. } => {
+            DisplayItem::Line {
+                x,
+                y,
+                width,
+                thickness,
+                ..
+            } => {
                 min_x = min_x.min(*x);
                 max_x = max_x.max(x + width);
                 min_y = min_y.min(y - thickness / 2.0);
                 max_y = max_y.max(y + thickness / 2.0);
             }
-            DisplayItem::Rect { x, y, width, height, .. } => {
+            DisplayItem::Rect {
+                x,
+                y,
+                width,
+                height,
+                ..
+            } => {
                 min_x = min_x.min(*x);
                 max_x = max_x.max(x + width);
                 min_y = min_y.min(*y);
@@ -772,7 +856,8 @@ fn compute_visual_bounds(items: &[DisplayItem]) -> (f64, f64, f64, f64) {
                         }
                     };
                     match cmd {
-                        PathCommand::MoveTo { x: cx, y: cy } | PathCommand::LineTo { x: cx, y: cy } => {
+                        PathCommand::MoveTo { x: cx, y: cy }
+                        | PathCommand::LineTo { x: cx, y: cy } => {
                             consider(*cx, *cy);
                         }
                         PathCommand::CubicTo {

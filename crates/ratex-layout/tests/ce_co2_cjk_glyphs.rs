@@ -10,7 +10,10 @@ fn ce_co2_line_emits_cjk_regular_for_simplified_chinese() {
     let dl = to_display_list(&lbox);
     let mut rows = Vec::new();
     for item in &dl.items {
-        if let DisplayItem::GlyphPath { font, char_code, .. } = item {
+        if let DisplayItem::GlyphPath {
+            font, char_code, ..
+        } = item
+        {
             if *char_code >= 0x4E00 {
                 let ch = char::from_u32(*char_code).unwrap();
                 rows.push(format!("{font} U+{:04X} {ch}", char_code));

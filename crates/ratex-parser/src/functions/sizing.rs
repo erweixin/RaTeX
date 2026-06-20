@@ -5,8 +5,17 @@ use crate::functions::{define_function_full, FunctionContext, FunctionSpec};
 use crate::parse_node::ParseNode;
 
 static SIZE_FUNCS: &[&str] = &[
-    "\\tiny", "\\sixptsize", "\\scriptsize", "\\footnotesize", "\\small",
-    "\\normalsize", "\\large", "\\Large", "\\LARGE", "\\huge", "\\Huge",
+    "\\tiny",
+    "\\sixptsize",
+    "\\scriptsize",
+    "\\footnotesize",
+    "\\small",
+    "\\normalsize",
+    "\\large",
+    "\\Large",
+    "\\LARGE",
+    "\\huge",
+    "\\Huge",
 ];
 
 pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
@@ -14,11 +23,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         SIZE_FUNCS,
         "sizing",
-        0, 0, None,
+        0,
+        0,
+        None,
         false,
         true, // allowed_in_text
         true,
-        false, false,
+        false,
+        false,
         handle_sizing,
     );
 }

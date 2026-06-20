@@ -54,13 +54,7 @@ pub fn katex_stretchy_arrow_path(
     katex_stretchy_path(label, width_em).map(|(cmds, _)| cmds)
 }
 
-
-fn scale_cmd_twohead_uniform(
-    cmd: &PathCommand,
-    s: f64,
-    vb_cy: f64,
-    x_shift: f64,
-) -> PathCommand {
+fn scale_cmd_twohead_uniform(cmd: &PathCommand, s: f64, vb_cy: f64, x_shift: f64) -> PathCommand {
     match *cmd {
         PathCommand::MoveTo { x, y } => PathCommand::MoveTo {
             x: x * s + x_shift,
@@ -70,7 +64,14 @@ fn scale_cmd_twohead_uniform(
             x: x * s + x_shift,
             y: (y - vb_cy) * s,
         },
-        PathCommand::CubicTo { x1, y1, x2, y2, x, y } => PathCommand::CubicTo {
+        PathCommand::CubicTo {
+            x1,
+            y1,
+            x2,
+            y2,
+            x,
+            y,
+        } => PathCommand::CubicTo {
             x1: x1 * s + x_shift,
             y1: (y1 - vb_cy) * s,
             x2: x2 * s + x_shift,
@@ -149,13 +150,26 @@ fn flatten_path_to_contours(commands: &[PathCommand]) -> Vec<Vec<(f64, f64)>> {
                 last = (x, y);
                 current.push(last);
             }
-            PathCommand::CubicTo { x1, y1, x2, y2, x, y } => {
+            PathCommand::CubicTo {
+                x1,
+                y1,
+                x2,
+                y2,
+                x,
+                y,
+            } => {
                 let (x0, y0) = last;
                 for k in 1..=N {
                     let t = k as f64 / N as f64;
                     let u = 1.0 - t;
-                    let x = u * u * u * x0 + 3.0 * u * u * t * x1 + 3.0 * u * t * t * x2 + t * t * t * x;
-                    let y = u * u * u * y0 + 3.0 * u * u * t * y1 + 3.0 * u * t * t * y2 + t * t * t * y;
+                    let x = u * u * u * x0
+                        + 3.0 * u * u * t * x1
+                        + 3.0 * u * t * t * x2
+                        + t * t * t * x;
+                    let y = u * u * u * y0
+                        + 3.0 * u * u * t * y1
+                        + 3.0 * u * t * t * y2
+                        + t * t * t * y;
                     last = (x, y);
                     current.push(last);
                 }
@@ -252,14 +266,8 @@ fn scale_svg_path_thousandths(cmds: &[PathCommand]) -> Vec<PathCommand> {
     let s = 0.001;
     cmds.iter()
         .map(|c| match *c {
-            PathCommand::MoveTo { x, y } => PathCommand::MoveTo {
-                x: x * s,
-                y: y * s,
-            },
-            PathCommand::LineTo { x, y } => PathCommand::LineTo {
-                x: x * s,
-                y: y * s,
-            },
+            PathCommand::MoveTo { x, y } => PathCommand::MoveTo { x: x * s, y: y * s },
+            PathCommand::LineTo { x, y } => PathCommand::LineTo { x: x * s, y: y * s },
             PathCommand::CubicTo {
                 x1,
                 y1,
@@ -333,9 +341,7 @@ fn parse_and_fit_nonuniform(
     let raw = parse_svg_path(svg_path);
     let sx = target_width_em / vb_width;
     let sy = target_height_em / vb_height;
-    raw.iter()
-        .map(|c| scale_cmd_xy(c, sx, sy))
-        .collect()
+    raw.iter().map(|c| scale_cmd_xy(c, sx, sy)).collect()
 }
 
 /// Build the overgroup/undergroup filled path from KaTeX leftgroup/rightgroup data.
@@ -365,54 +371,90 @@ fn build_overgroup(width_em: f64, h_em: f64, is_over: bool) -> Vec<PathCommand> 
     if is_over {
         vec![
             // Start at top-left, after corner
-            PathCommand::MoveTo { x: corner_em, y: ly(80.0) },
+            PathCommand::MoveTo {
+                x: corner_em,
+                y: ly(80.0),
+            },
             // Left outer curve down
             PathCommand::CubicTo {
-                x1: 64.0 * cx, y1: ly(80.0),
-                x2: 168.3 * cx, y2: ly(229.4),
-                x: 21.0 * cx, y: ly(260.0),
+                x1: 64.0 * cx,
+                y1: ly(80.0),
+                x2: 168.3 * cx,
+                y2: ly(229.4),
+                x: 21.0 * cx,
+                y: ly(260.0),
             },
             PathCommand::CubicTo {
-                x1: 15.1 * cx, y1: ly(261.2),
-                x2: 3.0 * cx, y2: ly(260.0),
-                x: 3.0 * cx, y: ly(260.0),
+                x1: 15.1 * cx,
+                y1: ly(261.2),
+                x2: 3.0 * cx,
+                y2: ly(260.0),
+                x: 3.0 * cx,
+                y: ly(260.0),
             },
             PathCommand::CubicTo {
-                x1: 1.0 * cx, y1: ly(260.0),
-                x2: 0.0, y2: ly(259.0),
-                x: 0.0, y: ly(257.0),
+                x1: 1.0 * cx,
+                y1: ly(260.0),
+                x2: 0.0,
+                y2: ly(259.0),
+                x: 0.0,
+                y: ly(257.0),
             },
-            PathCommand::LineTo { x: 0.0, y: ly(219.0) },
+            PathCommand::LineTo {
+                x: 0.0,
+                y: ly(219.0),
+            },
             // Left inner curve up
             PathCommand::CubicTo {
-                x1: 76.0 * cx, y1: ly(61.0),
-                x2: 257.0 * cx, y2: ly(0.0),
-                x: corner_em, y: ly(0.0),
+                x1: 76.0 * cx,
+                y1: ly(61.0),
+                x2: 257.0 * cx,
+                y2: ly(0.0),
+                x: corner_em,
+                y: ly(0.0),
             },
             // Bottom flat section
-            PathCommand::LineTo { x: width_em - corner_em, y: ly(0.0) },
+            PathCommand::LineTo {
+                x: width_em - corner_em,
+                y: ly(0.0),
+            },
             // Right inner curve down
             PathCommand::CubicTo {
-                x1: width_em - 257.0 * cx, y1: ly(0.0),
-                x2: width_em - 76.0 * cx, y2: ly(61.0),
-                x: width_em, y: ly(219.0),
+                x1: width_em - 257.0 * cx,
+                y1: ly(0.0),
+                x2: width_em - 76.0 * cx,
+                y2: ly(61.0),
+                x: width_em,
+                y: ly(219.0),
             },
-            PathCommand::LineTo { x: width_em, y: ly(257.0) },
+            PathCommand::LineTo {
+                x: width_em,
+                y: ly(257.0),
+            },
             // Right outer curves up
             PathCommand::CubicTo {
-                x1: width_em, y1: ly(259.0),
-                x2: width_em - 1.0 * cx, y2: ly(260.0),
-                x: width_em - 3.0 * cx, y: ly(260.0),
+                x1: width_em,
+                y1: ly(259.0),
+                x2: width_em - 1.0 * cx,
+                y2: ly(260.0),
+                x: width_em - 3.0 * cx,
+                y: ly(260.0),
             },
             PathCommand::CubicTo {
-                x1: width_em - 3.0 * cx, y1: ly(260.0),
-                x2: width_em - 15.1 * cx, y2: ly(261.2),
-                x: width_em - 21.0 * cx, y: ly(260.0),
+                x1: width_em - 3.0 * cx,
+                y1: ly(260.0),
+                x2: width_em - 15.1 * cx,
+                y2: ly(261.2),
+                x: width_em - 21.0 * cx,
+                y: ly(260.0),
             },
             PathCommand::CubicTo {
-                x1: width_em - 168.3 * cx, y1: ly(229.4),
-                x2: width_em - 64.0 * cx, y2: ly(80.0),
-                x: width_em - corner_em, y: ly(80.0),
+                x1: width_em - 168.3 * cx,
+                y1: ly(229.4),
+                x2: width_em - 64.0 * cx,
+                y2: ly(80.0),
+                x: width_em - corner_em,
+                y: ly(80.0),
             },
             PathCommand::Close,
         ]
@@ -422,49 +464,85 @@ fn build_overgroup(width_em: f64, h_em: f64, is_over: bool) -> Vec<PathCommand> 
         //   (435, 262) → C(64,262)(168.3,112.6)(21,82) → curves → (0,85) → V(0,123)
         //   Inner: (0,123) → C(76,281)(257,342)(435,342) → H → close
         vec![
-            PathCommand::MoveTo { x: corner_em, y: ly(262.0) },
-            PathCommand::CubicTo {
-                x1: 64.0 * cx, y1: ly(262.0),
-                x2: 168.3 * cx, y2: ly(112.6),
-                x: 21.0 * cx, y: ly(82.0),
+            PathCommand::MoveTo {
+                x: corner_em,
+                y: ly(262.0),
             },
             PathCommand::CubicTo {
-                x1: 15.1 * cx, y1: ly(80.8),
-                x2: 3.0 * cx, y2: ly(82.0),
-                x: 3.0 * cx, y: ly(82.0),
+                x1: 64.0 * cx,
+                y1: ly(262.0),
+                x2: 168.3 * cx,
+                y2: ly(112.6),
+                x: 21.0 * cx,
+                y: ly(82.0),
             },
             PathCommand::CubicTo {
-                x1: 1.0 * cx, y1: ly(82.0),
-                x2: 0.0, y2: ly(83.0),
-                x: 0.0, y: ly(85.0),
-            },
-            PathCommand::LineTo { x: 0.0, y: ly(123.0) },
-            PathCommand::CubicTo {
-                x1: 76.0 * cx, y1: ly(281.0),
-                x2: 257.0 * cx, y2: ly(342.0),
-                x: corner_em, y: ly(342.0),
-            },
-            PathCommand::LineTo { x: width_em - corner_em, y: ly(342.0) },
-            PathCommand::CubicTo {
-                x1: width_em - 257.0 * cx, y1: ly(342.0),
-                x2: width_em - 76.0 * cx, y2: ly(281.0),
-                x: width_em, y: ly(123.0),
-            },
-            PathCommand::LineTo { x: width_em, y: ly(85.0) },
-            PathCommand::CubicTo {
-                x1: width_em, y1: ly(83.0),
-                x2: width_em - 1.0 * cx, y2: ly(82.0),
-                x: width_em - 3.0 * cx, y: ly(82.0),
+                x1: 15.1 * cx,
+                y1: ly(80.8),
+                x2: 3.0 * cx,
+                y2: ly(82.0),
+                x: 3.0 * cx,
+                y: ly(82.0),
             },
             PathCommand::CubicTo {
-                x1: width_em - 3.0 * cx, y1: ly(82.0),
-                x2: width_em - 15.1 * cx, y2: ly(80.8),
-                x: width_em - 21.0 * cx, y: ly(82.0),
+                x1: 1.0 * cx,
+                y1: ly(82.0),
+                x2: 0.0,
+                y2: ly(83.0),
+                x: 0.0,
+                y: ly(85.0),
+            },
+            PathCommand::LineTo {
+                x: 0.0,
+                y: ly(123.0),
             },
             PathCommand::CubicTo {
-                x1: width_em - 168.3 * cx, y1: ly(112.6),
-                x2: width_em - 64.0 * cx, y2: ly(262.0),
-                x: width_em - corner_em, y: ly(262.0),
+                x1: 76.0 * cx,
+                y1: ly(281.0),
+                x2: 257.0 * cx,
+                y2: ly(342.0),
+                x: corner_em,
+                y: ly(342.0),
+            },
+            PathCommand::LineTo {
+                x: width_em - corner_em,
+                y: ly(342.0),
+            },
+            PathCommand::CubicTo {
+                x1: width_em - 257.0 * cx,
+                y1: ly(342.0),
+                x2: width_em - 76.0 * cx,
+                y2: ly(281.0),
+                x: width_em,
+                y: ly(123.0),
+            },
+            PathCommand::LineTo {
+                x: width_em,
+                y: ly(85.0),
+            },
+            PathCommand::CubicTo {
+                x1: width_em,
+                y1: ly(83.0),
+                x2: width_em - 1.0 * cx,
+                y2: ly(82.0),
+                x: width_em - 3.0 * cx,
+                y: ly(82.0),
+            },
+            PathCommand::CubicTo {
+                x1: width_em - 3.0 * cx,
+                y1: ly(82.0),
+                x2: width_em - 15.1 * cx,
+                y2: ly(80.8),
+                x: width_em - 21.0 * cx,
+                y: ly(82.0),
+            },
+            PathCommand::CubicTo {
+                x1: width_em - 168.3 * cx,
+                y1: ly(112.6),
+                x2: width_em - 64.0 * cx,
+                y2: ly(262.0),
+                x: width_em - corner_em,
+                y: ly(262.0),
             },
             PathCommand::Close,
         ]
@@ -473,16 +551,34 @@ fn build_overgroup(width_em: f64, h_em: f64, is_over: bool) -> Vec<PathCommand> 
 
 fn scale_cmd_xy(cmd: &PathCommand, sx: f64, sy: f64) -> PathCommand {
     match *cmd {
-        PathCommand::MoveTo { x, y } => PathCommand::MoveTo { x: x * sx, y: y * sy },
-        PathCommand::LineTo { x, y } => PathCommand::LineTo { x: x * sx, y: y * sy },
-        PathCommand::CubicTo { x1, y1, x2, y2, x, y } => PathCommand::CubicTo {
-            x1: x1 * sx, y1: y1 * sy,
-            x2: x2 * sx, y2: y2 * sy,
-            x: x * sx, y: y * sy,
+        PathCommand::MoveTo { x, y } => PathCommand::MoveTo {
+            x: x * sx,
+            y: y * sy,
+        },
+        PathCommand::LineTo { x, y } => PathCommand::LineTo {
+            x: x * sx,
+            y: y * sy,
+        },
+        PathCommand::CubicTo {
+            x1,
+            y1,
+            x2,
+            y2,
+            x,
+            y,
+        } => PathCommand::CubicTo {
+            x1: x1 * sx,
+            y1: y1 * sy,
+            x2: x2 * sx,
+            y2: y2 * sy,
+            x: x * sx,
+            y: y * sy,
         },
         PathCommand::QuadTo { x1, y1, x, y } => PathCommand::QuadTo {
-            x1: x1 * sx, y1: y1 * sy,
-            x: x * sx, y: y * sy,
+            x1: x1 * sx,
+            y1: y1 * sy,
+            x: x * sx,
+            y: y * sy,
         },
         PathCommand::Close => PathCommand::Close,
     }
@@ -508,34 +604,41 @@ fn parse_svg_path(d: &str) -> Vec<PathCommand> {
 
     while i < tokens.len() {
         let cmd_byte = match &tokens[i] {
-            Token::Cmd(c) => { i += 1; *c }
+            Token::Cmd(c) => {
+                i += 1;
+                *c
+            }
             Token::Num(_) => last_cmd,
         };
 
         match cmd_byte {
             b'M' => {
                 let (x, y) = read2(&tokens, &mut i);
-                cx = x; cy = y;
+                cx = x;
+                cy = y;
                 subpath_start = (cx, cy);
                 cmds.push(PathCommand::MoveTo { x, y });
                 last_cmd = b'L';
             }
             b'm' => {
                 let (dx, dy) = read2(&tokens, &mut i);
-                cx += dx; cy += dy;
+                cx += dx;
+                cy += dy;
                 subpath_start = (cx, cy);
                 cmds.push(PathCommand::MoveTo { x: cx, y: cy });
                 last_cmd = b'l';
             }
             b'L' => {
                 let (x, y) = read2(&tokens, &mut i);
-                cx = x; cy = y;
+                cx = x;
+                cy = y;
                 cmds.push(PathCommand::LineTo { x, y });
                 last_cmd = b'L';
             }
             b'l' => {
                 let (dx, dy) = read2(&tokens, &mut i);
-                cx += dx; cy += dy;
+                cx += dx;
+                cy += dy;
                 cmds.push(PathCommand::LineTo { x: cx, y: cy });
                 last_cmd = b'l';
             }
@@ -567,50 +670,95 @@ fn parse_svg_path(d: &str) -> Vec<PathCommand> {
                 let (x1, y1) = read2(&tokens, &mut i);
                 let (x2, y2) = read2(&tokens, &mut i);
                 let (x, y) = read2(&tokens, &mut i);
-                cx = x; cy = y;
-                cmds.push(PathCommand::CubicTo { x1, y1, x2, y2, x, y });
+                cx = x;
+                cy = y;
+                cmds.push(PathCommand::CubicTo {
+                    x1,
+                    y1,
+                    x2,
+                    y2,
+                    x,
+                    y,
+                });
                 last_cmd = b'C';
             }
             b'c' => {
                 let (dx1, dy1) = read2(&tokens, &mut i);
                 let (dx2, dy2) = read2(&tokens, &mut i);
                 let (dx, dy) = read2(&tokens, &mut i);
-                let x1 = cx + dx1; let y1 = cy + dy1;
-                let x2 = cx + dx2; let y2 = cy + dy2;
-                cx += dx; cy += dy;
-                cmds.push(PathCommand::CubicTo { x1, y1, x2, y2, x: cx, y: cy });
+                let x1 = cx + dx1;
+                let y1 = cy + dy1;
+                let x2 = cx + dx2;
+                let y2 = cy + dy2;
+                cx += dx;
+                cy += dy;
+                cmds.push(PathCommand::CubicTo {
+                    x1,
+                    y1,
+                    x2,
+                    y2,
+                    x: cx,
+                    y: cy,
+                });
                 last_cmd = b'c';
             }
             b'S' => {
                 let (x2, y2) = read2(&tokens, &mut i);
                 let (x, y) = read2(&tokens, &mut i);
-                let x1 = cx; let y1 = cy;
-                cx = x; cy = y;
-                cmds.push(PathCommand::CubicTo { x1, y1, x2, y2, x, y });
+                let x1 = cx;
+                let y1 = cy;
+                cx = x;
+                cy = y;
+                cmds.push(PathCommand::CubicTo {
+                    x1,
+                    y1,
+                    x2,
+                    y2,
+                    x,
+                    y,
+                });
                 last_cmd = b'S';
             }
             b's' => {
                 let (dx2, dy2) = read2(&tokens, &mut i);
                 let (dx, dy) = read2(&tokens, &mut i);
-                let x1 = cx; let y1 = cy;
-                let x2 = cx + dx2; let y2 = cy + dy2;
-                cx += dx; cy += dy;
-                cmds.push(PathCommand::CubicTo { x1, y1, x2, y2, x: cx, y: cy });
+                let x1 = cx;
+                let y1 = cy;
+                let x2 = cx + dx2;
+                let y2 = cy + dy2;
+                cx += dx;
+                cy += dy;
+                cmds.push(PathCommand::CubicTo {
+                    x1,
+                    y1,
+                    x2,
+                    y2,
+                    x: cx,
+                    y: cy,
+                });
                 last_cmd = b's';
             }
             b'Q' => {
                 let (x1, y1) = read2(&tokens, &mut i);
                 let (x, y) = read2(&tokens, &mut i);
-                cx = x; cy = y;
+                cx = x;
+                cy = y;
                 cmds.push(PathCommand::QuadTo { x1, y1, x, y });
                 last_cmd = b'Q';
             }
             b'q' => {
                 let (dx1, dy1) = read2(&tokens, &mut i);
                 let (dx, dy) = read2(&tokens, &mut i);
-                let x1 = cx + dx1; let y1 = cy + dy1;
-                cx += dx; cy += dy;
-                cmds.push(PathCommand::QuadTo { x1, y1, x: cx, y: cy });
+                let x1 = cx + dx1;
+                let y1 = cy + dy1;
+                cx += dx;
+                cy += dy;
+                cmds.push(PathCommand::QuadTo {
+                    x1,
+                    y1,
+                    x: cx,
+                    y: cy,
+                });
                 last_cmd = b'q';
             }
             b'Z' | b'z' => {
@@ -620,7 +768,9 @@ fn parse_svg_path(d: &str) -> Vec<PathCommand> {
                 cy = subpath_start.1;
                 last_cmd = b'M';
             }
-            _ => { i += 1; }
+            _ => {
+                i += 1;
+            }
         }
     }
     cmds
@@ -643,13 +793,20 @@ fn tokenize_svg(d: &str) -> Vec<Token> {
             i += 1;
         } else if b == b'-' || b == b'.' || b.is_ascii_digit() {
             let start = i;
-            if b == b'-' { i += 1; }
-            let mut has_dot = false;
-            while i < bytes.len() && (bytes[i].is_ascii_digit() || (bytes[i] == b'.' && !has_dot)) {
-                if bytes[i] == b'.' { has_dot = true; }
+            if b == b'-' {
                 i += 1;
             }
-            if let Ok(n) = std::str::from_utf8(&bytes[start..i]).unwrap_or("0").parse::<f64>() {
+            let mut has_dot = false;
+            while i < bytes.len() && (bytes[i].is_ascii_digit() || (bytes[i] == b'.' && !has_dot)) {
+                if bytes[i] == b'.' {
+                    has_dot = true;
+                }
+                i += 1;
+            }
+            if let Ok(n) = std::str::from_utf8(&bytes[start..i])
+                .unwrap_or("0")
+                .parse::<f64>()
+            {
                 tokens.push(Token::Num(n));
             }
         } else {
@@ -661,7 +818,10 @@ fn tokenize_svg(d: &str) -> Vec<Token> {
 
 fn read1(tokens: &[Token], i: &mut usize) -> f64 {
     if *i < tokens.len() {
-        if let Token::Num(n) = tokens[*i] { *i += 1; return n; }
+        if let Token::Num(n) = tokens[*i] {
+            *i += 1;
+            return n;
+        }
     }
     0.0
 }
@@ -813,13 +973,16 @@ const BARABOVELEFTARROW: &str = "M400000 620h-399890l3-3c68.7-52.7 113.7-120 135
 const RIGHTARROWABOVEBAR: &str = "M0 241v40h399891c-47.3 35.3-84 78-110 128-16.7 32-27.7 63.7-33 95 0 1.3-.2 2.7-.5 4-.3 1.3-.5 2.3-.5 3 0 7.3 6.7 11 20 11 8 0 13.2-.8 15.5-2.5 2.3-1.7 4.2-5.5 5.5-11.5 2-13.3 5.7-27 11-41 14.7-44.7 39-84.5 73-119.5s73.7-60.2 119-75.5c6-2 9-5.7 9-11s-3-9-9-11c-45.3-15.3-85-40.5-119-75.5s-58.3-74.8-73-119.5c-4.7-14-8.3-27.3-11-40-1.3-6.7-3.2-10.8-5.5-12.5-2.3-1.7-7.5-2.5-15.5-2.5-14 0-21 3.7-21 11 0 2 2 10.3 6 25 20.7 83.3 67 151.7 139 205zm96 379h399894v40H0zm0 0h399904v40H0z";
 
 // longequal (viewBox 400000×334)
-const LONGEQUAL: &str = "M0 50 h400000 v40H0z m0 194h400000v40H0z M0 50 h400000 v40H0z m0 194h400000v40H0z";
+const LONGEQUAL: &str =
+    "M0 50 h400000 v40H0z m0 194h400000v40H0z M0 50 h400000 v40H0z m0 194h400000v40H0z";
 
 // leftlinesegment (viewBox 400000×522)
-const LEFTLINESEGMENT: &str = "M40 281 V428 H0 V94 H40 V241 H400000 v40z M40 281 V428 H0 V94 H40 V241 H400000 v40z";
+const LEFTLINESEGMENT: &str =
+    "M40 281 V428 H0 V94 H40 V241 H400000 v40z M40 281 V428 H0 V94 H40 V241 H400000 v40z";
 
 // rightlinesegment (viewBox 400000×522)
-const RIGHTLINESEGMENT: &str = "M399960 241 V94 h40 V428 h-40 V281 H0 v-40z M399960 241 V94 h40 V428 h-40 V281 H0 v-40z";
+const RIGHTLINESEGMENT: &str =
+    "M399960 241 V94 h40 V428 h-40 V281 H0 v-40z M399960 241 V94 h40 V428 h-40 V281 H0 v-40z";
 
 // leftgroup (for \overgroup, viewBox 400000×342)
 const LEFTGROUP: &str = "M400000 80 H435C64 80 168.3 229.4 21 260c-5.9 1.2-18 0-18 0-2 0-3-1-3-3v-38C76 61 257 0 435 0h399565z";
@@ -857,50 +1020,250 @@ struct KatexImageData {
 fn katex_image_data(label: &str) -> Option<KatexImageData> {
     let key = label.trim_start_matches('\\');
     match key {
-        "overrightarrow"  => Some(KatexImageData { paths: &["rightarrow"],  min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
-        "overleftarrow"   => Some(KatexImageData { paths: &["leftarrow"],   min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
-        "underrightarrow" => Some(KatexImageData { paths: &["rightarrow"],  min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
-        "underleftarrow"  => Some(KatexImageData { paths: &["leftarrow"],   min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
-        "xrightarrow"     => Some(KatexImageData { paths: &["rightarrow"],  min_width: 1.469, vb_height: 522.0, align: Some("xMaxYMin") }),
+        "overrightarrow" => Some(KatexImageData {
+            paths: &["rightarrow"],
+            min_width: 0.888,
+            vb_height: 522.0,
+            align: Some("xMaxYMin"),
+        }),
+        "overleftarrow" => Some(KatexImageData {
+            paths: &["leftarrow"],
+            min_width: 0.888,
+            vb_height: 522.0,
+            align: Some("xMinYMin"),
+        }),
+        "underrightarrow" => Some(KatexImageData {
+            paths: &["rightarrow"],
+            min_width: 0.888,
+            vb_height: 522.0,
+            align: Some("xMaxYMin"),
+        }),
+        "underleftarrow" => Some(KatexImageData {
+            paths: &["leftarrow"],
+            min_width: 0.888,
+            vb_height: 522.0,
+            align: Some("xMinYMin"),
+        }),
+        "xrightarrow" => Some(KatexImageData {
+            paths: &["rightarrow"],
+            min_width: 1.469,
+            vb_height: 522.0,
+            align: Some("xMaxYMin"),
+        }),
         // KaTeX `stretchy.js` `katexImagesData`: `\\cdrightarrow` / `\\cdlongequal` use minWidth 3.0em
         // (comment “CD minwwidth2.5pc” — amscd `\minCDarrowwidth`, ~2.5pc ≈ 3em at 10pt).
-        "cdrightarrow"    => Some(KatexImageData { paths: &["rightarrow"],  min_width: 3.0, vb_height: 522.0, align: Some("xMaxYMin") }),
-        "cdleftarrow"     => Some(KatexImageData { paths: &["leftarrow"],   min_width: 3.0, vb_height: 522.0, align: Some("xMinYMin") }),
-        "xleftarrow"      => Some(KatexImageData { paths: &["leftarrow"],   min_width: 1.469, vb_height: 522.0, align: Some("xMinYMin") }),
-        "Overrightarrow"  => Some(KatexImageData { paths: &["doublerightarrow"], min_width: 0.888, vb_height: 560.0, align: Some("xMaxYMin") }),
-        "xRightarrow"     => Some(KatexImageData { paths: &["doublerightarrow"], min_width: 1.526, vb_height: 560.0, align: Some("xMaxYMin") }),
-        "xLeftarrow"      => Some(KatexImageData { paths: &["doubleleftarrow"],  min_width: 1.526, vb_height: 560.0, align: Some("xMinYMin") }),
-        "overleftharpoon" | "xleftharpoonup"    => Some(KatexImageData { paths: &["leftharpoon"],  min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
-        "xleftharpoondown"                      => Some(KatexImageData { paths: &["leftharpoondown"], min_width: 0.888, vb_height: 522.0, align: Some("xMinYMin") }),
-        "overrightharpoon" | "xrightharpoonup"  => Some(KatexImageData { paths: &["rightharpoon"], min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
-        "xrightharpoondown"                     => Some(KatexImageData { paths: &["rightharpoondown"], min_width: 0.888, vb_height: 522.0, align: Some("xMaxYMin") }),
-        "xlongequal"         => Some(KatexImageData { paths: &["longequal"],   min_width: 0.888, vb_height: 334.0, align: Some("xMinYMin") }),
-        "cdlongequal"        => Some(KatexImageData { paths: &["longequal"],   min_width: 3.0, vb_height: 334.0, align: Some("xMinYMin") }),
-        "xtwoheadleftarrow"  => Some(KatexImageData { paths: &["twoheadleftarrow"],  min_width: 0.888, vb_height: 334.0, align: Some("xMinYMin") }),
-        "xtwoheadrightarrow" => Some(KatexImageData { paths: &["twoheadrightarrow"], min_width: 0.888, vb_height: 334.0, align: Some("xMaxYMin") }),
-        "overleftrightarrow"  => Some(KatexImageData { paths: &["leftarrow", "rightarrow"], min_width: 0.888, vb_height: 522.0, align: None }),
-        "underleftrightarrow" => Some(KatexImageData { paths: &["leftarrow", "rightarrow"], min_width: 0.888, vb_height: 522.0, align: None }),
-        "xleftrightarrow"    => Some(KatexImageData { paths: &["leftarrow", "rightarrow"], min_width: 1.75, vb_height: 522.0, align: None }),
-        "xLeftrightarrow"    => Some(KatexImageData { paths: &["doubleleftarrow", "doublerightarrow"], min_width: 1.75, vb_height: 560.0, align: None }),
-        "xrightleftharpoons" => Some(KatexImageData { paths: &["leftharpoondownplus", "rightharpoonplus"], min_width: 1.75, vb_height: 716.0, align: None }),
-        "xleftrightharpoons" => Some(KatexImageData { paths: &["leftharpoonplus", "rightharpoondownplus"], min_width: 1.75, vb_height: 716.0, align: None }),
-        "xrightequilibrium" => Some(KatexImageData { paths: &["baraboveshortleftharpoon", "rightharpoonaboveshortbar"], min_width: 1.75, vb_height: 716.0, align: None }),
-        "xleftequilibrium" => Some(KatexImageData { paths: &["shortbaraboveleftharpoon", "shortrightharpoonabovebar"], min_width: 1.75, vb_height: 716.0, align: None }),
-        "xhookleftarrow"     => Some(KatexImageData { paths: &["leftarrow", "righthook"],  min_width: 1.08, vb_height: 522.0, align: None }),
-        "xhookrightarrow"    => Some(KatexImageData { paths: &["lefthook", "rightarrow"],  min_width: 1.08, vb_height: 522.0, align: None }),
-        "overlinesegment"    => Some(KatexImageData { paths: &["leftlinesegment", "rightlinesegment"], min_width: 0.888, vb_height: 522.0, align: None }),
-        "underlinesegment"   => Some(KatexImageData { paths: &["leftlinesegment", "rightlinesegment"], min_width: 0.888, vb_height: 522.0, align: None }),
-        "overgroup"          => Some(KatexImageData { paths: &["leftgroup", "rightgroup"], min_width: 0.888, vb_height: 342.0, align: None }),
-        "undergroup"         => Some(KatexImageData { paths: &["leftgroupunder", "rightgroupunder"], min_width: 0.888, vb_height: 342.0, align: None }),
-        "xmapsto"            => Some(KatexImageData { paths: &["leftmapsto", "rightarrow"], min_width: 1.5, vb_height: 522.0, align: None }),
-        "xtofrom"            => Some(KatexImageData { paths: &["leftToFrom", "rightToFrom"], min_width: 1.75, vb_height: 528.0, align: None }),
-        "xrightleftarrows"   => Some(KatexImageData { paths: &["baraboveleftarrow", "rightarrowabovebar"], min_width: 1.75, vb_height: 901.0, align: None }),
+        "cdrightarrow" => Some(KatexImageData {
+            paths: &["rightarrow"],
+            min_width: 3.0,
+            vb_height: 522.0,
+            align: Some("xMaxYMin"),
+        }),
+        "cdleftarrow" => Some(KatexImageData {
+            paths: &["leftarrow"],
+            min_width: 3.0,
+            vb_height: 522.0,
+            align: Some("xMinYMin"),
+        }),
+        "xleftarrow" => Some(KatexImageData {
+            paths: &["leftarrow"],
+            min_width: 1.469,
+            vb_height: 522.0,
+            align: Some("xMinYMin"),
+        }),
+        "Overrightarrow" => Some(KatexImageData {
+            paths: &["doublerightarrow"],
+            min_width: 0.888,
+            vb_height: 560.0,
+            align: Some("xMaxYMin"),
+        }),
+        "xRightarrow" => Some(KatexImageData {
+            paths: &["doublerightarrow"],
+            min_width: 1.526,
+            vb_height: 560.0,
+            align: Some("xMaxYMin"),
+        }),
+        "xLeftarrow" => Some(KatexImageData {
+            paths: &["doubleleftarrow"],
+            min_width: 1.526,
+            vb_height: 560.0,
+            align: Some("xMinYMin"),
+        }),
+        "overleftharpoon" | "xleftharpoonup" => Some(KatexImageData {
+            paths: &["leftharpoon"],
+            min_width: 0.888,
+            vb_height: 522.0,
+            align: Some("xMinYMin"),
+        }),
+        "xleftharpoondown" => Some(KatexImageData {
+            paths: &["leftharpoondown"],
+            min_width: 0.888,
+            vb_height: 522.0,
+            align: Some("xMinYMin"),
+        }),
+        "overrightharpoon" | "xrightharpoonup" => Some(KatexImageData {
+            paths: &["rightharpoon"],
+            min_width: 0.888,
+            vb_height: 522.0,
+            align: Some("xMaxYMin"),
+        }),
+        "xrightharpoondown" => Some(KatexImageData {
+            paths: &["rightharpoondown"],
+            min_width: 0.888,
+            vb_height: 522.0,
+            align: Some("xMaxYMin"),
+        }),
+        "xlongequal" => Some(KatexImageData {
+            paths: &["longequal"],
+            min_width: 0.888,
+            vb_height: 334.0,
+            align: Some("xMinYMin"),
+        }),
+        "cdlongequal" => Some(KatexImageData {
+            paths: &["longequal"],
+            min_width: 3.0,
+            vb_height: 334.0,
+            align: Some("xMinYMin"),
+        }),
+        "xtwoheadleftarrow" => Some(KatexImageData {
+            paths: &["twoheadleftarrow"],
+            min_width: 0.888,
+            vb_height: 334.0,
+            align: Some("xMinYMin"),
+        }),
+        "xtwoheadrightarrow" => Some(KatexImageData {
+            paths: &["twoheadrightarrow"],
+            min_width: 0.888,
+            vb_height: 334.0,
+            align: Some("xMaxYMin"),
+        }),
+        "overleftrightarrow" => Some(KatexImageData {
+            paths: &["leftarrow", "rightarrow"],
+            min_width: 0.888,
+            vb_height: 522.0,
+            align: None,
+        }),
+        "underleftrightarrow" => Some(KatexImageData {
+            paths: &["leftarrow", "rightarrow"],
+            min_width: 0.888,
+            vb_height: 522.0,
+            align: None,
+        }),
+        "xleftrightarrow" => Some(KatexImageData {
+            paths: &["leftarrow", "rightarrow"],
+            min_width: 1.75,
+            vb_height: 522.0,
+            align: None,
+        }),
+        "xLeftrightarrow" => Some(KatexImageData {
+            paths: &["doubleleftarrow", "doublerightarrow"],
+            min_width: 1.75,
+            vb_height: 560.0,
+            align: None,
+        }),
+        "xrightleftharpoons" => Some(KatexImageData {
+            paths: &["leftharpoondownplus", "rightharpoonplus"],
+            min_width: 1.75,
+            vb_height: 716.0,
+            align: None,
+        }),
+        "xleftrightharpoons" => Some(KatexImageData {
+            paths: &["leftharpoonplus", "rightharpoondownplus"],
+            min_width: 1.75,
+            vb_height: 716.0,
+            align: None,
+        }),
+        "xrightequilibrium" => Some(KatexImageData {
+            paths: &["baraboveshortleftharpoon", "rightharpoonaboveshortbar"],
+            min_width: 1.75,
+            vb_height: 716.0,
+            align: None,
+        }),
+        "xleftequilibrium" => Some(KatexImageData {
+            paths: &["shortbaraboveleftharpoon", "shortrightharpoonabovebar"],
+            min_width: 1.75,
+            vb_height: 716.0,
+            align: None,
+        }),
+        "xhookleftarrow" => Some(KatexImageData {
+            paths: &["leftarrow", "righthook"],
+            min_width: 1.08,
+            vb_height: 522.0,
+            align: None,
+        }),
+        "xhookrightarrow" => Some(KatexImageData {
+            paths: &["lefthook", "rightarrow"],
+            min_width: 1.08,
+            vb_height: 522.0,
+            align: None,
+        }),
+        "overlinesegment" => Some(KatexImageData {
+            paths: &["leftlinesegment", "rightlinesegment"],
+            min_width: 0.888,
+            vb_height: 522.0,
+            align: None,
+        }),
+        "underlinesegment" => Some(KatexImageData {
+            paths: &["leftlinesegment", "rightlinesegment"],
+            min_width: 0.888,
+            vb_height: 522.0,
+            align: None,
+        }),
+        "overgroup" => Some(KatexImageData {
+            paths: &["leftgroup", "rightgroup"],
+            min_width: 0.888,
+            vb_height: 342.0,
+            align: None,
+        }),
+        "undergroup" => Some(KatexImageData {
+            paths: &["leftgroupunder", "rightgroupunder"],
+            min_width: 0.888,
+            vb_height: 342.0,
+            align: None,
+        }),
+        "xmapsto" => Some(KatexImageData {
+            paths: &["leftmapsto", "rightarrow"],
+            min_width: 1.5,
+            vb_height: 522.0,
+            align: None,
+        }),
+        "xtofrom" => Some(KatexImageData {
+            paths: &["leftToFrom", "rightToFrom"],
+            min_width: 1.75,
+            vb_height: 528.0,
+            align: None,
+        }),
+        "xrightleftarrows" => Some(KatexImageData {
+            paths: &["baraboveleftarrow", "rightarrowabovebar"],
+            min_width: 1.75,
+            vb_height: 901.0,
+            align: None,
+        }),
         // Overbrace/underbrace: KaTeX Size4 glyphs (viewBox 400000×548), same 3-piece horizontal joining as stretchy arrows.
-        "overbrace"  => Some(KatexImageData { paths: &["leftbrace", "midbrace", "rightbrace"], min_width: 0.888, vb_height: 548.0, align: None }),
-        "underbrace" => Some(KatexImageData { paths: &["leftbraceunder", "midbraceunder", "rightbraceunder"], min_width: 0.888, vb_height: 548.0, align: None }),
+        "overbrace" => Some(KatexImageData {
+            paths: &["leftbrace", "midbrace", "rightbrace"],
+            min_width: 0.888,
+            vb_height: 548.0,
+            align: None,
+        }),
+        "underbrace" => Some(KatexImageData {
+            paths: &["leftbraceunder", "midbraceunder", "rightbraceunder"],
+            min_width: 0.888,
+            vb_height: 548.0,
+            align: None,
+        }),
         // mathtools `\overbracket` / `\underbracket`: 2-piece KaTeX SVG (same minWidth/height as KaTeX `stretchy.ts`).
-        "overbracket"  => Some(KatexImageData { paths: &["leftbracketover", "rightbracketover"], min_width: 1.6, vb_height: 440.0, align: None }),
-        "underbracket" => Some(KatexImageData { paths: &["leftbracketunder", "rightbracketunder"], min_width: 1.6, vb_height: 410.0, align: None }),
+        "overbracket" => Some(KatexImageData {
+            paths: &["leftbracketover", "rightbracketover"],
+            min_width: 1.6,
+            vb_height: 440.0,
+            align: None,
+        }),
+        "underbracket" => Some(KatexImageData {
+            paths: &["leftbracketunder", "rightbracketunder"],
+            min_width: 1.6,
+            vb_height: 410.0,
+            align: None,
+        }),
         _ => None,
     }
 }
@@ -914,48 +1277,48 @@ pub(crate) fn katex_stretchy_min_width_em(label: &str) -> Option<f64> {
 /// Look up the SVG path data for a named path key.
 fn path_for_name(name: &str) -> Option<&'static str> {
     match name {
-        "rightarrow"           => Some(RIGHTARROW),
-        "leftarrow"            => Some(LEFTARROW),
-        "doubleleftarrow"      => Some(DOUBLELEFTARROW),
-        "doublerightarrow"     => Some(DOUBLERIGHTARROW),
-        "leftharpoon"          => Some(LEFTHARPOON),
-        "leftharpoonplus"      => Some(LEFTHARPOONPLUS),
-        "leftharpoondown"      => Some(LEFTHARPOONDOWN),
-        "leftharpoondownplus"  => Some(LEFTHARPOONDOWNPLUS),
-        "rightharpoon"         => Some(RIGHTHARPOON),
-        "rightharpoonplus"     => Some(RIGHTHARPOONPLUS),
-        "rightharpoondown"     => Some(RIGHTHARPOONDOWN),
+        "rightarrow" => Some(RIGHTARROW),
+        "leftarrow" => Some(LEFTARROW),
+        "doubleleftarrow" => Some(DOUBLELEFTARROW),
+        "doublerightarrow" => Some(DOUBLERIGHTARROW),
+        "leftharpoon" => Some(LEFTHARPOON),
+        "leftharpoonplus" => Some(LEFTHARPOONPLUS),
+        "leftharpoondown" => Some(LEFTHARPOONDOWN),
+        "leftharpoondownplus" => Some(LEFTHARPOONDOWNPLUS),
+        "rightharpoon" => Some(RIGHTHARPOON),
+        "rightharpoonplus" => Some(RIGHTHARPOONPLUS),
+        "rightharpoondown" => Some(RIGHTHARPOONDOWN),
         "rightharpoondownplus" => Some(RIGHTHARPOONDOWNPLUS),
         "baraboveshortleftharpoon" => Some(BARABOVESHORTLEFTHARPOON),
         "rightharpoonaboveshortbar" => Some(RIGHTHARPOONABOVESHORTBAR),
         "shortbaraboveleftharpoon" => Some(SHORTBARABOVELEFTHARPOON),
         "shortrightharpoonabovebar" => Some(SHORTRIGHTHARPOONABOVEBAR),
-        "lefthook"             => Some(LEFTHOOK),
-        "righthook"            => Some(RIGHTHOOK),
-        "leftbrace"            => Some(LEFTBRACE),
-        "midbrace"             => Some(MIDBRACE),
-        "rightbrace"           => Some(RIGHTBRACE),
-        "leftbraceunder"       => Some(LEFTBRACEUNDER),
-        "midbraceunder"        => Some(MIDBRACEUNDER),
-        "rightbraceunder"      => Some(RIGHTBRACEUNDER),
-        "leftToFrom"           => Some(LEFTTOFROM),
-        "rightToFrom"          => Some(RIGHTTOFROM),
-        "baraboveleftarrow"    => Some(BARABOVELEFTARROW),
-        "rightarrowabovebar"   => Some(RIGHTARROWABOVEBAR),
-        "longequal"            => Some(LONGEQUAL),
-        "leftlinesegment"      => Some(LEFTLINESEGMENT),
-        "rightlinesegment"     => Some(RIGHTLINESEGMENT),
-        "leftmapsto"           => Some(LEFTMAPSTO),
-        "twoheadleftarrow"     => Some(TWOHEADLEFTARROW),
-        "twoheadrightarrow"    => Some(TWOHEADRIGHTARROW),
-        "leftgroup"            => Some(LEFTGROUP),
-        "leftgroupunder"       => Some(LEFTGROUPUNDER),
-        "rightgroup"           => Some(RIGHTGROUP),
-        "rightgroupunder"      => Some(RIGHTGROUPUNDER),
-        "leftbracketover"      => Some(LEFTBRACKETOVER),
-        "rightbracketover"     => Some(RIGHTBRACKETOVER),
-        "leftbracketunder"     => Some(LEFTBRACKETUNDER),
-        "rightbracketunder"    => Some(RIGHTBRACKETUNDER),
+        "lefthook" => Some(LEFTHOOK),
+        "righthook" => Some(RIGHTHOOK),
+        "leftbrace" => Some(LEFTBRACE),
+        "midbrace" => Some(MIDBRACE),
+        "rightbrace" => Some(RIGHTBRACE),
+        "leftbraceunder" => Some(LEFTBRACEUNDER),
+        "midbraceunder" => Some(MIDBRACEUNDER),
+        "rightbraceunder" => Some(RIGHTBRACEUNDER),
+        "leftToFrom" => Some(LEFTTOFROM),
+        "rightToFrom" => Some(RIGHTTOFROM),
+        "baraboveleftarrow" => Some(BARABOVELEFTARROW),
+        "rightarrowabovebar" => Some(RIGHTARROWABOVEBAR),
+        "longequal" => Some(LONGEQUAL),
+        "leftlinesegment" => Some(LEFTLINESEGMENT),
+        "rightlinesegment" => Some(RIGHTLINESEGMENT),
+        "leftmapsto" => Some(LEFTMAPSTO),
+        "twoheadleftarrow" => Some(TWOHEADLEFTARROW),
+        "twoheadrightarrow" => Some(TWOHEADRIGHTARROW),
+        "leftgroup" => Some(LEFTGROUP),
+        "leftgroupunder" => Some(LEFTGROUPUNDER),
+        "rightgroup" => Some(RIGHTGROUP),
+        "rightgroupunder" => Some(RIGHTGROUPUNDER),
+        "leftbracketover" => Some(LEFTBRACKETOVER),
+        "rightbracketover" => Some(RIGHTBRACKETOVER),
+        "leftbracketunder" => Some(LEFTBRACKETUNDER),
+        "rightbracketunder" => Some(RIGHTBRACKETUNDER),
         _ => None,
     }
 }
@@ -976,14 +1339,25 @@ pub fn katex_stretchy_path(label: &str, width_em: f64) -> Option<(Vec<PathComman
     let make_cmds = |path_name: &str, x_shift: f64| -> Option<Vec<PathCommand>> {
         let svg_str = path_for_name(path_name)?;
         let raw = parse_svg_path(svg_str);
-        Some(raw.iter().map(|c| scale_cmd_twohead_uniform(c, s, vb_cy, x_shift)).collect())
+        Some(
+            raw.iter()
+                .map(|c| scale_cmd_twohead_uniform(c, s, vb_cy, x_shift))
+                .collect(),
+        )
     };
 
     match data.paths.len() {
         1 => {
-            let x_shift = if data.align == Some("xMaxYMin") { width_em - 400_000.0 * s } else { 0.0 };
+            let x_shift = if data.align == Some("xMaxYMin") {
+                width_em - 400_000.0 * s
+            } else {
+                0.0
+            };
             let cmds = make_cmds(data.paths[0], x_shift)?;
-            Some((clip_path_to_rect(&cmds, 0.0, width_em, y_min, y_max), height_em))
+            Some((
+                clip_path_to_rect(&cmds, 0.0, width_em, y_min, y_max),
+                height_em,
+            ))
         }
         2 => {
             let x_r = width_em - 400_000.0 * s;
@@ -1005,10 +1379,22 @@ pub fn katex_stretchy_path(label: &str, width_em: f64) -> Option<(Vec<PathComman
                 let shaft_x_end = x_r.max(left_bar_x_max);
                 let mut cmds = clip_path_to_rect(&lc, 0.0, left_bar_x_max, y_min, y_max);
                 if shaft_x_end > shaft_x_start {
-                    cmds.push(PathCommand::MoveTo { x: shaft_x_start, y: shaft_y_top });
-                    cmds.push(PathCommand::LineTo { x: shaft_x_end, y: shaft_y_top });
-                    cmds.push(PathCommand::LineTo { x: shaft_x_end, y: shaft_y_bot });
-                    cmds.push(PathCommand::LineTo { x: shaft_x_start, y: shaft_y_bot });
+                    cmds.push(PathCommand::MoveTo {
+                        x: shaft_x_start,
+                        y: shaft_y_top,
+                    });
+                    cmds.push(PathCommand::LineTo {
+                        x: shaft_x_end,
+                        y: shaft_y_top,
+                    });
+                    cmds.push(PathCommand::LineTo {
+                        x: shaft_x_end,
+                        y: shaft_y_bot,
+                    });
+                    cmds.push(PathCommand::LineTo {
+                        x: shaft_x_start,
+                        y: shaft_y_bot,
+                    });
                     cmds.push(PathCommand::Close);
                 }
                 cmds.extend(clip_path_to_rect(&rc, 0.0, width_em, y_min, y_max));
@@ -1144,7 +1530,10 @@ mod tests {
     #[test]
     fn test_parse_katex_vec_path() {
         let cmds = scale_svg_path_thousandths(&parse_svg_path(KATEX_VEC_PATH));
-        assert!(cmds.len() >= 8, "vec path should parse to multiple segments");
+        assert!(
+            cmds.len() >= 8,
+            "vec path should parse to multiple segments"
+        );
         match cmds[0] {
             PathCommand::MoveTo { x, y } => {
                 assert!((x - 0.377).abs() < 0.001);

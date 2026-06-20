@@ -1,3 +1,4 @@
+use ratex_layout::to_display_list;
 /// Integration tests comparing ratex-layout box dimensions against KaTeX.
 ///
 /// These expected values were extracted from KaTeX 0.16.38 using
@@ -6,11 +7,10 @@
 ///
 /// Tolerance: 0.001em (well within the 0.02em threshold from the plan).
 use ratex_layout::{layout, LayoutOptions};
-use ratex_layout::to_display_list;
 use ratex_parser::parser::parse;
-use ratex_types::MathStyle;
 use ratex_types::color::Color;
 use ratex_types::display_item::DisplayItem;
+use ratex_types::MathStyle;
 
 const TOLERANCE: f64 = 0.002;
 
@@ -70,41 +70,45 @@ fn htmlstyle_applies_supported_css() {
 
 #[test]
 fn prooftree_binary_emits_inference_rule() {
-    let ast = parse("\\begin{prooftree}\\AxiomC{P}\\AxiomC{Q}\\BinaryInfC{R}\\end{prooftree}").unwrap();
+    let ast =
+        parse("\\begin{prooftree}\\AxiomC{P}\\AxiomC{Q}\\BinaryInfC{R}\\end{prooftree}").unwrap();
     let options = LayoutOptions::default();
     let lbox = layout(&ast, &options);
     let display = to_display_list(&lbox);
 
     assert!(display.width > 0.0);
     assert!(display.height > 0.0);
-    assert!(display.items.iter().any(|item| matches!(
-        item,
-        DisplayItem::Line { dashed: false, .. }
-    )));
+    assert!(display
+        .items
+        .iter()
+        .any(|item| matches!(item, DisplayItem::Line { dashed: false, .. })));
 }
 
 #[test]
 fn prooftree_dashed_and_noline_rules() {
-    let dashed_ast = parse("\\begin{prooftree}\\AxiomC{P}\\dashedLine\\UnaryInfC{Q}\\end{prooftree}").unwrap();
+    let dashed_ast =
+        parse("\\begin{prooftree}\\AxiomC{P}\\dashedLine\\UnaryInfC{Q}\\end{prooftree}").unwrap();
     let options = LayoutOptions::default();
     let dashed_display = to_display_list(&layout(&dashed_ast, &options));
-    assert!(dashed_display.items.iter().any(|item| matches!(
-        item,
-        DisplayItem::Line { dashed: true, .. }
-    )));
+    assert!(dashed_display
+        .items
+        .iter()
+        .any(|item| matches!(item, DisplayItem::Line { dashed: true, .. })));
 
-    let noline_ast = parse("\\begin{prooftree}\\AxiomC{P}\\noLine\\UnaryInfC{Q}\\end{prooftree}").unwrap();
+    let noline_ast =
+        parse("\\begin{prooftree}\\AxiomC{P}\\noLine\\UnaryInfC{Q}\\end{prooftree}").unwrap();
     let noline_display = to_display_list(&layout(&noline_ast, &options));
-    assert!(!noline_display.items.iter().any(|item| matches!(
-        item,
-        DisplayItem::Line { .. }
-    )));
+    assert!(!noline_display
+        .items
+        .iter()
+        .any(|item| matches!(item, DisplayItem::Line { .. })));
 }
 
 #[test]
 fn prooftree_root_at_top_flips_layout() {
     let normal_ast = parse("\\begin{prooftree}\\AxiomC{P}\\UIC{Q}\\end{prooftree}").unwrap();
-    let root_at_top_ast = parse("\\begin{prooftree}\\AxiomC{P}\\rootAtTop\\UIC{Q}\\end{prooftree}").unwrap();
+    let root_at_top_ast =
+        parse("\\begin{prooftree}\\AxiomC{P}\\rootAtTop\\UIC{Q}\\end{prooftree}").unwrap();
     let options = LayoutOptions::default();
     let normal_display = to_display_list(&layout(&normal_ast, &options));
     let root_at_top_display = to_display_list(&layout(&root_at_top_ast, &options));
@@ -415,12 +419,20 @@ fn biggest_biggl() {
 
 #[test]
 fn pmatrix_2x2() {
-    check("\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}", 1.45, 0.95);
+    check(
+        "\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}",
+        1.45,
+        0.95,
+    );
 }
 
 #[test]
 fn bmatrix_identity() {
-    check("\\begin{bmatrix} 1 & 0 \\\\ 0 & 1 \\end{bmatrix}", 1.45, 0.95);
+    check(
+        "\\begin{bmatrix} 1 & 0 \\\\ 0 & 1 \\end{bmatrix}",
+        1.45,
+        0.95,
+    );
 }
 
 #[test]

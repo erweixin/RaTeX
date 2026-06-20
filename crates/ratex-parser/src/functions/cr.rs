@@ -9,9 +9,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\\\", "\\newline"],
         "cr",
-        0, 0,
+        0,
+        0,
         None,
-        false, false, true, false, false,
+        false,
+        false,
+        true,
+        false,
+        false,
         handle_cr,
     );
 }

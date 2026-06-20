@@ -36,10 +36,7 @@ pub enum BoxContent {
     /// Filled rectangle from `\rule[<raise>]{width}{height}`.
     /// `thickness` is the ink height; `raise` is the distance (in em) from the baseline
     /// to the bottom edge of the rectangle, positive toward the top of the line.
-    Rule {
-        thickness: f64,
-        raise: f64,
-    },
+    Rule { thickness: f64, raise: f64 },
 
     /// Empty space (kern).
     Kern,
@@ -170,10 +167,7 @@ pub enum BoxContent {
 
     /// A raised/lowered box (raisebox).
     /// shift > 0 moves content up, shift < 0 moves content down.
-    RaiseBox {
-        body: Box<LayoutBox>,
-        shift: f64,
-    },
+    RaiseBox { body: Box<LayoutBox>, shift: f64 },
 
     /// A scaled box (for \scriptstyle, \scriptscriptstyle in inline context).
     /// The child is rendered at child_scale relative to the parent.

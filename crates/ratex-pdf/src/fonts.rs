@@ -48,11 +48,13 @@ fn variable_weight(font: &SfFontRef) -> Option<f32> {
     let axes = font.axes();
     let wght_axis = axes.get_by_tag(Tag::new(b"wght"))?;
 
-    Some(if wght_axis.min_value() <= 400.0 && 400.0 <= wght_axis.max_value() {
-        400.0
-    } else {
-        wght_axis.default_value()
-    })
+    Some(
+        if wght_axis.min_value() <= 400.0 && 400.0 <= wght_axis.max_value() {
+            400.0
+        } else {
+            wght_axis.default_value()
+        },
+    )
 }
 
 /// If the font has a `wght` variation axis, return a `Location` targeting the selected weight.
@@ -452,14 +454,14 @@ pub(crate) fn embed_fonts(
 
         // Subset the font.
         let index = skrifa_collection_index(usage.font_id);
-        let sf = SfFontRef::from_index(raw, index)
-            .map_err(|e| format!("skrifa error: {e}"))?;
+        let sf = SfFontRef::from_index(raw, index).map_err(|e| format!("skrifa error: {e}"))?;
         let subsetted = if let Some(target_weight) = variable_weight(&sf) {
             let coords = [(subsetter::Tag::new(b"wght"), target_weight)];
             subsetter::subset_with_variations(raw, index, &coords, &remapper)
         } else {
             subsetter::subset(raw, index, &remapper)
-        }.map_err(|e| format!("Subset error for {:?}: {e}", usage.font_id))?;
+        }
+        .map_err(|e| format!("Subset error for {:?}: {e}", usage.font_id))?;
 
         // Compress the subset.
         let compressed = miniz_oxide::deflate::compress_to_vec_zlib(&subsetted, 6);

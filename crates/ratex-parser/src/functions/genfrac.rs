@@ -9,8 +9,16 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
     define_function_full(
         map,
         &[
-            "\\cfrac", "\\dfrac", "\\frac", "\\tfrac", "\\dbinom", "\\binom", "\\tbinom",
-            "\\\\atopfrac", "\\\\bracefrac", "\\\\brackfrac",
+            "\\cfrac",
+            "\\dfrac",
+            "\\frac",
+            "\\tfrac",
+            "\\dbinom",
+            "\\binom",
+            "\\tbinom",
+            "\\\\atopfrac",
+            "\\\\bracefrac",
+            "\\\\brackfrac",
         ],
         "genfrac",
         2,
@@ -32,10 +40,18 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         6,
         0,
         Some(vec![
-            ArgType::Math, ArgType::Math, ArgType::Size,
-            ArgType::Text, ArgType::Math, ArgType::Math,
+            ArgType::Math,
+            ArgType::Math,
+            ArgType::Size,
+            ArgType::Text,
+            ArgType::Math,
+            ArgType::Math,
         ]),
-        true, false, true, false, false,
+        true,
+        false,
+        true,
+        false,
+        false,
         handle_genfrac_full,
     );
 
@@ -60,9 +76,12 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\above"],
         "infix",
-        1, 0,
+        1,
+        0,
         Some(vec![ArgType::Size]),
-        false, false, true,
+        false,
+        false,
+        true,
         true, // infix
         false,
         handle_above_infix,
@@ -73,9 +92,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\\\abovefrac"],
         "genfrac",
-        3, 0,
+        3,
+        0,
         Some(vec![ArgType::Math, ArgType::Size, ArgType::Math]),
-        false, false, true, false, false,
+        false,
+        false,
+        true,
+        false,
+        false,
         handle_abovefrac,
     );
 }
@@ -96,16 +120,8 @@ fn handle_genfrac(
         "\\dbinom" | "\\binom" | "\\tbinom" => {
             (false, Some("(".to_string()), Some(")".to_string()))
         }
-        "\\\\bracefrac" => (
-            false,
-            Some("\\{".to_string()),
-            Some("\\}".to_string()),
-        ),
-        "\\\\brackfrac" => (
-            false,
-            Some("[".to_string()),
-            Some("]".to_string()),
-        ),
+        "\\\\bracefrac" => (false, Some("\\{".to_string()), Some("\\}".to_string())),
+        "\\\\brackfrac" => (false, Some("[".to_string()), Some("]".to_string())),
         _ => (true, None, None),
     };
 
@@ -156,7 +172,9 @@ fn handle_genfrac_full(
     let right_delim = extract_delim(&args[1]);
 
     let (has_bar_line, bar_size) = match &args[2] {
-        ParseNode::Size { value, is_blank, .. } => {
+        ParseNode::Size {
+            value, is_blank, ..
+        } => {
             if *is_blank {
                 (true, None)
             } else {
@@ -167,7 +185,12 @@ fn handle_genfrac_full(
         _ => (true, None),
     };
 
-    let style_strs = [StyleStr::Display, StyleStr::Text, StyleStr::Script, StyleStr::Scriptscript];
+    let style_strs = [
+        StyleStr::Display,
+        StyleStr::Text,
+        StyleStr::Script,
+        StyleStr::Scriptscript,
+    ];
     let style = match &args[3] {
         ParseNode::OrdGroup { body, .. } if !body.is_empty() => {
             extract_textord_num(&body[0]).and_then(|n| style_strs.get(n).cloned())
@@ -188,7 +211,12 @@ fn handle_genfrac_full(
     };
 
     match style {
-        Some(s) => Ok(ParseNode::Styling { mode, style: s, body: vec![frac], loc: None }),
+        Some(s) => Ok(ParseNode::Styling {
+            mode,
+            style: s,
+            body: vec![frac],
+            loc: None,
+        }),
         None => Ok(frac),
     }
 }
@@ -196,15 +224,17 @@ fn handle_genfrac_full(
 fn extract_delim(node: &ParseNode) -> Option<String> {
     let text = match node {
         ParseNode::Atom { text, .. } => text.clone(),
-        ParseNode::OrdGroup { body, .. } if body.len() == 1 => {
-            match &body[0] {
-                ParseNode::Atom { text, .. } => text.clone(),
-                _ => return None,
-            }
-        }
+        ParseNode::OrdGroup { body, .. } if body.len() == 1 => match &body[0] {
+            ParseNode::Atom { text, .. } => text.clone(),
+            _ => return None,
+        },
         _ => return None,
     };
-    if text == "." || text.is_empty() { None } else { Some(text) }
+    if text == "." || text.is_empty() {
+        None
+    } else {
+        Some(text)
+    }
 }
 
 fn extract_textord_num(node: &ParseNode) -> Option<usize> {

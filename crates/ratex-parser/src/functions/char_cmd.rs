@@ -9,8 +9,14 @@ pub fn register(map: &mut HashMap<&'static str, FunctionSpec>) {
         map,
         &["\\@char"],
         "textord",
-        1, 0, None,
-        false, true, true, false, false,
+        1,
+        0,
+        None,
+        false,
+        true,
+        true,
+        false,
+        false,
         handle_at_char,
     );
 }

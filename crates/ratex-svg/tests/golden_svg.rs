@@ -22,10 +22,7 @@ fn project_root() -> PathBuf {
 }
 
 fn font_dir() -> String {
-    project_root()
-        .join("fonts")
-        .to_string_lossy()
-        .to_string()
+    project_root().join("fonts").to_string_lossy().to_string()
 }
 
 fn load_png(path: &std::path::Path) -> Option<(Vec<u8>, u32, u32)> {

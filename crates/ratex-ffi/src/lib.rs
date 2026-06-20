@@ -83,12 +83,17 @@ fn sanitize_json_numbers(v: Value) -> Value {
     }
 }
 
-fn do_layout(latex_str: &str, style: MathStyle, color: ratex_types::color::Color) -> Result<String, String> {
+fn do_layout(
+    latex_str: &str,
+    style: MathStyle,
+    color: ratex_types::color::Color,
+) -> Result<String, String> {
     let nodes = parse(latex_str).map_err(|e| format!("parse error: {e}"))?;
     let options = LayoutOptions::default().with_style(style).with_color(color);
     let layout_box = layout(&nodes, &options);
     let display_list = to_display_list(&layout_box);
-    let value = serde_json::to_value(&display_list).map_err(|e| format!("serialization error: {e}"))?;
+    let value =
+        serde_json::to_value(&display_list).map_err(|e| format!("serialization error: {e}"))?;
     let mut sanitized = sanitize_json_numbers(value);
     // Add a protocol version at the top level for forward-compatible decoding.
     if let Value::Object(ref mut map) = sanitized {
@@ -199,7 +204,10 @@ pub unsafe extern "C" fn ratex_parse_and_layout(
 ) -> RatexResult {
     let err_result = |msg: &str| -> RatexResult {
         set_last_error(msg);
-        RatexResult { data: std::ptr::null_mut(), error_code: 1 }
+        RatexResult {
+            data: std::ptr::null_mut(),
+            error_code: 1,
+        }
     };
 
     clear_last_error();
@@ -217,8 +225,8 @@ pub unsafe extern "C" fn ratex_parse_and_layout(
         MathStyle::Display
     } else {
         let opts_ref = unsafe { &*opts };
-        let min_size = std::mem::offset_of!(RatexOptions, display_mode)
-            + std::mem::size_of::<c_int>();
+        let min_size =
+            std::mem::offset_of!(RatexOptions, display_mode) + std::mem::size_of::<c_int>();
         if opts_ref.struct_size >= min_size && opts_ref.display_mode == 0 {
             MathStyle::Text
         } else {
@@ -230,8 +238,8 @@ pub unsafe extern "C" fn ratex_parse_and_layout(
         ratex_types::color::Color::BLACK
     } else {
         let opts_ref = unsafe { &*opts };
-        let color_size = std::mem::offset_of!(RatexOptions, color)
-            + std::mem::size_of::<*const RatexColor>();
+        let color_size =
+            std::mem::offset_of!(RatexOptions, color) + std::mem::size_of::<*const RatexColor>();
 
         if opts_ref.struct_size >= color_size && !opts_ref.color.is_null() {
             match validate_color(unsafe { *opts_ref.color }) {
@@ -245,7 +253,10 @@ pub unsafe extern "C" fn ratex_parse_and_layout(
 
     match do_layout(latex_str, style, color) {
         Ok(json) => match CString::new(json) {
-            Ok(cs) => RatexResult { data: cs.into_raw(), error_code: 0 },
+            Ok(cs) => RatexResult {
+                data: cs.into_raw(),
+                error_code: 0,
+            },
             Err(e) => err_result(&format!("JSON contains interior null byte: {e}")),
         },
         Err(e) => err_result(&e),
