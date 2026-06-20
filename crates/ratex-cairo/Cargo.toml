@@ -1,0 +1,27 @@
+[package]
+name = "ratex-cairo"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+description = "Cairo renderer for RaTeX DisplayList"
+
+[features]
+default = ["embed-fonts"]
+embed-fonts = ["dep:ratex-katex-fonts", "ratex-font-loader/embed-fonts"]
+
+[dependencies]
+ratex-types = { workspace = true }
+ratex-font = { workspace = true }
+ratex-font-loader = { workspace = true }
+ratex-katex-fonts = { workspace = true, optional = true }
+ratex-unicode-font = { workspace = true }
+ab_glyph = "0.2"
+cairo-rs = { version = "0.20", features = ["png"] }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+ratex-layout = { workspace = true }
+ratex-parser = { workspace = true }

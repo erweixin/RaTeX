@@ -29,7 +29,7 @@ fn render_latex_impl(latex: &str, color: Option<&str>) -> Result<String, String>
     let options = if let Some(color) = color {
         let color = Color::parse(color).ok_or_else(|| {
             format!(
-                "invalid color: '{}'. Expected a named color, #rgb, #rrggbb, or [MODEL]value",
+                "invalid color: '{}'. Expected a named color, #rgb, #rgba, #rrggbb, #rrggbbaa, or [MODEL]value",
                 color
             )
         })?;

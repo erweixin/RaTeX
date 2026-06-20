@@ -4,7 +4,7 @@
 //! 1. Collect all glyphs used across the display list.
 //! 2. Subset & embed fonts, then write the content stream.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use pdf_writer::{types::ProcSet, Content, Filter, Finish, Name, Pdf, Rect, Ref, Str};
 use ratex_font::FontId;
@@ -13,6 +13,10 @@ use ratex_types::display_item::{DisplayItem, DisplayList};
 use ratex_types::path_command::PathCommand;
 
 use crate::fonts::{self, EmbeddedFont};
+
+// Keep a tiny vertical guard band for rasterizers/viewers that antialias
+// glyphs just outside the TeX layout box when callers render with little/no padding.
+const MIN_VERTICAL_ANTIALIAS_GUARD: f64 = 1.0;
 
 /// Options controlling PDF output.
 #[derive(Debug, Clone)]
@@ -66,8 +70,14 @@ pub fn render_to_pdf(
     let sw = options.stroke_width;
 
     let total_h = display_list.height + display_list.depth;
+    let vertical_guard = if display_list.items.is_empty() {
+        0.0
+    } else {
+        (MIN_VERTICAL_ANTIALIAS_GUARD - pad).max(0.0)
+    };
+    let y_origin = pad + vertical_guard;
     let page_w = display_list.width * em + 2.0 * pad;
-    let page_h = total_h * em + 2.0 * pad;
+    let page_h = total_h * em + 2.0 * pad + 2.0 * vertical_guard;
 
     // Load raw font data (lazy: only fonts referenced by this display list).
     let font_data = ratex_font_loader::load_fonts_for_items(&options.font_dir, &display_list.items)
@@ -105,6 +115,8 @@ pub fn render_to_pdf(
         .map(|(i, e)| (e.char_code, i))
         .collect();
 
+    let alpha_states = collect_alpha_graphics_states(&display_list.items, &mut alloc);
+
     // Generate content stream.
     let content_bytes = build_content_stream(
         &display_list.items,
@@ -113,8 +125,10 @@ pub fn render_to_pdf(
         &font_data,
         &emoji_embedded,
         &emoji_ix,
+        &alpha_states,
         em,
         pad,
+        y_origin,
         page_h,
         sw,
     );
@@ -127,6 +141,8 @@ pub fn render_to_pdf(
     stream.filter(Filter::FlateDecode);
     stream.pair(Name(b"Length1"), content_bytes.len() as i32);
     stream.finish();
+
+    write_alpha_graphics_states(&mut pdf, &alpha_states);
 
     // Page object.
     let mut page = pdf.page(page_ref);
@@ -158,6 +174,13 @@ pub fn render_to_pdf(
         }
         xobjects.finish();
     }
+    if !alpha_states.is_empty() {
+        let mut ext_g_states = resources.ext_g_states();
+        for state in alpha_states.values() {
+            ext_g_states.pair(Name(state.res_name.as_bytes()), state.state_ref);
+        }
+        ext_g_states.finish();
+    }
     resources.finish();
     page.finish();
 
@@ -185,8 +208,10 @@ fn build_content_stream(
     font_data: &fonts::RawFontData,
     emoji_assets: &[fonts::EmbeddedEmojiImage],
     emoji_ix: &HashMap<u32, usize>,
+    alpha_states: &AlphaGraphicsStates,
     em: f64,
-    pad: f64,
+    x_origin: f64,
+    y_origin: f64,
     page_h: f64,
     stroke_width: f64,
 ) -> Vec<u8> {
@@ -205,8 +230,8 @@ fn build_content_stream(
             } => {
                 emit_glyph(
                     &mut content,
-                    *x * em + pad,
-                    *y * em + pad,
+                    *x * em + x_origin,
+                    *y * em + y_origin,
                     font,
                     *char_code,
                     *scale,
@@ -218,6 +243,7 @@ fn build_content_stream(
                     font_data,
                     emoji_assets,
                     emoji_ix,
+                    alpha_states,
                 );
             }
             DisplayItem::Line {
@@ -231,14 +257,15 @@ fn build_content_stream(
                 emit_line(
                     &mut content,
                     &LineParams {
-                        x: *x * em + pad,
-                        y: *y * em + pad,
+                        x: *x * em + x_origin,
+                        y: *y * em + y_origin,
                         width: *width * em,
                         thickness: *thickness * em,
                         color: *color,
                         dashed: *dashed,
                         page_h,
                     },
+                    alpha_states,
                 );
             }
             DisplayItem::Rect {
@@ -250,12 +277,13 @@ fn build_content_stream(
             } => {
                 emit_rect(
                     &mut content,
-                    *x * em + pad,
-                    *y * em + pad,
+                    *x * em + x_origin,
+                    *y * em + y_origin,
                     *width * em,
                     *height * em,
                     color,
                     page_h,
+                    alpha_states,
                 );
             }
             DisplayItem::Path {
@@ -267,14 +295,15 @@ fn build_content_stream(
             } => {
                 emit_path(
                     &mut content,
-                    *x * em + pad,
-                    *y * em + pad,
+                    *x * em + x_origin,
+                    *y * em + y_origin,
                     commands,
                     *fill,
                     color,
                     em,
                     stroke_width,
                     page_h,
+                    alpha_states,
                 );
             }
         }
@@ -358,12 +387,15 @@ fn emit_glyph(
     font_data: &fonts::RawFontData,
     emoji_assets: &[fonts::EmbeddedEmojiImage],
     emoji_ix: &HashMap<u32, usize>,
+    alpha_states: &AlphaGraphicsStates,
 ) {
     // Color emoji: collect/embed keyed only by char_code; draw whenever we embedded an XObject,
     // without re-resolving (must match [`fonts::collect_glyph_usage`] prefer-color path).
     if let Some(&ix) = emoji_ix.get(&char_code) {
         let asset = &emoji_assets[ix];
+        let alpha_applied = apply_non_stroking_alpha(content, color, alpha_states);
         emit_emoji_raster(content, px, py, scale * em, page_h, asset);
+        restore_alpha_if_needed(content, alpha_applied);
         return;
     }
 
@@ -413,12 +445,14 @@ fn emit_glyph(
     // CID as 2-byte big-endian.
     let cid_bytes = [(new_cid >> 8) as u8, (new_cid & 0xFF) as u8];
 
+    let alpha_applied = apply_non_stroking_alpha(content, color, alpha_states);
     set_fill_rgb(content, color);
     content.begin_text();
     content.set_font(Name(ef.res_name.as_bytes()), glyph_em);
     content.set_text_matrix([text_matrix_scale, 0.0, 0.0, text_matrix_scale, pdf_x, pdf_y]);
     content.show(Str(&cid_bytes));
     content.end_text();
+    restore_alpha_if_needed(content, alpha_applied);
 }
 
 // ---------------------------------------------------------------------------
@@ -435,9 +469,10 @@ struct LineParams {
     page_h: f64,
 }
 
-fn emit_line(content: &mut Content, line: &LineParams) {
+fn emit_line(content: &mut Content, line: &LineParams, alpha_states: &AlphaGraphicsStates) {
     let t = line.thickness.max(0.5);
 
+    let alpha_applied = apply_non_stroking_alpha(content, &line.color, alpha_states);
     set_fill_rgb(content, &line.color);
 
     if line.dashed {
@@ -461,12 +496,14 @@ fn emit_line(content: &mut Content, line: &LineParams) {
         content.rect(pdf_x, pdf_y, line.width as f32, t as f32);
         content.fill_nonzero();
     }
+    restore_alpha_if_needed(content, alpha_applied);
 }
 
 // ---------------------------------------------------------------------------
 // Rect
 // ---------------------------------------------------------------------------
 
+#[allow(clippy::too_many_arguments)]
 fn emit_rect(
     content: &mut Content,
     x: f64,
@@ -475,15 +512,18 @@ fn emit_rect(
     height: f64,
     color: &Color,
     page_h: f64,
+    alpha_states: &AlphaGraphicsStates,
 ) {
     let w = width.max(0.5);
     let h = height.max(0.5);
 
+    let alpha_applied = apply_non_stroking_alpha(content, color, alpha_states);
     set_fill_rgb(content, color);
     let pdf_x = x as f32;
     let pdf_y = flip_y(y + h, page_h); // bottom-left corner in PDF coords
     content.rect(pdf_x, pdf_y, w as f32, h as f32);
     content.fill_nonzero();
+    restore_alpha_if_needed(content, alpha_applied);
 }
 
 // ---------------------------------------------------------------------------
@@ -501,6 +541,7 @@ fn emit_path(
     em: f64,
     stroke_width: f64,
     page_h: f64,
+    alpha_states: &AlphaGraphicsStates,
 ) {
     if fill {
         // Split by MoveTo to avoid cross-contour winding issues (same as ratex-render).
@@ -517,6 +558,7 @@ fn emit_path(
                     em,
                     stroke_width,
                     page_h,
+                    alpha_states,
                 );
                 start = i;
             }
@@ -531,6 +573,7 @@ fn emit_path(
             em,
             stroke_width,
             page_h,
+            alpha_states,
         );
     } else {
         emit_path_segment(
@@ -543,6 +586,7 @@ fn emit_path(
             em,
             stroke_width,
             page_h,
+            alpha_states,
         );
     }
 }
@@ -558,9 +602,22 @@ fn emit_path_segment(
     em: f64,
     stroke_width: f64,
     page_h: f64,
+    alpha_states: &AlphaGraphicsStates,
 ) {
     if commands.is_empty() {
         return;
+    }
+
+    let alpha_applied = if fill {
+        apply_non_stroking_alpha(content, color, alpha_states)
+    } else {
+        apply_stroking_alpha(content, color, alpha_states)
+    };
+    if fill {
+        set_fill_rgb(content, color);
+    } else {
+        set_stroke_rgb(content, color);
+        content.set_line_width(stroke_width as f32);
     }
 
     // Track current point for quad-to-cubic promotion.
@@ -621,13 +678,11 @@ fn emit_path_segment(
     }
 
     if fill {
-        set_fill_rgb(content, color);
         content.fill_even_odd();
     } else {
-        set_stroke_rgb(content, color);
-        content.set_line_width(stroke_width as f32);
         content.stroke();
     }
+    restore_alpha_if_needed(content, alpha_applied);
 }
 
 // ---------------------------------------------------------------------------
@@ -640,4 +695,95 @@ fn set_fill_rgb(content: &mut Content, color: &Color) {
 
 fn set_stroke_rgb(content: &mut Content, color: &Color) {
     content.set_stroke_rgb(color.r, color.g, color.b);
+}
+
+#[derive(Debug)]
+struct AlphaGraphicsState {
+    alpha: f32,
+    res_name: String,
+    state_ref: Ref,
+}
+
+type AlphaGraphicsStates = BTreeMap<u32, AlphaGraphicsState>;
+
+fn collect_alpha_graphics_states(items: &[DisplayItem], alloc: &mut Ref) -> AlphaGraphicsStates {
+    let mut states = AlphaGraphicsStates::new();
+    for item in items {
+        let color = match item {
+            DisplayItem::GlyphPath { color, .. }
+            | DisplayItem::Line { color, .. }
+            | DisplayItem::Rect { color, .. }
+            | DisplayItem::Path { color, .. } => color,
+        };
+
+        if let Some(key) = alpha_key(color.a) {
+            states.entry(key).or_insert_with(|| AlphaGraphicsState {
+                alpha: normalized_alpha(color.a),
+                res_name: format!("GS{key}"),
+                state_ref: alloc.bump(),
+            });
+        }
+    }
+    states
+}
+
+fn write_alpha_graphics_states(pdf: &mut Pdf, states: &AlphaGraphicsStates) {
+    for state in states.values() {
+        let mut ext_g_state = pdf.ext_graphics(state.state_ref);
+        ext_g_state
+            .stroking_alpha(state.alpha)
+            .non_stroking_alpha(state.alpha);
+        ext_g_state.finish();
+    }
+}
+
+fn apply_non_stroking_alpha(
+    content: &mut Content,
+    color: &Color,
+    states: &AlphaGraphicsStates,
+) -> bool {
+    apply_alpha(content, color, states)
+}
+
+fn apply_stroking_alpha(
+    content: &mut Content,
+    color: &Color,
+    states: &AlphaGraphicsStates,
+) -> bool {
+    apply_alpha(content, color, states)
+}
+
+fn apply_alpha(content: &mut Content, color: &Color, states: &AlphaGraphicsStates) -> bool {
+    let Some(key) = alpha_key(color.a) else {
+        return false;
+    };
+    let Some(state) = states.get(&key) else {
+        return false;
+    };
+
+    content.save_state();
+    content.set_parameters(Name(state.res_name.as_bytes()));
+    true
+}
+
+fn restore_alpha_if_needed(content: &mut Content, applied: bool) {
+    if applied {
+        content.restore_state();
+    }
+}
+
+fn alpha_key(alpha: f32) -> Option<u32> {
+    let alpha = normalized_alpha(alpha);
+    if alpha >= 1.0 {
+        return None;
+    }
+    Some((alpha * 1_000_000.0).round() as u32)
+}
+
+fn normalized_alpha(alpha: f32) -> f32 {
+    if alpha.is_finite() {
+        alpha.clamp(0.0, 1.0)
+    } else {
+        1.0
+    }
 }

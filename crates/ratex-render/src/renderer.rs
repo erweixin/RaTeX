@@ -87,6 +87,25 @@ fn to_tiny_skia_color(color: Color) -> tiny_skia::Color {
     .unwrap_or(tiny_skia::Color::TRANSPARENT)
 }
 
+fn paint_for_color(color: &Color) -> Paint<'static> {
+    let mut paint = Paint::default();
+    paint.set_color_rgba8(
+        (color.r * 255.0) as u8,
+        (color.g * 255.0) as u8,
+        (color.b * 255.0) as u8,
+        (color.a.clamp(0.0, 1.0) * 255.0).round() as u8,
+    );
+    paint
+}
+
+fn normalized_alpha(alpha: f32) -> f32 {
+    if alpha.is_finite() {
+        alpha.clamp(0.0, 1.0)
+    } else {
+        1.0
+    }
+}
+
 /// Build a `FontId → FontRef` map from the raw font data (borrowed from the cache lock).
 fn build_font_refs(data: &FontSet) -> Result<HashMap<FontId, FontRef<'_>>, String> {
     let mut font_refs = HashMap::new();
@@ -299,7 +318,7 @@ fn try_emoji_vector_then_bitmap(
     em: f32,
     font_cache: &HashMap<FontId, FontRef<'_>>,
 ) -> bool {
-    if try_blit_emoji_raster_fallback(pixmap, px, py, em, ch) {
+    if try_blit_emoji_raster_fallback(pixmap, px, py, em, ch, color) {
         return true;
     }
     if let Some(emoji_font) = font_cache.get(&FontId::EmojiFallback) {
@@ -352,7 +371,7 @@ fn render_glyph(
     }
 
     if font_id == FontId::EmojiFallback {
-        if try_blit_emoji_raster_fallback(pixmap, px, py, em, ch) {
+        if try_blit_emoji_raster_fallback(pixmap, px, py, em, ch, color) {
             return;
         }
         let _ = render_glyph_with_font(
@@ -453,6 +472,14 @@ struct FontGlyph<'a> {
     font_id: FontId,
     font: &'a FontRef<'a>,
     glyph_id: ab_glyph::GlyphId,
+}
+
+struct RasterGlyphParams {
+    px: f32,
+    py: f32,
+    em: f32,
+    ch: char,
+    opacity: f32,
 }
 
 fn render_glyph_with_font(
@@ -561,13 +588,7 @@ fn render_glyph_with_font(
     }
 
     if let Some(path) = builder.finish() {
-        let mut paint = Paint::default();
-        paint.set_color_rgba8(
-            (color.r * 255.0) as u8,
-            (color.g * 255.0) as u8,
-            (color.b * 255.0) as u8,
-            255,
-        );
+        let mut paint = paint_for_color(color);
         paint.anti_alias = true;
         pixmap.fill_path(
             &path,
@@ -589,20 +610,29 @@ fn try_blit_emoji_raster_fallback(
     py: f32,
     em: f32,
     ch: char,
+    color: &Color,
 ) -> bool {
     let Some(bytes) = ratex_unicode_font::load_emoji_font_arc() else {
         return false;
     };
     let idx = ratex_unicode_font::emoji_font_face_index().unwrap_or(0);
-    try_blit_raster_glyph(pixmap, px, py, em, ch, bytes.as_slice(), idx)
+    try_blit_raster_glyph(
+        pixmap,
+        RasterGlyphParams {
+            px,
+            py,
+            em,
+            ch,
+            opacity: normalized_alpha(color.a),
+        },
+        bytes.as_slice(),
+        idx,
+    )
 }
 
 fn try_blit_raster_glyph(
     pixmap: &mut Pixmap,
-    px: f32,
-    py: f32,
-    em: f32,
-    ch: char,
+    params: RasterGlyphParams,
     font_bytes: &[u8],
     face_index: u32,
 ) -> bool {
@@ -610,11 +640,11 @@ fn try_blit_raster_glyph(
         Ok(f) => f,
         Err(_) => return false,
     };
-    let gid = match face.glyph_index(ch) {
+    let gid = match face.glyph_index(params.ch) {
         Some(g) => g,
         None => return false,
     };
-    let strike = em.round().clamp(8.0, 256.0) as u16;
+    let strike = params.em.round().clamp(8.0, 256.0) as u16;
     let img = face
         .glyph_raster_image(gid, strike)
         .or_else(|| face.glyph_raster_image(gid, u16::MAX));
@@ -626,26 +656,27 @@ fn try_blit_raster_glyph(
         None => return false,
     };
     let ppm = f32::from(img.pixels_per_em.max(1));
-    let mut scale = em / ppm;
+    let mut scale = params.em / ppm;
     // Scale emoji to fit 1.0em layout width if it's wider (prevents overflow).
     let actual_width_em = f32::from(img.width) / ppm;
     let assumed_width = 1.0;
     if actual_width_em > 0.01 && actual_width_em > assumed_width * 1.01 {
         scale *= assumed_width / actual_width_em;
     }
-    let top_x = px + f32::from(img.x) * scale;
+    let top_x = params.px + f32::from(img.x) * scale;
     // `ttf-parser` / OpenType: `RasterGlyphImage::{x,y}` are in strike pixels; `y` is the
     // **bottom** edge of the bitmap in y-up coordinates (sbix yOffset to bottom; CBDT normalized
     // the same way). Top edge = y + height — using `y` alone shifts the glyph down by ~full height.
-    let mut top_y = py - (f32::from(img.y) + f32::from(img.height)) * scale;
+    let mut top_y = params.py - (f32::from(img.y) + f32::from(img.height)) * scale;
     // sbix places the bitmap bottom on the math baseline, but tall (~1em) color strikes put the
     // ink centroid near 0.5em above baseline. Binary/relation glyphs (+, =) are centered on the
     // math axis (~0.25em). Nudge the bitmap so its vertical center matches the axis — matches
     // mixed `\text{emoji} … formula` rows without changing layout baselines.
     let center_strike = (f32::from(img.y) + f32::from(img.height) / 2.0) / ppm;
     let axis = ratex_font::get_global_metrics(0).axis_height as f32;
-    top_y += (center_strike - axis) * em;
+    top_y += (center_strike - axis) * params.em;
     let paint = PixmapPaint {
+        opacity: params.opacity,
         quality: FilterQuality::Bilinear,
         ..Default::default()
     };
@@ -697,13 +728,7 @@ fn render_line(
     dashed: bool,
 ) {
     let t = thickness.max(1.0);
-    let mut paint = Paint::default();
-    paint.set_color_rgba8(
-        (color.r * 255.0) as u8,
-        (color.g * 255.0) as u8,
-        (color.b * 255.0) as u8,
-        255,
-    );
+    let paint = paint_for_color(color);
 
     if dashed {
         // Draw a dashed line: dash length = 4t, gap = 4t.
@@ -733,13 +758,7 @@ fn render_rect(pixmap: &mut Pixmap, x: f32, y: f32, width: f32, height: f32, col
     let height = height.max(2.0);
     let rect = tiny_skia::Rect::from_xywh(x, y, width, height);
     if let Some(rect) = rect {
-        let mut paint = Paint::default();
-        paint.set_color_rgba8(
-            (color.r * 255.0) as u8,
-            (color.g * 255.0) as u8,
-            (color.b * 255.0) as u8,
-            255,
-        );
+        let paint = paint_for_color(color);
         pixmap.fill_rect(rect, &paint, Transform::identity(), None);
     }
 }
@@ -853,13 +872,7 @@ fn render_path_segment(
     }
 
     if let Some(path) = builder.finish() {
-        let mut paint = Paint::default();
-        paint.set_color_rgba8(
-            (color.r * 255.0) as u8,
-            (color.g * 255.0) as u8,
-            (color.b * 255.0) as u8,
-            255,
-        );
+        let mut paint = paint_for_color(color);
         if fill {
             paint.anti_alias = true;
             // Even-odd: KaTeX `tallDelim` vert uses two subpaths (outline + stem); nonzero winding
@@ -882,17 +895,7 @@ fn render_path_segment(
 }
 
 fn encode_png(pixmap: &Pixmap) -> Result<Vec<u8>, String> {
-    let mut buf = Vec::new();
-    {
-        let mut encoder = png::Encoder::new(&mut buf, pixmap.width(), pixmap.height());
-        encoder.set_color(png::ColorType::Rgba);
-        encoder.set_depth(png::BitDepth::Eight);
-        let mut writer = encoder
-            .write_header()
-            .map_err(|e| format!("PNG header error: {}", e))?;
-        writer
-            .write_image_data(pixmap.data())
-            .map_err(|e| format!("PNG write error: {}", e))?;
-    }
-    Ok(buf)
+    pixmap
+        .encode_png()
+        .map_err(|e| format!("PNG encode error: {}", e))
 }

@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.text.style.ReplacementSpan
+import kotlin.math.ceil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -26,7 +27,7 @@ import kotlinx.coroutines.withContext
  *
  * @param bitmap   Pre-rendered formula bitmap (transparent background).
  * @param heightPx Formula height above the baseline, in pixels.
- * @param depthPx  Formula depth below the baseline, in pixels.
+ * @param depthPx  Rendered depth below the baseline, in pixels.
  */
 class RaTeXSpan private constructor(
     private val bitmap: Bitmap,
@@ -53,8 +54,8 @@ class RaTeXSpan private constructor(
                 val fontSizePx = fontSize * context.resources.displayMetrics.density
                 val renderer = RaTeXRenderer(dl, fontSizePx) { RaTeXFontLoader.getTypeface(it) }
 
-                val w = renderer.widthPx.toInt().coerceAtLeast(1)
-                val h = renderer.totalHeightPx.toInt().coerceAtLeast(1)
+                val w = ceil(renderer.widthPx).toInt().coerceAtLeast(1)
+                val h = ceil(renderer.totalHeightPx).toInt().coerceAtLeast(1)
                 val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
                 renderer.draw(Canvas(bitmap))
 
@@ -73,8 +74,8 @@ class RaTeXSpan private constructor(
     ): Int {
         fm?.let {
             // Expand the line height to fully accommodate the formula.
-            it.ascent  = -heightPx.toInt()
-            it.descent =  depthPx.toInt()
+            it.ascent  = -ceil(heightPx).toInt()
+            it.descent =  ceil(depthPx).toInt()
             it.top     = it.ascent
             it.bottom  = it.descent
         }

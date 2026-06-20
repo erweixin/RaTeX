@@ -162,7 +162,7 @@ fn default_font_dir() -> String {
 fn parse_color_arg(flag: &str, value: &str) -> Result<Color, String> {
     Color::parse(value).ok_or_else(|| {
         format!(
-            "invalid {} '{}': expected a named color, #rgb, #rrggbb, or [MODEL]value",
+            "invalid {} '{}': expected a named color, #rgb, #rgba, #rrggbb, #rrggbbaa, or [MODEL]value",
             flag, value
         )
     })
@@ -193,10 +193,12 @@ Options:
 {font_dir_option}  --output-dir <DIR>                Write PNGs to this directory [default: output]
   --dpr <FACTOR>                    Render scale factor [default: 1.0]
   --font-size <SIZE>                Base font size in pixels [default: 40.0]
-  --color <COLOR>                   Formula color: named, #rgb, #rrggbb, or [MODEL]value
+  --color <COLOR>                   Formula color: named, #rgb, #rgba, #rrggbb,
+                                    #rrggbbaa, or [MODEL]value
                                     [default: black]
-  --background-color <COLOR>        Background color: named, #rgb, #rrggbb, [MODEL]value,
-                                    or 'transparent' [default: white]
+  --background-color <COLOR>        Background color: named, #rgb, #rgba, #rrggbb,
+                                    #rrggbbaa, [MODEL]value, or 'transparent'
+                                    [default: white]
   --inline                          Use inline math style instead of display style
 "
     )

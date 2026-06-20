@@ -30,6 +30,8 @@ RaTeX/
 │   ├── ratex-katex-fonts/        # KaTeX TTF blobs for embed-fonts (crates.io–safe path)
 │   ├── ratex-font-loader/        # Shared lazy font loading/cache for PNG/SVG/PDF
 │   ├── ratex-ffi/                # C ABI: LaTeX → DisplayList JSON (+ Android JNI)
+│   ├── ratex-cairo/              # DisplayList → Cairo context (native Linux / GTK base)
+│   ├── ratex-gtk4/               # GTK4 widget subclass for native Linux rendering
 │   ├── ratex-render/             # DisplayList → PNG (tiny-skia, server-side)
 │   ├── ratex-wasm/               # WASM: LaTeX → DisplayList JSON (browser)
 │   ├── ratex-svg/                # SVG export: DisplayList → SVG string (vector output)
@@ -39,6 +41,7 @@ RaTeX/
 ├── platforms/
 │   ├── ios/                      # Swift + XCFramework + CoreGraphics
 │   ├── android/                  # Kotlin + AAR + JNI/Canvas
+│   ├── gtk/                      # GTK4 Linux docs, C/GI metadata, and C/Python/Vala examples
 │   ├── flutter/                  # Dart FFI + widget
 │   ├── react-native/             # Native module + iOS/Android views
 │   └── web/                      # npm package `ratex-wasm`: WASM + TypeScript web-render
@@ -290,6 +293,8 @@ ratex-layout
     ↑
 platforms/ (ios, android, flutter, react-native, web)
 ```
+
+`platforms/gtk` contains the Linux desktop GObject package metadata for the `RatexGtk-1.0` namespace: the public C header, GIR file, Vala VAPI, pkg-config template, and C/Python/Vala smoke examples. The implementation lives in `crates/ratex-gtk4`.
 
 ---
 

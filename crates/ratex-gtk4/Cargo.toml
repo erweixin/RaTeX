@@ -1,0 +1,30 @@
+[package]
+name = "ratex-gtk4"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+description = "GTK4 widget for native RaTeX rendering"
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+ratex-cairo = { workspace = true }
+ratex-layout = { workspace = true }
+ratex-parser = { workspace = true }
+ratex-types = { workspace = true }
+gtk4 = "0.9"
+
+[dev-dependencies]
+libadwaita = { version = "0.7", features = ["v1_4"] }
+
+[[example]]
+name = "formula_demo"
+path = "examples/formula_demo.rs"
+
+[[example]]
+name = "adw_formula_demo"
+path = "examples/adw_formula_demo.rs"

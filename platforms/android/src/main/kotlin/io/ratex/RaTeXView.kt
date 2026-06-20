@@ -8,6 +8,8 @@ import android.graphics.Color
 import android.util.AttributeSet
 import android.view.View
 import androidx.annotation.ColorInt
+import kotlin.math.ceil
+import kotlin.math.max
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -94,14 +96,28 @@ class RaTeXView @JvmOverloads constructor(
         if (r == null) {
             setMeasuredDimension(0, 0)
         } else {
-            setMeasuredDimension(r.widthPx.toInt(), r.totalHeightPx.toInt())
+            val desiredWidth = max(
+                ceil(r.widthPx).toInt() + paddingLeft + paddingRight,
+                suggestedMinimumWidth,
+            )
+            val desiredHeight = max(
+                ceil(r.totalHeightPx).toInt() + paddingTop + paddingBottom,
+                suggestedMinimumHeight,
+            )
+            setMeasuredDimension(
+                resolveSize(desiredWidth, widthMeasureSpec),
+                resolveSize(desiredHeight, heightMeasureSpec),
+            )
         }
     }
 
     // MARK: - Draw
 
     override fun onDraw(canvas: Canvas) {
+        canvas.save()
+        canvas.translate(paddingLeft.toFloat(), paddingTop.toFloat())
         renderer?.draw(canvas)
+        canvas.restore()
     }
 
     // MARK: - Lifecycle

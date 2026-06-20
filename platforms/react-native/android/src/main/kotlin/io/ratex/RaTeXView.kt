@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.util.AttributeSet
 import android.view.View
 import androidx.annotation.ColorInt
+import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
 import kotlinx.coroutines.CoroutineScope
@@ -100,11 +101,11 @@ class RaTeXView @JvmOverloads constructor(
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         val r = renderer
         val desiredWidth = max(
-            (r?.widthPx?.toInt() ?: 0) + paddingLeft + paddingRight,
+            (r?.widthPx?.let { ceil(it).toInt() } ?: 0) + paddingLeft + paddingRight,
             suggestedMinimumWidth,
         )
         val desiredHeight = max(
-            (r?.totalHeightPx?.toInt() ?: 0) + paddingTop + paddingBottom,
+            (r?.totalHeightPx?.let { ceil(it).toInt() } ?: 0) + paddingTop + paddingBottom,
             suggestedMinimumHeight,
         )
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Install Git hooks (e.g. pre-commit runs cargo clippy).
+# Install Git hooks (e.g. pre-commit runs cargo fmt and cargo clippy).
 # Run from repo root: ./scripts/install-hooks.sh
 
 set -euo pipefail
@@ -13,5 +13,5 @@ fi
 
 # Option A: use core.hooksPath so all hooks live in .githooks (tracked by git)
 git config core.hooksPath .githooks
-echo "Git hooks path set to .githooks (pre-commit will run cargo clippy)."
+echo "Git hooks path set to .githooks (pre-commit will run cargo fmt and cargo clippy)."
 chmod +x .githooks/pre-commit 2>/dev/null || true

@@ -1,7 +1,7 @@
 //! Batch-export golden cases to standalone SVG (path glyphs, same scale as `ratex-render` + DPR).
 
 use std::fs::File;
-use std::io::{self, BufRead};
+use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
 
 use ratex_layout::{layout, to_display_list, LayoutOptions};
@@ -33,6 +33,8 @@ fn main() {
         .and_then(|i| args.get(i + 1))
         .cloned()
         .unwrap_or_else(|| "output_svg".to_string());
+
+    let stdout = args.iter().any(|a| a == "--stdout");
 
     let device_pixel_ratio = args
         .iter()
@@ -66,7 +68,9 @@ fn main() {
         .and_then(|i| args.get(i + 1))
         .cloned();
 
-    std::fs::create_dir_all(&output_dir).expect("Failed to create output dir");
+    if !stdout {
+        std::fs::create_dir_all(&output_dir).expect("Failed to create output dir");
+    }
 
     let dpr = device_pixel_ratio.clamp(0.01, 16.0) as f64;
     let svg_opts = SvgOptions {
@@ -104,9 +108,20 @@ fn main() {
         idx += 1;
         match svg_formula(expr, &layout_opts, &svg_opts) {
             Ok(svg) => {
-                let path = PathBuf::from(&output_dir).join(format!("{:04}.svg", idx));
-                std::fs::write(&path, svg.as_bytes()).expect("Failed to write SVG");
-                println!("OK  {:4} {}", idx, expr);
+                if stdout {
+                    let mut handle = io::stdout().lock();
+                    handle
+                        .write_all(svg.as_bytes())
+                        .expect("Failed to write SVG to stdout");
+                    handle
+                        .write_all(b"\n")
+                        .expect("Failed to write SVG to stdout");
+                    eprintln!("OK  {:4} {}", idx, expr);
+                } else {
+                    let path = PathBuf::from(&output_dir).join(format!("{:04}.svg", idx));
+                    std::fs::write(&path, svg.as_bytes()).expect("Failed to write SVG");
+                    println!("OK  {:4} {}", idx, expr);
+                }
             }
             Err(e) => {
                 eprintln!("ERR {:4} {} — {}", idx, expr, e);
@@ -114,7 +129,11 @@ fn main() {
         }
     }
 
-    println!("\nWrote {} SVG(s) to {}/", idx, output_dir);
+    if stdout {
+        eprintln!("\nWrote {} SVG(s) to stdout", idx);
+    } else {
+        println!("\nWrote {} SVG(s) to {}/", idx, output_dir);
+    }
 }
 
 fn svg_formula(
@@ -143,7 +162,7 @@ fn default_font_dir() -> String {
 fn parse_color_arg(value: &str) -> Result<Color, String> {
     Color::parse(value).ok_or_else(|| {
         format!(
-            "invalid --color '{}': expected a named color, #rgb, #rrggbb, or [MODEL]value",
+            "invalid --color '{}': expected a named color, #rgb, #rgba, #rrggbb, #rrggbbaa, or [MODEL]value",
             value
         )
     })
@@ -173,9 +192,11 @@ Options:
   -h, --help                 Show this help message
   --input <FILE>             Read formulas from file instead of stdin
 {font_dir_option}  --output-dir <DIR>         Write SVGs to this directory [default: output_svg]
+  --stdout                   Write SVGs to stdout instead of files
   --dpr <FACTOR>             Scale font size, padding, and stroke width [default: 1.0]
   --font-size <SIZE>         Base SVG font size in user units [default: 40.0]
-  --color <COLOR>            Formula color: named, #rgb, #rrggbb, or [MODEL]value
+  --color <COLOR>            Formula color: named, #rgb, #rgba, #rrggbb, #rrggbbaa,
+                             or [MODEL]value
                              [default: black]
   --inline                   Use inline math style instead of display style
 "

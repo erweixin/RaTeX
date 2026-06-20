@@ -28,14 +28,21 @@ class RaTeXRenderer(
     // MARK: - Dimensions in pixels
 
     val widthPx:       Float get() = (displayList.width  * fontSize).toFloat()
-    val heightPx:      Float get() = (displayList.height * fontSize).toFloat()
-    val depthPx:       Float get() = (displayList.depth  * fontSize).toFloat()
+    val layoutHeightPx: Float get() = (displayList.height * fontSize).toFloat()
+    val layoutDepthPx:  Float get() = (displayList.depth * fontSize).toFloat()
+
+    /** Android text rasterization can paint a 1px antialiased fringe at exact vertical edges. */
+    val glyphVerticalBleedPx: Float get() = if (displayList.items.isEmpty()) 0f else 1f
+    val heightPx:      Float get() = layoutHeightPx + glyphVerticalBleedPx
+    val depthPx:       Float get() = layoutDepthPx + glyphVerticalBleedPx
     val totalHeightPx: Float get() = heightPx + depthPx
 
     // MARK: - Drawing
 
     /** Draw the formula into [canvas]. The canvas origin is the top-left of the bounding box. */
     fun draw(canvas: Canvas) {
+        canvas.save()
+        canvas.translate(0f, glyphVerticalBleedPx)
         for (item in displayList.items) {
             when (item) {
                 is DisplayItem.GlyphPath -> drawGlyph(canvas, item)
@@ -44,6 +51,7 @@ class RaTeXRenderer(
                 is DisplayItem.Path      -> drawPath(canvas, item)
             }
         }
+        canvas.restore()
     }
 
     // MARK: - Private helpers

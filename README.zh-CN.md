@@ -217,6 +217,9 @@ printf '%s\n' '\frac{1}{2} + \sqrt{x}' | ./target/release/render --output-dir ./
 printf '%s\n' '\int_0^\infty e^{-x^2} dx = \frac{\sqrt{\pi}}{2}' | \
   ./target/release/render-svg --font-dir /path/to/katex/fonts --color '#1E88E5' --output-dir ./out
 
+# SVG：将渲染后的 SVG 文档写到 stdout，而不是文件
+printf '%s\n' '\frac{1}{2} + \sqrt{x}' | ./target/release/render-svg --stdout > formula.svg
+
 # PDF：运行时从 KaTeX TTF 目录加载字体
 printf '%s\n' '\ce{H2SO4 + 2NaOH -> Na2SO4 + 2H2O}' | \
   ./target/release/render-pdf --font-dir /path/to/katex/fonts --output-dir ./out
@@ -232,6 +235,7 @@ CLI 说明
 
 - `--input <FILE>`：从文件读取公式，每行一条公式。
 - `--output-dir <DIR>`：输出目录。默认分别是 `output`、`output_svg`、`output_pdf`。
+- `render-svg --stdout`：将 SVG 文档写到 stdout，而不是文件；状态信息写到 stderr。
 - `--help`：查看当前二进制支持的选项，以及当前构建是否启用了嵌入字体。
 - `--color` / `--background-color` 支持命名颜色（如 `black`、`red`、`teal`）、三位或六位十六进制（如 `#f00`、`#ff0000`）、以及 KaTeX / MathJax 风格的颜色模型写法（如 `[RGB]255,0,0`、`[rgb]1,0,0`、`[HTML]B22222`、`[gray]0.5`、`[cmyk]0,1,1,0`）。
 - `ratex-render` 的 `--background-color transparent` 可输出透明背景 PNG。

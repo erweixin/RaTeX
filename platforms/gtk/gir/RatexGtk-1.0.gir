@@ -1,0 +1,55 @@
+<?xml version="1.0"?>
+<repository version="1.2"
+            xmlns="http://www.gtk.org/introspection/core/1.0"
+            xmlns:c="http://www.gtk.org/introspection/c/1.0"
+            xmlns:glib="http://www.gtk.org/introspection/glib/1.0">
+  <include name="GObject" version="2.0"/>
+  <include name="Gdk" version="4.0"/>
+  <include name="Gtk" version="4.0"/>
+  <package name="ratex-gtk-1.0"/>
+  <c:include name="ratex-gtk.h"/>
+  <namespace name="RatexGtk"
+             version="1.0"
+             shared-library="libratex_gtk4.so"
+             c:identifier-prefixes="Ratex"
+             c:symbol-prefixes="ratex">
+    <class name="Formula"
+           c:symbol-prefix="formula"
+           c:type="RatexFormula"
+           parent="Gtk.Widget"
+           glib:type-name="RaTeXFormula"
+           glib:get-type="ratex_formula_get_type"
+           glib:type-struct="FormulaClass">
+      <constructor name="new" c:identifier="ratex_formula_new">
+        <return-value transfer-ownership="full" nullable="1">
+          <type name="Formula" c:type="RatexFormula*"/>
+        </return-value>
+      </constructor>
+      <property name="latex" writable="1" readable="1" transfer-ownership="none">
+        <type name="utf8" c:type="gchar*"/>
+      </property>
+      <property name="display-mode" writable="1" readable="1" transfer-ownership="none">
+        <type name="gboolean" c:type="gboolean"/>
+      </property>
+      <property name="font-size" writable="1" readable="1" transfer-ownership="none">
+        <type name="gdouble" c:type="gdouble"/>
+      </property>
+      <property name="padding" writable="1" readable="1" transfer-ownership="none">
+        <type name="gdouble" c:type="gdouble"/>
+      </property>
+      <property name="color" writable="1" readable="1" transfer-ownership="none">
+        <type name="Gdk.RGBA" c:type="GdkRGBA*"/>
+      </property>
+      <property name="font-dir" writable="1" readable="1" transfer-ownership="none">
+        <type name="utf8" c:type="gchar*"/>
+      </property>
+      <property name="error-message" readable="1" transfer-ownership="none">
+        <type name="utf8" c:type="gchar*"/>
+      </property>
+    </class>
+    <record name="FormulaClass"
+            c:type="RatexFormulaClass"
+            disguised="1"
+            glib:is-gtype-struct-for="Formula"/>
+  </namespace>
+</repository>

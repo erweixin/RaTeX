@@ -60,6 +60,26 @@ mod core_parsing {
     }
 
     #[test]
+    fn dotsc_before_comma_omits_thinspace() {
+        let ast = parse("x,\\dotsc,y").unwrap();
+        assert!(!ast
+            .iter()
+            .any(|node| matches!(node, ParseNode::Kern { .. })));
+        assert_eq!(ast.len(), 5);
+        assert_eq!(ast[2].symbol_text(), Some("\\ldots"));
+        assert_eq!(ast[3].symbol_text(), Some(","));
+    }
+
+    #[test]
+    fn dotsc_before_selected_punctuation_keeps_thinspace() {
+        let ast = parse("x,\\dotsc;y").unwrap();
+        assert_eq!(ast.len(), 6);
+        assert_eq!(ast[2].symbol_text(), Some("\\ldots"));
+        assert!(matches!(ast[3], ParseNode::Kern { .. }));
+        assert_eq!(ast[4].symbol_text(), Some(";"));
+    }
+
+    #[test]
     fn open_paren() {
         let ast = parse("(").unwrap();
         assert_eq!(ast.len(), 1);
@@ -1055,6 +1075,107 @@ mod environments {
             assert_eq!(right, "\\Vert");
         } else {
             panic!("Expected LeftRight node");
+        }
+    }
+}
+
+#[cfg(test)]
+mod verb {
+    use crate::parse_node::ParseNode;
+    use crate::parser::parse;
+
+    #[test]
+    fn ascii_delimiter() {
+        let ast = parse("\\verb|hello|").unwrap();
+        assert_eq!(ast.len(), 1);
+        if let ParseNode::Verb { body, star, .. } = &ast[0] {
+            assert_eq!(body, "hello");
+            assert!(!star);
+        } else {
+            panic!("Expected Verb node");
+        }
+    }
+
+    #[test]
+    fn starred_ascii_delimiter() {
+        let ast = parse("\\verb*|hello world|").unwrap();
+        if let ParseNode::Verb { body, star, .. } = &ast[0] {
+            assert_eq!(body, "hello world");
+            assert!(star);
+        } else {
+            panic!("Expected Verb node");
+        }
+    }
+
+    #[test]
+    fn multibyte_delimiter_does_not_panic() {
+        let ast = parse("\\verbéxé").unwrap();
+        if let ParseNode::Verb { body, star, .. } = &ast[0] {
+            assert_eq!(body, "x");
+            assert!(!star);
+        } else {
+            panic!("Expected Verb node");
+        }
+    }
+
+    #[test]
+    fn starred_multibyte_delimiter_does_not_panic() {
+        let ast = parse("\\verb*éxé").unwrap();
+        if let ParseNode::Verb { body, star, .. } = &ast[0] {
+            assert_eq!(body, "x");
+            assert!(star);
+        } else {
+            panic!("Expected Verb node");
+        }
+    }
+
+    #[test]
+    fn too_short_returns_error() {
+        assert!(parse("\\verbé").is_err());
+    }
+}
+
+#[cfg(test)]
+mod recursion_limit {
+    use crate::error::ParseError;
+    use crate::parser::parse;
+
+    fn nested_braces(n: usize) -> String {
+        format!("{}{}{}", "{".repeat(n), "x", "}".repeat(n))
+    }
+
+    fn assert_recursion_limit_err(input: &str) {
+        let err = parse(input).unwrap_err();
+        assert!(
+            err.to_string().contains("Recursion limit exceeded"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn recursion_limit_error_message() {
+        let err = ParseError::recursion_limit_exceeded();
+        assert!(err.to_string().contains("Recursion limit exceeded"));
+    }
+
+    // Needs release-sized stacks; debug overflows before MAX (512) is reached.
+    #[cfg(not(debug_assertions))]
+    mod release_only {
+        use super::*;
+
+        #[test]
+        fn nested_braces_at_limit_succeeds() {
+            assert!(parse(&nested_braces(511)).is_ok());
+        }
+
+        #[test]
+        fn nested_braces_over_limit_fails() {
+            assert_recursion_limit_err(&nested_braces(512));
+        }
+
+        #[test]
+        fn poc_deep_nesting_does_not_abort() {
+            assert_recursion_limit_err(&nested_braces(200_000));
         }
     }
 }

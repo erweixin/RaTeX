@@ -193,8 +193,16 @@ fn color_to_svg(c: &Color) -> String {
     let r = (c.r.clamp(0.0, 1.0) * 255.0).round() as u8;
     let g = (c.g.clamp(0.0, 1.0) * 255.0).round() as u8;
     let b = (c.b.clamp(0.0, 1.0) * 255.0).round() as u8;
-    let a = c.a.clamp(0.0, 1.0);
+    let a = normalized_alpha(c.a);
     format!("rgba({r},{g},{b},{a})")
+}
+
+fn normalized_alpha(alpha: f32) -> f32 {
+    if alpha.is_finite() {
+        alpha.clamp(0.0, 1.0)
+    } else {
+        1.0
+    }
 }
 
 pub(crate) fn fmt_num(n: f64) -> String {
@@ -290,10 +298,19 @@ fn emit_glyph_standalone(
                     let y_s = fmt_num(*y as f64);
                     let w_s = fmt_num(*w as f64);
                     let h_s = fmt_num(*h as f64);
-                    let _ = write!(
-                        out,
-                        r#"<image href="{href}" x="{x_s}" y="{y_s}" width="{w_s}" height="{h_s}" preserveAspectRatio="none"/>"#
-                    );
+                    let opacity = normalized_alpha(g.color.a);
+                    if opacity < 1.0 {
+                        let opacity_s = fmt_num(opacity as f64);
+                        let _ = write!(
+                            out,
+                            r#"<image href="{href}" x="{x_s}" y="{y_s}" width="{w_s}" height="{h_s}" opacity="{opacity_s}" preserveAspectRatio="none"/>"#
+                        );
+                    } else {
+                        let _ = write!(
+                            out,
+                            r#"<image href="{href}" x="{x_s}" y="{y_s}" width="{w_s}" height="{h_s}" preserveAspectRatio="none"/>"#
+                        );
+                    }
                     return;
                 }
             }
@@ -613,5 +630,49 @@ mod tests {
         assert!(svg.contains("<path"));
         assert!(svg.contains("fill-rule=\"nonzero\""));
         assert!(!svg.contains("<text"));
+    }
+
+    #[cfg(feature = "standalone")]
+    #[test]
+    fn embedded_emoji_image_uses_color_alpha_as_opacity() {
+        use std::path::PathBuf;
+
+        let ch = '😀';
+        if ratex_unicode_font::emoji_png_raster_for_char(ch, 10.0).is_none() {
+            return;
+        }
+
+        let font_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tools/lexer_compare/node_modules/katex/dist/fonts");
+        if !font_dir.join("KaTeX_Main-Regular.ttf").exists() {
+            return;
+        }
+
+        let list = DisplayList {
+            items: vec![DisplayItem::GlyphPath {
+                x: 0.0,
+                y: 1.0,
+                scale: 1.0,
+                font: "Emoji-Fallback".to_string(),
+                char_code: ch as u32,
+                color: Color::new(1.0, 0.0, 0.0, 0.5),
+            }],
+            width: 1.2,
+            height: 2.0,
+            depth: 0.0,
+        };
+        let svg = render_to_svg(
+            &list,
+            &SvgOptions {
+                font_size: 10.0,
+                padding: 0.0,
+                stroke_width: 1.0,
+                embed_glyphs: true,
+                font_dir: font_dir.to_string_lossy().into(),
+            },
+        );
+
+        assert!(svg.contains("<image"));
+        assert!(svg.contains("opacity=\"0.5\""), "{svg}");
     }
 }
