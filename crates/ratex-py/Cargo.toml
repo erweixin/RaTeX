@@ -1,0 +1,33 @@
+[package]
+name = "ratex-py"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+description = "Python bindings for RaTeX math rendering (PyO3 / maturin)"
+
+[lib]
+name = "ratex_py"
+crate-type = ["cdylib"]
+
+[features]
+default = ["embed-fonts"]
+## Required by maturin / PyO3 when building a Python extension module.
+extension-module = ["pyo3/extension-module"]
+## Bundle KaTeX TTF fonts so no external font-dir is needed at runtime.
+embed-fonts = [
+    "ratex-svg/embed-fonts",
+    "ratex-render/embed-fonts",
+]
+
+[dependencies]
+pyo3 = { version = "0.28", features = ["auto-initialize"] }
+ratex-types  = { workspace = true }
+ratex-parser = { workspace = true }
+ratex-layout = { workspace = true }
+ratex-svg    = { workspace = true, features = ["standalone"] }
+ratex-render = { workspace = true }
+ratex-pdf    = { workspace = true }
+serde_json   = { workspace = true }
