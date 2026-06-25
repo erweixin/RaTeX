@@ -304,11 +304,6 @@ private struct BaselineFlowLayout: Layout {
         var y = bounds.minY
         for line in cache {
             let baselines = line.map { item in
-                let formulaAscent = subviews[item.index][RaTeXFormulaAscentKey.self]
-                if formulaAscent > 0 {
-                    return formulaAscent
-                }
-
                 let dimensions = subviews[item.index].dimensions(in: ProposedViewSize(item.size))
                 let textBaseline = dimensions[.firstTextBaseline]
                 return textBaseline > 0 ? textBaseline : item.size.height / 2

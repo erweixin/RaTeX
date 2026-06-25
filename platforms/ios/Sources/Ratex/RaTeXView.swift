@@ -127,6 +127,22 @@ public class RaTeXView: PlatformView {
             platformSetNeedsDisplay()
         }
     }
+
+    // MARK: Baseline
+
+    /// Expose the formula's math baseline to AppKit Auto Layout so that
+    /// `firstBaselineAnchor` / `lastBaselineAnchor` align to the baseline instead
+    /// of the view's edges — the AppKit analogue of the iOS `baselineMarker`.
+    /// These read the up-to-date `mathAscent`/`mathDescent` written by `rerender()`,
+    /// which also calls `invalidateIntrinsicContentSize()` so the constraint system
+    /// re-queries them after the renderer changes.
+    public override var firstBaselineOffsetFromTop: CGFloat {
+        mathAscent > 0 ? mathAscent : super.firstBaselineOffsetFromTop
+    }
+
+    public override var lastBaselineOffsetFromBottom: CGFloat {
+        mathDescent > 0 ? mathDescent : super.lastBaselineOffsetFromBottom
+    }
     #else
     // MARK: Baseline
 

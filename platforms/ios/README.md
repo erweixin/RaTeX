@@ -171,7 +171,7 @@ struct FlowLayout: Layout {
 > }
 > ```
 >
-> The `RaTeXFormulaAscentKey` + custom `Layout` approach above (iOS 16+ / macOS 13+) is only needed when you also want automatic line wrapping; see `demo/spm-macos` for a runnable macOS example. When embedding `RaTeXView` directly in raw UIKit/AppKit Auto Layout, use `firstBaselineAnchor` (iOS) or override `firstBaselineOffsetFromTop` (macOS).
+> The `RaTeXFormulaAscentKey` + custom `Layout` approach above (iOS 16+ / macOS 13+) is only needed when you also want automatic line wrapping; see `demo/spm-macos` for a runnable macOS example. When embedding `RaTeXView` directly in raw UIKit/AppKit Auto Layout, its `firstBaselineAnchor` / `lastBaselineAnchor` already resolve to the formula's math baseline on **both platforms** — UIKit via `forFirstBaselineLayout`, AppKit via `firstBaselineOffsetFromTop` / `lastBaselineOffsetFromBottom` — so a baseline constraint against an `NSTextField`/`UILabel` lines up without any extra work.
 
 ### Low-level (custom drawing)
 

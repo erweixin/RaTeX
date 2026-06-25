@@ -172,7 +172,7 @@ struct FlowLayout: Layout {
 > }
 > ```
 >
-> 上面基于 `RaTeXFormulaAscentKey` + 自定义 `Layout` 的方案（iOS 16+ / macOS 13+）仅在需要自动换行时才需要，可运行示例见 `demo/spm-macos`。若将 `RaTeXView` 直接嵌入原生 UIKit/AppKit Auto Layout，请使用 `firstBaselineAnchor`（iOS）或重写 `firstBaselineOffsetFromTop`（macOS）。
+> 上面基于 `RaTeXFormulaAscentKey` + 自定义 `Layout` 的方案（iOS 16+ / macOS 13+）仅在需要自动换行时才需要，可运行示例见 `demo/spm-macos`。若将 `RaTeXView` 直接嵌入原生 UIKit/AppKit Auto Layout，其 `firstBaselineAnchor` / `lastBaselineAnchor` 在 **iOS 与 macOS 上**都已对齐到公式的数学基线——UIKit 通过 `forFirstBaselineLayout`，AppKit 通过 `firstBaselineOffsetFromTop` / `lastBaselineOffsetFromBottom`——因此与 `NSTextField`/`UILabel` 做基线约束时无需任何额外处理即可对齐。
 
 ### 底层自定义绘制
 
