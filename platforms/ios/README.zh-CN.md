@@ -163,6 +163,17 @@ struct FlowLayout: Layout {
 
 `RaTeXFormulaAscentKey` 是库内置的 `LayoutValueKey<CGFloat>`，携带公式的 ascent（基线到顶部的距离），供 `FlowLayout` 在混排时对齐，无需手动计算偏移量。
 
+> **基线对齐跨平台可用。** `RaTeXFormula` 通过 `.alignmentGuide(.firstTextBaseline)` 上报数学基线，因此 `HStack(alignment: .firstTextBaseline)` 与 `Text` 基线对齐在 **iOS 与 macOS 上、所有受支持的系统版本**都能正确对齐——简单场景无需自定义 `Layout`：
+>
+> ```swift
+> HStack(alignment: .firstTextBaseline) {
+>     Text("欧拉恒等式：")
+>     RaTeXFormula(latex: #"e^{i\pi}+1=0"#, fontSize: 17, displayMode: false)
+> }
+> ```
+>
+> 上面基于 `RaTeXFormulaAscentKey` + 自定义 `Layout` 的方案（iOS 16+ / macOS 13+）仅在需要自动换行时才需要，可运行示例见 `demo/spm-macos`。若将 `RaTeXView` 直接嵌入原生 UIKit/AppKit Auto Layout，请使用 `firstBaselineAnchor`（iOS）或重写 `firstBaselineOffsetFromTop`（macOS）。
+
 ### 底层自定义绘制
 
 ```swift

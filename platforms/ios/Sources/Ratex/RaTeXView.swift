@@ -243,6 +243,18 @@ public struct RaTeXFormulaAscentKey: LayoutValueKey {
 /// RaTeXFormula(latex: #"\int_0^\infty e^{-x^2}\,dx = \frac{\sqrt{\pi}}{2}"#, fontSize: 24)
 /// ```
 ///
+/// ### Baseline alignment (all versions, iOS + macOS)
+///
+/// `RaTeXFormula` reports its math baseline via `.alignmentGuide(.firstTextBaseline)`,
+/// so it aligns with surrounding text out of the box on both platforms:
+///
+/// ```swift
+/// HStack(alignment: .firstTextBaseline) {
+///     Text("Euler's identity:")
+///     RaTeXFormula(latex: #"e^{i\pi}+1=0"#, fontSize: 17, displayMode: false)
+/// }
+/// ```
+///
 /// ### Inline mixing with custom layouts (iOS 16+ / macOS 13+)
 ///
 /// `RaTeXFormula` automatically writes its typographic ascent into
@@ -295,6 +307,18 @@ public struct RaTeXFormula: View {
     }
 
     public var body: some View {
+        // `.alignmentGuide(.firstTextBaseline)` reports the formula's math baseline
+        // explicitly, so `HStack(alignment: .firstTextBaseline)` and `Text` baseline
+        // alignment work identically on iOS and macOS, on every supported OS version.
+        // This does not rely on SwiftUI bridging the UIKit/AppKit native baseline
+        // anchors through the representable (which is undocumented and inconsistent).
+        representable
+            .alignmentGuide(.firstTextBaseline) { _ in ascent }
+            .alignmentGuide(.lastTextBaseline) { _ in ascent }
+    }
+
+    @ViewBuilder
+    private var representable: some View {
         if #available(iOS 16, macOS 13, *) {
             _RaTeXRepresentable(
                 latex: latex,
@@ -304,6 +328,7 @@ public struct RaTeXFormula: View {
                 onError: onError,
                 onLayout: onLayout
             )
+            // Read by custom `Layout`s for flow/wrapping (see ``RaTeXFormulaAscentKey``).
             .layoutValue(key: RaTeXFormulaAscentKey.self, value: ascent)
         } else {
             _RaTeXRepresentable(

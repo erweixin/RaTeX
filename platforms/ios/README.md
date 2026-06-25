@@ -162,6 +162,17 @@ struct FlowLayout: Layout {
 
 `RaTeXFormulaAscentKey` is a `LayoutValueKey<CGFloat>` built into the library. It carries the formula's ascent (distance from baseline to top) so that `FlowLayout` can align mixed children without manual offset calculation.
 
+> **Baseline alignment is cross-platform.** `RaTeXFormula` reports its math baseline through `.alignmentGuide(.firstTextBaseline)`, so `HStack(alignment: .firstTextBaseline)` and `Text` baseline alignment line up correctly on **both iOS and macOS**, on every supported OS version — no custom `Layout` required for the simple case:
+>
+> ```swift
+> HStack(alignment: .firstTextBaseline) {
+>     Text("Euler's identity:")
+>     RaTeXFormula(latex: #"e^{i\pi}+1=0"#, fontSize: 17, displayMode: false)
+> }
+> ```
+>
+> The `RaTeXFormulaAscentKey` + custom `Layout` approach above (iOS 16+ / macOS 13+) is only needed when you also want automatic line wrapping; see `demo/spm-macos` for a runnable macOS example. When embedding `RaTeXView` directly in raw UIKit/AppKit Auto Layout, use `firstBaselineAnchor` (iOS) or override `firstBaselineOffsetFromTop` (macOS).
+
 ### Low-level (custom drawing)
 
 ```swift

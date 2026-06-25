@@ -146,3 +146,24 @@ jobs:
         run: LIBRARY_PATH=$(pwd)/target/release swift test --package-path platforms/ios/tests
       - name: Smoke executable (macOS)
         run: LIBRARY_PATH=$(pwd)/target/release swift run --package-path platforms/ios/tests ratex-smoke
+
+  # Compiles the real SPM package's Swift wrapper (platforms/ios/Sources/Ratex/*.swift)
+  # for macOS/AppKit through the published Package.swift + RaTeX.xcframework binary
+  # target. The ios-swift-smoke job above only exercises a separate macOS-compatible
+  # copy under platforms/ios/tests, so this job is what guards the NSView/AppKit code.
+  macos-spm-build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - name: Build macOS XCFramework slice
+        run: bash scripts/build-apple-xcframework.sh --macos
+      - name: Verify macOS slice
+        run: bash scripts/verify-xcframework-slices.sh platforms/ios/RaTeX.xcframework macos
+      # `swift build` (not `run`) — the demo is a SwiftUI App and would block on a
+      # GUI window in CI. Building is enough to compile every macOS code path.
+      - name: Build macOS SPM demo (compiles Sources/Ratex for AppKit)
+        run: swift build --package-path demo/spm-macos
