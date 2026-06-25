@@ -1,6 +1,6 @@
-# RaTeX — iOS Integration Guide
+# RaTeX — Apple Integration Guide
 
-Native iOS rendering of LaTeX math formulas via Swift and CoreGraphics.
+Native iOS and macOS rendering of LaTeX math formulas via Swift and CoreGraphics.
 No WebView, no JavaScript, no DOM.
 
 ---
@@ -14,7 +14,7 @@ JSON DisplayList
     ↓ RaTeXEngine.parse()       [Swift JSON decode]
 DisplayList
     ↓ RaTeXRenderer.draw()      [CoreGraphics]
-UIView / SwiftUI View
+UIView / NSView / SwiftUI View
 ```
 
 ---
@@ -38,11 +38,13 @@ UIView / SwiftUI View
 | Xcode | 15+ |
 | Rust | 1.75+ (`rustup`) |
 | iOS target | 14+ |
+| macOS target | 14+ |
 
-Install Rust iOS targets once:
+Install Rust Apple targets once:
 
 ```bash
 rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
 ```
 
 ---
@@ -52,17 +54,16 @@ rustup target add aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
 From the repo root:
 
 ```bash
-bash platforms/ios/build-ios.sh
+bash scripts/build-apple-xcframework.sh
 ```
 
-This produces `platforms/ios/RaTeX.xcframework` with **iOS** slices.
+This produces `platforms/ios/RaTeX.xcframework` with **iOS** and **macOS** slices.
 
-> React Native with macOS support must build an XCFramework that also contains
-> **macOS** slices:
->
-> ```bash
-> bash scripts/build-apple-xcframework.sh
-> ```
+For an iOS-only local artifact, use the compatibility wrapper:
+
+```bash
+bash platforms/ios/build-ios.sh
+```
 
 ---
 
@@ -72,14 +73,15 @@ This produces `platforms/ios/RaTeX.xcframework` with **iOS** slices.
 
 In Xcode: **File → Add Package Dependencies**, enter `https://github.com/erweixin/RaTeX` and select the `RaTeX` product.
 
-**Local development** — Run `bash platforms/ios/build-ios.sh` first, then point Xcode to the repo root via **File → Add Package Dependencies → Add Local…**.
-For React Native macOS scenarios, run `bash scripts/build-apple-xcframework.sh` instead.
+**Local development** — Run `bash platforms/ios/build-ios.sh` first for iOS-only work, or `bash scripts/build-apple-xcframework.sh` for macOS SPM consumers. Then point Xcode to the repo root via **File → Add Package Dependencies → Add Local…**.
+
+For a runnable macOS SPM integration check, see `demo/spm-macos`.
 
 ### Option B — Manual
 
 1. Drag `platforms/ios/RaTeX.xcframework` into your Xcode project.
 2. In **Build Phases → Link Binary With Libraries**, ensure it is listed.
-3. Copy the `platforms/ios/Sources/RaTeX/*.swift` files into your project.
+3. Copy the `platforms/ios/Sources/Ratex/*.swift` files into your project, including `PlatformCompat.swift`.
 4. Add the `Fonts` folder from `platforms/ios/Sources/Ratex/Fonts/` to your target’s **Copy Bundle Resources**; fonts load automatically on first render, or call `RaTeXFontLoader.loadFromBundle()` at startup.
 
 ---
@@ -160,6 +162,17 @@ struct FlowLayout: Layout {
 
 `RaTeXFormulaAscentKey` is a `LayoutValueKey<CGFloat>` built into the library. It carries the formula's ascent (distance from baseline to top) so that `FlowLayout` can align mixed children without manual offset calculation.
 
+> **Baseline alignment is cross-platform.** `RaTeXFormula` reports its math baseline through `.alignmentGuide(.firstTextBaseline)`, so `HStack(alignment: .firstTextBaseline)` and `Text` baseline alignment line up correctly on **both iOS and macOS**, on every supported OS version — no custom `Layout` required for the simple case:
+>
+> ```swift
+> HStack(alignment: .firstTextBaseline) {
+>     Text("Euler's identity:")
+>     RaTeXFormula(latex: #"e^{i\pi}+1=0"#, fontSize: 17, displayMode: false)
+> }
+> ```
+>
+> The `RaTeXFormulaAscentKey` + custom `Layout` approach above (iOS 16+ / macOS 13+) is only needed when you also want automatic line wrapping; see `demo/spm-macos` for a runnable macOS example. When embedding `RaTeXView` directly in raw UIKit/AppKit Auto Layout, its `firstBaselineAnchor` / `lastBaselineAnchor` already resolve to the formula's math baseline on **both platforms** — UIKit via `forFirstBaselineLayout`, AppKit via `firstBaselineOffsetFromTop` / `lastBaselineOffsetFromBottom` — so a baseline constraint against an `NSTextField`/`UILabel` lines up without any extra work.
+
 ### Low-level (custom drawing)
 
 ```swift
@@ -199,7 +212,8 @@ by `fontSize` (pt) to produce screen coordinates.
 |------|---------|
 | `build-ios.sh` | iOS-only build entry (delegates to unified Apple build script) |
 | `Package.swift` | Swift Package manifest |
-| `Sources/RaTeX/DisplayList.swift` | Codable Swift mirror of Rust types |
-| `Sources/RaTeX/RaTeXEngine.swift` | Calls C ABI, decodes JSON |
-| `Sources/RaTeX/RaTeXRenderer.swift` | CoreGraphics drawing loop |
-| `Sources/RaTeX/RaTeXView.swift` | UIKit `UIView` + SwiftUI `View` |
+| `Sources/Ratex/DisplayList.swift` | Codable Swift mirror of Rust types |
+| `Sources/Ratex/PlatformCompat.swift` | UIKit/AppKit compatibility aliases |
+| `Sources/Ratex/RaTeXEngine.swift` | Calls C ABI, decodes JSON |
+| `Sources/Ratex/RaTeXRenderer.swift` | CoreGraphics drawing loop |
+| `Sources/Ratex/RaTeXView.swift` | UIKit/AppKit view + SwiftUI `View` |

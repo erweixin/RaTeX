@@ -6,7 +6,7 @@
 #
 # IMPORTANT:
 # - iOS-only artifacts:    use this script (or build-apple-xcframework.sh --ios)
-# - React Native macOS:    must use scripts/build-apple-xcframework.sh (default)
+# - SPM/macOS consumers:   must use scripts/build-apple-xcframework.sh (default)
 #                          so RaTeX.xcframework includes macOS slices.
 
 set -euo pipefail

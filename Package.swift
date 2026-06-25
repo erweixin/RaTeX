@@ -1,13 +1,10 @@
 // swift-tools-version: 5.9
 //
-// RaTeX — Native iOS LaTeX rendering via CoreGraphics + CoreText.
+// RaTeX — Native Apple LaTeX rendering via CoreGraphics + CoreText.
 //
 // Development (local):
-//   1. Run `bash platforms/ios/build-ios.sh` to produce an iOS-only RaTeX.xcframework
+//   1. Run `bash scripts/build-apple-xcframework.sh` to produce an iOS + macOS RaTeX.xcframework
 //   2. Add this package locally in Xcode via File → Add Package Dependencies → Add Local…
-//
-// React Native macOS needs iOS + macOS slices:
-//   `bash scripts/build-apple-xcframework.sh`
 //
 // Published releases use a remote binaryTarget (url + checksum).
 // The CI workflow substitutes the path: target below before tagging a release.
@@ -16,20 +13,20 @@ import PackageDescription
 
 let package = Package(
     name: "RaTeX",
-    platforms: [.iOS(.v14)],
+    platforms: [.iOS(.v14), .macOS(.v14)],
     products: [
         .library(name: "RaTeX", targets: ["RaTeX"]),
     ],
     targets: [
-        // Pre-built XCFramework — iOS-only build entry:
-        // `bash platforms/ios/build-ios.sh` (delegates to the unified Apple script).
+        // Pre-built XCFramework - iOS + macOS build entry:
+        // `bash scripts/build-apple-xcframework.sh`.
         // In published releases this is replaced with a remote url + checksum target.
         .binaryTarget(
             name: "RaTeXFFI",
             path: "platforms/ios/RaTeX.xcframework"
         ),
 
-        // Swift wrapper: rendering, font loading, UIKit/SwiftUI views.
+        // Swift wrapper: rendering, font loading, UIKit/AppKit/SwiftUI views.
         .target(
             name: "RaTeX",
             dependencies: ["RaTeXFFI"],

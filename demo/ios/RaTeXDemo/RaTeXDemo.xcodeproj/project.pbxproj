@@ -17,6 +17,7 @@
 		AA000007 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000030 /* ContentView.swift */; };
 		AA000008 /* RaTeXDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000031 /* RaTeXDemoApp.swift */; };
 		AA000009 /* RaTeXFontLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000024 /* RaTeXFontLoader.swift */; };
+		AA00000A /* PlatformCompat.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000025 /* PlatformCompat.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -46,11 +47,12 @@
 
 /* Begin PBXFileReference section */
 		AA000010 /* RaTeX.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = "RaTeX.xcframework"; path = "../../../platforms/ios/RaTeX.xcframework"; sourceTree = "<group>"; };
-		AA000020 /* DisplayList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DisplayList.swift; path = "../../../platforms/ios/Sources/RaTeX/DisplayList.swift"; sourceTree = "<group>"; };
-		AA000021 /* RaTeXEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RaTeXEngine.swift; path = "../../../platforms/ios/Sources/RaTeX/RaTeXEngine.swift"; sourceTree = "<group>"; };
-		AA000022 /* RaTeXRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RaTeXRenderer.swift; path = "../../../platforms/ios/Sources/RaTeX/RaTeXRenderer.swift"; sourceTree = "<group>"; };
-		AA000023 /* RaTeXView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RaTeXView.swift; path = "../../../platforms/ios/Sources/RaTeX/RaTeXView.swift"; sourceTree = "<group>"; };
-		AA000024 /* RaTeXFontLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RaTeXFontLoader.swift; path = "../../../platforms/ios/Sources/RaTeX/RaTeXFontLoader.swift"; sourceTree = "<group>"; };
+		AA000020 /* DisplayList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DisplayList.swift; path = "../../../platforms/ios/Sources/Ratex/DisplayList.swift"; sourceTree = "<group>"; };
+		AA000021 /* RaTeXEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RaTeXEngine.swift; path = "../../../platforms/ios/Sources/Ratex/RaTeXEngine.swift"; sourceTree = "<group>"; };
+		AA000022 /* RaTeXRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RaTeXRenderer.swift; path = "../../../platforms/ios/Sources/Ratex/RaTeXRenderer.swift"; sourceTree = "<group>"; };
+		AA000023 /* RaTeXView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RaTeXView.swift; path = "../../../platforms/ios/Sources/Ratex/RaTeXView.swift"; sourceTree = "<group>"; };
+		AA000024 /* RaTeXFontLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = RaTeXFontLoader.swift; path = "../../../platforms/ios/Sources/Ratex/RaTeXFontLoader.swift"; sourceTree = "<group>"; };
+		AA000025 /* PlatformCompat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = PlatformCompat.swift; path = "../../../platforms/ios/Sources/Ratex/PlatformCompat.swift"; sourceTree = "<group>"; };
 		AA000030 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AA000031 /* RaTeXDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RaTeXDemoApp.swift; sourceTree = "<group>"; };
 		AA000050 /* RaTeXDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RaTeXDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -97,6 +99,7 @@
 				AA000022 /* RaTeXRenderer.swift */,
 				AA000023 /* RaTeXView.swift */,
 				AA000024 /* RaTeXFontLoader.swift */,
+				AA000025 /* PlatformCompat.swift */,
 			);
 			name = "RaTeX Sources";
 			sourceTree = "<group>";
@@ -189,6 +192,7 @@
 				AA000005 /* RaTeXRenderer.swift in Sources */,
 				AA000006 /* RaTeXView.swift in Sources */,
 				AA000009 /* RaTeXFontLoader.swift in Sources */,
+				AA00000A /* PlatformCompat.swift in Sources */,
 				AA000007 /* ContentView.swift in Sources */,
 				AA000008 /* RaTeXDemoApp.swift in Sources */,
 			);

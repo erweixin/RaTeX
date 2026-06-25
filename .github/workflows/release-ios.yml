@@ -18,16 +18,21 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+          targets: >
+            aarch64-apple-ios,
+            aarch64-apple-ios-sim,
+            x86_64-apple-ios,
+            aarch64-apple-darwin,
+            x86_64-apple-darwin
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
 
       - name: Build XCFramework
-        run: bash platforms/ios/build-ios.sh
+        run: bash scripts/build-apple-xcframework.sh
 
       - name: Verify XCFramework platform slices
-        run: bash scripts/verify-xcframework-slices.sh platforms/ios/RaTeX.xcframework ios
+        run: bash scripts/verify-xcframework-slices.sh platforms/ios/RaTeX.xcframework ios macos
 
       # Zip the XCFramework — SPM requires a zip for remote binary targets
       - name: Package XCFramework
