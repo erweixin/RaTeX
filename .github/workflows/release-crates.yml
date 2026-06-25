@@ -46,12 +46,27 @@ jobs:
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
 
-      - name: Publish crates (dependency order)
+      - name: Publish core crates (dependency order)
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
           # 拓扑序：依赖在前，被依赖在后（与 workspace 的 path 依赖一致）
           for crate in ratex-types ratex-font ratex-lexer ratex-parser ratex-layout ratex-katex-fonts ratex-unicode-font ratex-font-loader ratex-svg ratex-ffi ratex-pdf ratex-render ratex-wasm; do
+            echo "Publishing $crate..."
+            cargo publish -p "$crate"
+          done
+
+      - name: Install GTK/Cairo system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libcairo2-dev libgtk-4-dev libadwaita-1-dev
+
+      - name: Publish GTK crates (dependency order)
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          # 追加发布桌面 GTK/Cairo crates；放在 core crates 之后，避免影响既有发布链路。
+          for crate in ratex-cairo ratex-gtk4; do
             echo "Publishing $crate..."
             cargo publish -p "$crate"
           done
