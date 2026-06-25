@@ -44,3 +44,8 @@ resvg = { version = "0.47", default-features = false }
 name = "golden_svg"
 path = "tests/golden_svg.rs"
 required-features = ["standalone"]
+
+[[test]]
+name = "render_svg_cli"
+path = "tests/render_svg_cli.rs"
+required-features = ["cli", "standalone"]

@@ -37,3 +37,8 @@ required-features = ["cli"]
 [dev-dependencies]
 ratex-layout = { workspace = true }
 ratex-parser = { workspace = true }
+
+[[test]]
+name = "render_pdf_cli"
+path = "tests/render_pdf_cli.rs"
+required-features = ["cli"]

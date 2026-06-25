@@ -35,18 +35,20 @@ mkdir -p "$OUTPUT_DIR" "$OUTPUT_SVG_DIR"
 rm -f "$OUTPUT_DIR"/*.png "$OUTPUT_SVG_DIR"/*.svg
 
 echo "Rendering prooftree formulas (PNG)..."
+# Render errors are informational here (see update_golden_output.sh). `|| true` keeps
+# `set -e` from aborting on the binary's non-zero exit; failures are reported below.
 cargo run --release -p ratex-render --bin render -- \
   --font-dir "$FONT_DIR" \
   --font-size 36 \
   --output-dir "$OUTPUT_DIR" \
-  < "$TEST_CASES" 2>"$TMP_ERR"
+  < "$TEST_CASES" 2>"$TMP_ERR" || true
 
 echo "Rendering prooftree formulas (SVG, path glyphs)..."
 (cd "$ROOT" && cargo run --release -p ratex-svg --features cli,standalone --bin render-svg -- \
   --font-dir "$FONT_DIR" \
   --font-size 36 \
   --output-dir "$OUTPUT_SVG_DIR" \
-  < "$TEST_CASES") 2>"$TMP_ERR_SVG"
+  < "$TEST_CASES") 2>"$TMP_ERR_SVG" || true
 
 if [[ -s "$TMP_ERR" ]]; then
   failed=$(grep -c '^ERR' "$TMP_ERR" 2>/dev/null || true)

@@ -46,16 +46,19 @@ rm -f "$OUTPUT_DIR"/*.png
 rm -f "$OUTPUT_SVG_DIR"/*.svg
 
 echo "Rendering formulas (PNG)..."
+# Render errors are informational here: the corpus intentionally includes cases RaTeX
+# does not support (e.g. \includegraphics). `|| true` keeps `set -e` from aborting on the
+# binary's non-zero exit; failures are still reported from $TMP_ERR below.
 cargo run --release -p ratex-render --bin render -- \
   --font-dir "$FONT_DIR" \
   --output-dir "$OUTPUT_DIR" \
-  < "$TEST_CASES" 2>"$TMP_ERR"
+  < "$TEST_CASES" 2>"$TMP_ERR" || true
 
 echo "Rendering formulas (SVG, path glyphs)..."
 (cd "$ROOT" && cargo run --release -p ratex-svg --features cli,standalone --bin render-svg -- \
   --font-dir "$FONT_DIR" \
   --output-dir "$OUTPUT_SVG_DIR" \
-  < "$TEST_CASES") 2>"$TMP_ERR_SVG"
+  < "$TEST_CASES") 2>"$TMP_ERR_SVG" || true
 
 if [[ -s "$TMP_ERR" ]]; then
   failed_count=$(grep -c '^ERR' "$TMP_ERR" 2>/dev/null || true)
@@ -86,12 +89,12 @@ if [[ -f "$TEST_CASE_CE" ]]; then
     --font-dir "$FONT_DIR" \
     --output-dir "$OUTPUT_CE_DIR" \
     --dpr 2 \
-    < "$TEST_CASE_CE" 2>"$TMP_ERR_CE"
+    < "$TEST_CASE_CE" 2>"$TMP_ERR_CE" || true
   (cd "$ROOT" && cargo run --release -p ratex-svg --features cli,standalone --bin render-svg -- \
     --font-dir "$FONT_DIR" \
     --output-dir "$OUTPUT_SVG_CE_DIR" \
     --dpr 2 \
-    < "$TEST_CASE_CE") 2>"$TMP_ERR_SVG_CE"
+    < "$TEST_CASE_CE") 2>"$TMP_ERR_SVG_CE" || true
   if [[ -s "$TMP_ERR_CE" ]]; then
     failed_ce=$(grep -c '^ERR' "$TMP_ERR_CE" 2>/dev/null || true)
     echo "mhchem PNG render errors: $failed_ce"

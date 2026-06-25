@@ -73,6 +73,7 @@ fn main() {
 
     let mut idx = 0;
     let mut ok_count = 0;
+    let mut failed = 0;
     let reader: Box<dyn BufRead> = match input_file {
         Some(path) => {
             Box::new(io::BufReader::new(File::open(&path).unwrap_or_else(|e| {
@@ -97,15 +98,20 @@ fn main() {
                 println!("OK  {:4} {}", idx, expr);
             }
             Err(e) => {
+                failed += 1;
                 eprintln!("ERR {:4} {} — {}", idx, expr, e);
             }
         }
     }
 
     println!(
-        "\nProcessed {} formula(s), wrote {} PDF(s) to {}/",
-        idx, ok_count, output_dir
+        "\nProcessed {} formula(s), wrote {} PDF(s), failed {}.",
+        idx, ok_count, failed
     );
+
+    if failed > 0 {
+        std::process::exit(1);
+    }
 }
 
 fn pdf_formula(

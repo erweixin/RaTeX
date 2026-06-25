@@ -96,6 +96,8 @@ fn main() {
     let layout_opts = LayoutOptions::default().with_style(style).with_color(color);
 
     let mut idx = 0;
+    let mut wrote = 0;
+    let mut failed = 0;
     let reader: Box<dyn BufRead> = match input_file {
         Some(path) => {
             Box::new(io::BufReader::new(File::open(&path).unwrap_or_else(|e| {
@@ -116,15 +118,24 @@ fn main() {
             Ok(png_data) => {
                 let path = PathBuf::from(&output_dir).join(format!("{:04}.png", idx));
                 std::fs::write(&path, &png_data).expect("Failed to write PNG");
+                wrote += 1;
                 println!("OK  {:4} {}", idx, expr);
             }
             Err(e) => {
+                failed += 1;
                 eprintln!("ERR {:4} {} — {}", idx, expr, e);
             }
         }
     }
 
-    println!("\nRendered {} formulas to {}/", idx, output_dir);
+    println!(
+        "\nProcessed {} formula(s), wrote {} PNG(s), failed {}.",
+        idx, wrote, failed
+    );
+
+    if failed > 0 {
+        std::process::exit(1);
+    }
 }
 
 fn render_formula(
