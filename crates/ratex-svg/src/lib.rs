@@ -23,7 +23,18 @@ use ratex_types::path_command::PathCommand;
 mod standalone;
 
 /// Options controlling SVG size and stroke appearance.
+///
+/// Marked `#[non_exhaustive]` so new options can be added without breaking call sites.
+/// Because of that, code outside this crate cannot use struct-literal syntax; construct
+/// via [`SvgOptions::default`] and override the fields you need:
+///
+/// ```
+/// # use ratex_svg::{SvgOptions, SvgColorSyntax};
+/// let mut opts = SvgOptions::default();
+/// opts.color_syntax = SvgColorSyntax::Rgb;
+/// ```
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct SvgOptions {
     /// User units per em (matches `ratex_render::RenderOptions::font_size` at DPR 1).
     pub font_size: f64,
@@ -36,6 +47,18 @@ pub struct SvgOptions {
     pub embed_glyphs: bool,
     /// Directory containing KaTeX `.ttf` files. Used only when `embed-fonts` is disabled.
     pub font_dir: String,
+    /// Syntax used to emit paint colors. Defaults to [`SvgColorSyntax::Rgba`].
+    pub color_syntax: SvgColorSyntax,
+}
+
+/// SVG paint color syntax.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum SvgColorSyntax {
+    /// Emit paint values as `rgba(r,g,b,a)`.
+    #[default]
+    Rgba,
+    /// Emit paint values as `rgb(r,g,b)` and preserve alpha with opacity attributes.
+    Rgb,
 }
 
 impl Default for SvgOptions {
@@ -46,6 +69,7 @@ impl Default for SvgOptions {
             stroke_width: 1.5,
             embed_glyphs: false,
             font_dir: String::new(),
+            color_syntax: SvgColorSyntax::Rgba,
         }
     }
 }
@@ -57,6 +81,8 @@ impl SvgOptions {
 }
 
 /// Render a display list to a standalone SVG document string.
+///
+/// Paint color syntax is controlled by [`SvgOptions::color_syntax`].
 pub fn render_to_svg(list: &DisplayList, opts: &SvgOptions) -> String {
     #[cfg(feature = "standalone")]
     #[cfg(not(feature = "embed-fonts"))]
@@ -189,12 +215,31 @@ fn ty(y_em: f64, opts: &SvgOptions) -> f64 {
     y_em * opts.em_px() + opts.padding
 }
 
-fn color_to_svg(c: &Color) -> String {
+fn color_to_svg(c: &Color, syntax: SvgColorSyntax) -> String {
     let r = (c.r.clamp(0.0, 1.0) * 255.0).round() as u8;
     let g = (c.g.clamp(0.0, 1.0) * 255.0).round() as u8;
     let b = (c.b.clamp(0.0, 1.0) * 255.0).round() as u8;
-    let a = normalized_alpha(c.a);
-    format!("rgba({r},{g},{b},{a})")
+    match syntax {
+        SvgColorSyntax::Rgba => {
+            let a = normalized_alpha(c.a);
+            format!("rgba({r},{g},{b},{a})")
+        }
+        SvgColorSyntax::Rgb => format!("rgb({r},{g},{b})"),
+    }
+}
+
+fn color_opacity_attr(c: &Color, attr: &str, syntax: SvgColorSyntax) -> String {
+    if syntax != SvgColorSyntax::Rgb {
+        return String::new();
+    }
+
+    let alpha = normalized_alpha(c.a);
+    if alpha >= 1.0 {
+        String::new()
+    } else {
+        let opacity = fmt_num(alpha as f64);
+        format!(r#" {attr}="{opacity}""#)
+    }
 }
 
 fn normalized_alpha(alpha: f32) -> f32 {
@@ -280,15 +325,17 @@ fn emit_glyph_standalone(
     opts: &SvgOptions,
     prerendered: Option<&standalone::StandaloneGlyph>,
 ) {
+    let color_syntax = opts.color_syntax;
     if opts.embed_glyphs {
         if let Some(glyph) = prerendered {
             match glyph {
                 standalone::StandaloneGlyph::Path(d) => {
-                    let fill = color_to_svg(g.color);
+                    let fill = color_to_svg(g.color, color_syntax);
+                    let opacity = color_opacity_attr(g.color, "fill-opacity", color_syntax);
                     use std::fmt::Write;
                     let _ = write!(
                         out,
-                        r#"<path d="{d}" fill="{fill}" fill-rule="nonzero" stroke="none"/>"#
+                        r#"<path d="{d}" fill="{fill}"{opacity} fill-rule="nonzero" stroke="none"/>"#
                     );
                     return;
                 }
@@ -320,18 +367,20 @@ fn emit_glyph_standalone(
 }
 
 fn emit_glyph_text(out: &mut String, g: GlyphEmit<'_>, opts: &SvgOptions) {
+    let color_syntax = opts.color_syntax;
     let ch = char::from_u32(g.char_code).unwrap_or('\u{fffd}');
     let text = xml_escape_text(&ch.to_string());
     let (family, weight, style) = katex_face(g.font);
     let fs = g.scale * opts.em_px();
-    let fill = color_to_svg(g.color);
+    let fill = color_to_svg(g.color, color_syntax);
+    let opacity = color_opacity_attr(g.color, "fill-opacity", color_syntax);
     let x_s = fmt_num(tx(g.x, opts));
     let y_s = fmt_num(ty(g.y, opts));
     let fs_s = fmt_num(fs);
     use std::fmt::Write;
     let _ = write!(
         out,
-        r#"<text x="{x_s}" y="{y_s}" font-family="{family}" font-size="{fs_s}" font-weight="{weight}" font-style="{style}" fill="{fill}" dominant-baseline="alphabetic">{text}</text>"#
+        r#"<text x="{x_s}" y="{y_s}" font-family="{family}" font-size="{fs_s}" font-weight="{weight}" font-style="{style}" fill="{fill}"{opacity} dominant-baseline="alphabetic">{text}</text>"#
     );
 }
 
@@ -346,14 +395,16 @@ fn emit_line(
     dashed: bool,
     opts: &SvgOptions,
 ) {
+    let color_syntax = opts.color_syntax;
     let em = opts.em_px();
     let x0 = tx(x, opts);
     let yc = ty(y, opts);
     let t = (thickness * em).max(1e-6);
     let w = width * em;
-    let stroke = color_to_svg(color);
+    let stroke = color_to_svg(color, color_syntax);
     use std::fmt::Write;
     if dashed {
+        let opacity = color_opacity_attr(color, "stroke-opacity", color_syntax);
         let x0s = fmt_num(x0);
         let ycs = fmt_num(yc);
         let x1s = fmt_num(x0 + w);
@@ -361,9 +412,10 @@ fn emit_line(
         let dash = fmt_num(t * 3.0);
         let _ = write!(
             out,
-            r#"<line x1="{x0s}" y1="{ycs}" x2="{x1s}" y2="{ycs}" stroke="{stroke}" stroke-width="{ts}" stroke-dasharray="{dash} {dash}"/>"#
+            r#"<line x1="{x0s}" y1="{ycs}" x2="{x1s}" y2="{ycs}" stroke="{stroke}"{opacity} stroke-width="{ts}" stroke-dasharray="{dash} {dash}"/>"#
         );
     } else {
+        let opacity = color_opacity_attr(color, "fill-opacity", color_syntax);
         let y0 = yc - t / 2.0;
         let x0s = fmt_num(x0);
         let y0s = fmt_num(y0);
@@ -371,7 +423,7 @@ fn emit_line(
         let hs = fmt_num(t);
         let _ = write!(
             out,
-            r#"<rect x="{x0s}" y="{y0s}" width="{ws}" height="{hs}" fill="{stroke}"/>"#
+            r#"<rect x="{x0s}" y="{y0s}" width="{ws}" height="{hs}" fill="{stroke}"{opacity}/>"#
         );
     }
 }
@@ -385,12 +437,14 @@ fn emit_rect(
     color: &Color,
     opts: &SvgOptions,
 ) {
+    let color_syntax = opts.color_syntax;
     let em = opts.em_px();
     let x0 = tx(x, opts);
     let y0 = ty(y, opts);
     let w = width * em;
     let h = height * em;
-    let fill = color_to_svg(color);
+    let fill = color_to_svg(color, color_syntax);
+    let opacity = color_opacity_attr(color, "fill-opacity", color_syntax);
     let x0s = fmt_num(x0);
     let y0s = fmt_num(y0);
     let ws = fmt_num(w);
@@ -398,7 +452,7 @@ fn emit_rect(
     use std::fmt::Write;
     let _ = write!(
         out,
-        r#"<rect x="{x0s}" y="{y0s}" width="{ws}" height="{hs}" fill="{fill}"/>"#
+        r#"<rect x="{x0s}" y="{y0s}" width="{ws}" height="{hs}" fill="{fill}"{opacity}/>"#
     );
 }
 
@@ -465,12 +519,14 @@ fn emit_path_item(
     color: &Color,
     opts: &SvgOptions,
 ) {
+    let color_syntax = opts.color_syntax;
     let em = opts.em_px();
     let ox = tx(x, opts);
     let oy = ty(y, opts);
-    let paint = color_to_svg(color);
+    let paint = color_to_svg(color, color_syntax);
 
     if fill {
+        let opacity = color_opacity_attr(color, "fill-opacity", color_syntax);
         let mut start = 0usize;
         for i in 1..commands.len() {
             if matches!(commands[i], PathCommand::MoveTo { .. }) {
@@ -486,7 +542,7 @@ fn emit_path_item(
                 use std::fmt::Write;
                 let _ = write!(
                     out,
-                    r#"<path d="{d}" fill="{paint}" fill-rule="nonzero" stroke="none"/>"#
+                    r#"<path d="{d}" fill="{paint}"{opacity} fill-rule="nonzero" stroke="none"/>"#
                 );
             }
         }
@@ -497,7 +553,7 @@ fn emit_path_item(
                 use std::fmt::Write;
                 let _ = write!(
                     out,
-                    r#"<path d="{d}" fill="{paint}" fill-rule="nonzero" stroke="none"/>"#
+                    r#"<path d="{d}" fill="{paint}"{opacity} fill-rule="nonzero" stroke="none"/>"#
                 );
             }
         }
@@ -507,10 +563,11 @@ fn emit_path_item(
             return;
         }
         let sw = fmt_num(opts.stroke_width);
+        let opacity = color_opacity_attr(color, "stroke-opacity", color_syntax);
         use std::fmt::Write;
         let _ = write!(
             out,
-            r#"<path d="{d}" fill="none" stroke="{paint}" stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round"/>"#
+            r#"<path d="{d}" fill="none" stroke="{paint}"{opacity} stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round"/>"#
         );
     }
 }
@@ -584,6 +641,7 @@ mod tests {
                 stroke_width: 1.0,
                 embed_glyphs: false,
                 font_dir: String::new(),
+                ..Default::default()
             },
         );
         assert!(svg.contains("<rect"));
@@ -591,6 +649,58 @@ mod tests {
         assert!(svg.contains("<text"));
         assert!(svg.contains("KaTeX_Math"));
         assert!(svg.contains("fill=\"rgba(255,0,0,1)\"") || svg.contains("fill=\"rgba(255,0,0,1"));
+    }
+
+    #[test]
+    fn rgb_color_syntax_uses_rgb_and_opacity_attrs() {
+        let list = DisplayList {
+            items: vec![
+                DisplayItem::Rect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 0.5,
+                    height: 0.2,
+                    color: Color::new(1.0, 0.0, 0.0, 0.5),
+                },
+                DisplayItem::Path {
+                    x: 0.0,
+                    y: 0.0,
+                    commands: vec![
+                        PathCommand::MoveTo { x: 0.0, y: 0.0 },
+                        PathCommand::LineTo { x: 1.0, y: 0.0 },
+                    ],
+                    fill: false,
+                    color: Color::new(0.0, 0.5, 0.0, 0.25),
+                },
+                DisplayItem::GlyphPath {
+                    x: 0.1,
+                    y: 0.8,
+                    scale: 1.0,
+                    font: "Math-Italic".to_string(),
+                    char_code: b'x' as u32,
+                    color: Color::new(0.0, 0.0, 1.0, 0.75),
+                },
+            ],
+            width: 2.0,
+            height: 1.0,
+            depth: 0.0,
+        };
+        let svg = render_to_svg(
+            &list,
+            &SvgOptions {
+                font_size: 10.0,
+                padding: 0.0,
+                stroke_width: 1.0,
+                embed_glyphs: false,
+                font_dir: String::new(),
+                color_syntax: SvgColorSyntax::Rgb,
+            },
+        );
+
+        assert!(!svg.contains("rgba("), "{svg}");
+        assert!(svg.contains(r#"fill="rgb(255,0,0)" fill-opacity="0.5""#));
+        assert!(svg.contains(r#"stroke="rgb(0,128,0)" stroke-opacity="0.25""#));
+        assert!(svg.contains(r#"fill="rgb(0,0,255)" fill-opacity="0.75""#));
     }
 
     #[cfg(feature = "standalone")]
@@ -625,6 +735,7 @@ mod tests {
                 stroke_width: 1.0,
                 embed_glyphs: true,
                 font_dir: font_dir.to_string_lossy().into(),
+                ..Default::default()
             },
         );
         assert!(svg.contains("<path"));
@@ -669,6 +780,7 @@ mod tests {
                 stroke_width: 1.0,
                 embed_glyphs: true,
                 font_dir: font_dir.to_string_lossy().into(),
+                ..Default::default()
             },
         );
 

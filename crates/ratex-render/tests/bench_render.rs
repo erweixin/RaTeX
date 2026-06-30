@@ -35,17 +35,14 @@ fn bench_formula(
     warmup: u32,
     iters: u32,
 ) -> BenchResult {
-    let svg_opts = ratex_svg::SvgOptions {
-        font_size: render_opts.font_size as f64,
-        padding: render_opts.padding as f64,
-        stroke_width: 1.5,
-        embed_glyphs: false,
-        font_dir: render_opts.font_dir.clone(),
-    };
-    let svg_standalone_opts = ratex_svg::SvgOptions {
-        embed_glyphs: true,
-        ..svg_opts.clone()
-    };
+    let mut svg_opts = ratex_svg::SvgOptions::default();
+    svg_opts.font_size = render_opts.font_size as f64;
+    svg_opts.padding = render_opts.padding as f64;
+    svg_opts.stroke_width = 1.5;
+    svg_opts.embed_glyphs = false;
+    svg_opts.font_dir = render_opts.font_dir.clone();
+    let mut svg_standalone_opts = svg_opts.clone();
+    svg_standalone_opts.embed_glyphs = true;
     let pdf_opts = ratex_pdf::PdfOptions {
         font_size: render_opts.font_size as f64,
         padding: render_opts.padding as f64,

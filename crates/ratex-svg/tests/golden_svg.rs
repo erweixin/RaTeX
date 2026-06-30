@@ -220,13 +220,12 @@ fn run_golden_svg_suite(
     }
 
     let fd = font_dir();
-    let svg_opts = SvgOptions {
-        font_size: 40.0 * dpr,
-        padding: 10.0 * dpr,
-        stroke_width: 1.5 * dpr,
-        embed_glyphs: true,
-        font_dir: fd,
-    };
+    let mut svg_opts = SvgOptions::default();
+    svg_opts.font_size = 40.0 * dpr;
+    svg_opts.padding = 10.0 * dpr;
+    svg_opts.stroke_width = 1.5 * dpr;
+    svg_opts.embed_glyphs = true;
+    svg_opts.font_dir = fd;
     let layout_opts = LayoutOptions::default();
 
     let lines: Vec<String> = std::fs::read_to_string(tc_path)
@@ -357,13 +356,9 @@ mod macos_emoji_svg {
         let ast = parse(r"\text{😀} \quad x").unwrap();
         let lbox = layout(&ast, &LayoutOptions::default());
         let dl = to_display_list(&lbox);
-        let opts = SvgOptions {
-            font_size: 40.0,
-            padding: 10.0,
-            stroke_width: 1.5,
-            embed_glyphs: true,
-            font_dir: concat!(env!("CARGO_MANIFEST_DIR"), "/../../fonts").to_string(),
-        };
+        let mut opts = SvgOptions::default();
+        opts.embed_glyphs = true;
+        opts.font_dir = concat!(env!("CARGO_MANIFEST_DIR"), "/../../fonts").to_string();
         let svg = render_to_svg(&dl, &opts);
         assert!(
             svg.contains("data:image/png;base64,"),
