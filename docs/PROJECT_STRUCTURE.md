@@ -242,7 +242,7 @@ crates/ratex-svg/
 | `standalone` | Embed glyph outlines as `<path>` using `ab_glyph` (requires KaTeX TTF files). Produces self-contained SVGs with no external font dependency. |
 | `cli` | Enables the `render-svg` binary (implies `standalone` + pulls in `ratex-layout` / `ratex-parser`). |
 
-**`SvgOptions` fields:** `font_size` (em units, default 40.0), `padding` (default 10.0), `stroke_width` (default 1.5), `embed_glyphs` (use `<path>` outlines), `font_dir` (KaTeX TTF directory for standalone mode).
+**`SvgOptions` fields:** `font_size` (em units, default 40.0), `padding` (default 10.0), `stroke_width` (default 1.5), `embed_glyphs` (use `<path>` outlines), `font_dir` (KaTeX TTF directory for standalone mode). `render_to_svg` retains the default `rgba(...)` paint syntax. Use `render_to_svg_with_color_syntax(..., SvgColorSyntax::Rgb)` (or pass `render-svg --office-compatible-colors`) to emit `rgb(...)` plus opacity attributes instead.
 
 ---
 

@@ -238,6 +238,7 @@ CLI 说明
 - `render-svg --stdout`：将 SVG 文档写到 stdout，而不是文件；状态信息写到 stderr。
 - `--help`：查看当前二进制支持的选项，以及当前构建是否启用了嵌入字体。
 - `--color` / `--background-color` 支持命名颜色（如 `black`、`red`、`teal`）、三位或六位十六进制（如 `#f00`、`#ff0000`）、以及 KaTeX / MathJax 风格的颜色模型写法（如 `[RGB]255,0,0`、`[rgb]1,0,0`、`[HTML]B22222`、`[gray]0.5`、`[cmyk]0,1,1,0`）。
+- `render-svg --office-compatible-colors`：将 SVG 颜色写成 `rgb(...)` 加 opacity 属性，而不是默认的 `rgba(...)`，用于不识别 SVG `rgba(...)` 的 Office 版本。
 - `ratex-render` 的 `--background-color transparent` 可输出透明背景 PNG。
 
 ### CJK / Unicode 回退字体

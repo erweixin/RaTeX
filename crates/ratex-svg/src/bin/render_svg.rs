@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use ratex_layout::{layout, to_display_list, LayoutOptions};
 use ratex_parser::parser::parse;
-use ratex_svg::{render_to_svg, SvgOptions};
+use ratex_svg::{render_to_svg_with_color_syntax, SvgColorSyntax, SvgOptions};
 use ratex_types::color::Color;
 use ratex_types::math_style::MathStyle;
 
@@ -35,6 +35,11 @@ fn main() {
         .unwrap_or_else(|| "output_svg".to_string());
 
     let stdout = args.iter().any(|a| a == "--stdout");
+    let color_syntax = if args.iter().any(|a| a == "--office-compatible-colors") {
+        SvgColorSyntax::Rgb
+    } else {
+        SvgColorSyntax::Rgba
+    };
 
     let device_pixel_ratio = args
         .iter()
@@ -108,7 +113,7 @@ fn main() {
         }
 
         idx += 1;
-        match svg_formula(expr, &layout_opts, &svg_opts) {
+        match svg_formula(expr, &layout_opts, &svg_opts, color_syntax) {
             Ok(svg) => {
                 if stdout {
                     let mut handle = io::stdout().lock();
@@ -153,11 +158,16 @@ fn svg_formula(
     expr: &str,
     layout_opts: &LayoutOptions,
     svg_opts: &SvgOptions,
+    color_syntax: SvgColorSyntax,
 ) -> Result<String, String> {
     let ast = parse(expr).map_err(|e| format!("Parse error: {e}"))?;
     let lbox = layout(&ast, layout_opts);
     let display_list = to_display_list(&lbox);
-    Ok(render_to_svg(&display_list, svg_opts))
+    Ok(render_to_svg_with_color_syntax(
+        &display_list,
+        svg_opts,
+        color_syntax,
+    ))
 }
 
 fn default_font_dir() -> String {
@@ -211,6 +221,8 @@ Options:
   --color <COLOR>            Formula color: named, #rgb, #rgba, #rrggbb, #rrggbbaa,
                              or [MODEL]value
                              [default: black]
+  --office-compatible-colors Emit rgb(...) paint values instead of rgba(...);
+                             alpha is preserved with SVG opacity attributes
   --inline                   Use inline math style instead of display style
 "
     )
