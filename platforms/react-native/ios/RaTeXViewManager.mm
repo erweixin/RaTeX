@@ -26,7 +26,13 @@
 // header — a non-deterministic build race that fails `xcodebuild` (and EAS/CI)
 // with "ratex_react_native-Swift.h file not found". The angle/module form forces
 // the Swift module to build first.
+// Fall back to the quote form under Expo prebuild, where the module-qualified
+// header is not on the search path and the module form is "file not found".
+#if __has_include(<ratex_react_native/ratex_react_native-Swift.h>)
 #import <ratex_react_native/ratex_react_native-Swift.h>
+#else
+#import "ratex_react_native-Swift.h"
+#endif
 #import "RaTeXColorUtils.h"
 
 // ---------------------------------------------------------------------------

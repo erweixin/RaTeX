@@ -22,7 +22,13 @@
 // Framework/module import form (not the quote form): forces the Swift module to
 // build before this Objective-C++ TU, avoiding a non-deterministic compile race
 // where -Swift.h is "file not found" on a clean xcodebuild / EAS / CI build.
+// Fall back to the quote form under Expo prebuild, where the module-qualified
+// header is not on the search path and the module form is "file not found".
+#if __has_include(<ratex_react_native/ratex_react_native-Swift.h>)
 #import <ratex_react_native/ratex_react_native-Swift.h>
+#else
+#import "ratex_react_native-Swift.h"
+#endif
 #import "RaTeXColorUtils.h"
 
 // ---------------------------------------------------------------------------
