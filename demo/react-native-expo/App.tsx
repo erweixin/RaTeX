@@ -65,19 +65,21 @@ function MeasuredFormula({ latex }: { latex: string }) {
   const [firstPass, setFirstPass] = useState<{ w: number; h: number } | null>(
     null
   );
-  const firstCaptured = useRef(false);
-
-  useLayoutEffect(() => {
+  const measure = useCallback(() => {
     const node = hostRef.current;
     if (!node) return;
     node.measure((_x, _y, w, h) => {
-      setDeco({ w, h });
-      if (!firstCaptured.current) {
-        firstCaptured.current = true;
-        setFirstPass({ w, h });
-      }
+      // Capture only the FIRST commit's measurement (the #120 signal).
+      setFirstPass((prev) => prev ?? { w, h });
+      // Guard object identity so an unchanged size doesn't re-trigger a render.
+      setDeco((prev) => (prev && prev.w === w && prev.h === h ? prev : { w, h }));
     });
-  });
+  }, []);
+
+  // Runs once after the first commit; the component is keyed so remounts re-test.
+  useLayoutEffect(() => {
+    measure();
+  }, [measure]);
 
   const ok = firstPass ? firstPass.w > 0 && firstPass.h > 0 : null;
 
@@ -87,7 +89,12 @@ function MeasuredFormula({ latex }: { latex: string }) {
         {/* collapsable={false} keeps the wrapper in the native tree on Android
             so measure() targets it instead of being flattened away. */}
         <View ref={hostRef} collapsable={false} style={styles.measureHost}>
-          <RaTeXView latex={latex} fontSize={30} displayMode={true} />
+          <RaTeXView
+            latex={latex}
+            fontSize={30}
+            displayMode={true}
+            onContentSizeChange={measure}
+          />
           {deco && deco.w > 0 && deco.h > 0 ? (
             <>
               <View
