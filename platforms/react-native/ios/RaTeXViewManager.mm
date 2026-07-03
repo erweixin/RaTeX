@@ -20,13 +20,22 @@
 #endif
 
 // Swift-generated header (module name derived from podspec/target name).
-// Use the framework/module form (<module/module-Swift.h>) rather than the quote
-// form: the quote form creates no module dependency, so this Objective-C++ TU can
-// be scheduled to compile BEFORE the Swift target has generated the -Swift.h
-// header — a non-deterministic build race that fails `xcodebuild` (and EAS/CI)
-// with "ratex_react_native-Swift.h file not found". The angle/module form forces
-// the Swift module to build first.
+// Prefer the framework/module form (<module/module-Swift.h>) when it resolves: it
+// creates a module dependency that forces the Swift target to build BEFORE this
+// Objective-C++ TU, avoiding a non-deterministic build race that fails `xcodebuild`
+// (and EAS/CI) with "ratex_react_native-Swift.h file not found". But when the
+// library is built as a *static library* rather than a framework/clang module —
+// e.g. `use_frameworks! :linkage => :static` (Expo's `useFrameworks: 'static'`,
+// required to statically link some RN pods such as RNFirebase) — the generated
+// header is emitted only into this target's own DerivedSources and the
+// angle/module form no longer resolves. Guard with __has_include so framework
+// builds keep the race-avoidance and static-library builds fall back to the quote
+// form (which resolves against DerivedSources). Linkage-agnostic.
+#if __has_include(<ratex_react_native/ratex_react_native-Swift.h>)
 #import <ratex_react_native/ratex_react_native-Swift.h>
+#else
+#import "ratex_react_native-Swift.h"
+#endif
 #import "RaTeXColorUtils.h"
 
 // ---------------------------------------------------------------------------

@@ -19,10 +19,18 @@
 #import <UIKit/UIKit.h>
 #endif
 
-// Framework/module import form (not the quote form): forces the Swift module to
-// build before this Objective-C++ TU, avoiding a non-deterministic compile race
-// where -Swift.h is "file not found" on a clean xcodebuild / EAS / CI build.
+// Prefer the framework/module form (forces the Swift module to build before this
+// Objective-C++ TU, avoiding a non-deterministic "-Swift.h file not found" compile
+// race on clean xcodebuild/EAS/CI builds). Fall back to the quote form when the
+// module form does not resolve — i.e. when the library builds as a *static library*
+// rather than a framework/clang module (`use_frameworks! :linkage => :static` /
+// Expo `useFrameworks: 'static'`), where the generated header lands only in this
+// target's own DerivedSources. Guard with __has_include so both linkages work.
+#if __has_include(<ratex_react_native/ratex_react_native-Swift.h>)
 #import <ratex_react_native/ratex_react_native-Swift.h>
+#else
+#import "ratex_react_native-Swift.h"
+#endif
 #import "RaTeXColorUtils.h"
 
 // ---------------------------------------------------------------------------
