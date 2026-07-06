@@ -2,8 +2,10 @@
 
 package io.ratex
 
+import android.content.Context
 import android.graphics.Color
 import com.facebook.react.bridge.ReactApplicationContext
+import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.uimanager.SimpleViewManager
 import com.facebook.react.uimanager.ThemedReactContext
@@ -11,6 +13,8 @@ import com.facebook.react.uimanager.UIManagerHelper
 import com.facebook.react.uimanager.annotations.ReactProp
 import com.facebook.react.viewmanagers.RaTeXViewManagerDelegate
 import com.facebook.react.viewmanagers.RaTeXViewManagerInterface
+import com.facebook.yoga.YogaMeasureMode
+import com.facebook.yoga.YogaMeasureOutput
 
 @ReactModule(name = RaTeXViewManager.NAME)
 class RaTeXViewManager(private val reactContext: ReactApplicationContext) :
@@ -64,5 +68,39 @@ class RaTeXViewManager(private val reactContext: ReactApplicationContext) :
     @ReactProp(name = "color", customType = "Color")
     override fun setColor(view: RaTeXView, value: Int?) {
         view.color = value ?: Color.BLACK
+    }
+
+    // Synchronous intrinsic measure for Fabric, invoked by the custom C++ shadow
+    // node's measureContent via FabricUIManager.measure. Gives the view its real
+    // size on the first commit (e.g. at JS useLayoutEffect) instead of only after
+    // the async onContentSizeChange event. Parsing is thread-safe and fonts are not
+    // needed for measurement; color does not affect size, so it is ignored here.
+    override fun measure(
+        context: Context,
+        localData: ReadableMap?,
+        props: ReadableMap?,
+        state: ReadableMap?,
+        width: Float,
+        widthMode: YogaMeasureMode?,
+        height: Float,
+        heightMode: YogaMeasureMode?,
+        attachmentsPositions: FloatArray?,
+    ): Long {
+        val latex = props?.getString("latex").orEmpty()
+        val fontSize =
+            if (props?.hasKey("fontSize") == true) props.getDouble("fontSize").toFloat() else 24f
+        if (latex.isBlank() || fontSize <= 0f) {
+            return YogaMeasureOutput.make(0f, 0f)
+        }
+        val displayMode =
+            if (props?.hasKey("displayMode") == true) props.getBoolean("displayMode") else true
+        return try {
+            val density = context.resources.displayMetrics.density
+            val displayList = RaTeXEngine.parseBlocking(latex, displayMode, Color.BLACK)
+            val renderer = RaTeXRenderer(displayList, fontSize * density)
+            YogaMeasureOutput.make(renderer.widthPx / density, renderer.totalHeightPx / density)
+        } catch (e: Throwable) {
+            YogaMeasureOutput.make(0f, 0f)
+        }
     }
 }

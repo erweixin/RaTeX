@@ -199,3 +199,24 @@ public class RaTeXRNView: PlatformView {
         }
     }
 }
+
+/// Thread-safe synchronous LaTeX measurement.
+///
+/// Used by the Fabric shadow node's `measureContent` so the component self-sizes
+/// during Yoga layout — making its size available at `useLayoutEffect` instead of
+/// only after the async `onContentSizeChange` event. Safe to call off the main
+/// thread: `RaTeXEngine.parse` is thread-safe (thread-local FFI error state) and
+/// `RaTeXRenderer` is a value type; fonts are not needed for measurement.
+@objc(RaTeXMeasure)
+public final class RaTeXMeasure: NSObject {
+    @objc public static func measureLatex(_ latex: String, fontSize: CGFloat, displayMode: Bool) -> CGSize {
+        guard !latex.isEmpty, fontSize > 0 else { return .zero }
+        do {
+            let displayList = try RaTeXEngine.shared.parse(latex, displayMode: displayMode, color: .black)
+            let renderer = RaTeXRenderer(displayList: displayList, fontSize: fontSize)
+            return CGSize(width: renderer.width, height: renderer.totalHeight)
+        } catch {
+            return .zero
+        }
+    }
+}

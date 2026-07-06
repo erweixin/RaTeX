@@ -8,6 +8,8 @@
 #import <react/renderer/components/RNRaTeXSpec/EventEmitters.h>
 #import <react/renderer/components/RNRaTeXSpec/Props.h>
 #import <react/renderer/components/RNRaTeXSpec/RCTComponentViewHelpers.h>
+#import <react/renderer/core/LayoutConstraints.h>
+#import <react/renderer/core/LayoutContext.h>
 #else
 #import "RaTeXViewManager.h"
 #import <React/RCTUIManager.h>
@@ -46,6 +48,47 @@
 
 using namespace facebook::react;
 
+namespace {
+
+// A ShadowNode that measures the formula synchronously during Yoga layout, using
+// the (thread-safe) RaTeX engine. This makes the view's size available on the very
+// first commit — i.e. at JS `useLayoutEffect` — instead of only after the async
+// `onContentSizeChange` event, which otherwise causes a one-frame 0-size flash and
+// breaks synchronous reserve-then-place layout (e.g. TextKit attachments).
+class RaTeXViewMeasuringShadowNode final : public RaTeXViewShadowNode {
+ public:
+  using RaTeXViewShadowNode::RaTeXViewShadowNode;
+
+  static ShadowNodeTraits BaseTraits() {
+    auto traits = RaTeXViewShadowNode::BaseTraits();
+    traits.set(ShadowNodeTraits::Trait::LeafYogaNode);
+    traits.set(ShadowNodeTraits::Trait::MeasurableYogaNode);
+    return traits;
+  }
+
+  facebook::react::Size measureContent(const LayoutContext &layoutContext,
+                                       const LayoutConstraints &layoutConstraints) const override {
+    const auto &props = getConcreteProps();
+    if (props.latex.empty() || props.fontSize <= 0) {
+      return layoutConstraints.clamp(facebook::react::Size{0, 0});
+    }
+    NSString *latex = [NSString stringWithUTF8String:props.latex.c_str()];
+    if (latex == nil) {
+      return layoutConstraints.clamp(facebook::react::Size{0, 0});
+    }
+    CGSize measured = [RaTeXMeasure measureLatex:latex
+                                        fontSize:static_cast<CGFloat>(props.fontSize)
+                                     displayMode:props.displayMode ? YES : NO];
+    facebook::react::Size size{static_cast<Float>(measured.width), static_cast<Float>(measured.height)};
+    return layoutConstraints.clamp(size);
+  }
+};
+
+using RaTeXViewMeasuringComponentDescriptor =
+    ConcreteComponentDescriptor<RaTeXViewMeasuringShadowNode>;
+
+}  // namespace
+
 // Class name follows RN Fabric convention: {ComponentName}ComponentView
 // so that RCTThirdPartyComponentsProvider can resolve it via NSClassFromString.
 @interface RaTeXViewComponentView : RCTViewComponentView
@@ -57,7 +100,7 @@ using namespace facebook::react;
 
 + (ComponentDescriptorProvider)componentDescriptorProvider
 {
-  return concreteComponentDescriptorProvider<RaTeXViewComponentDescriptor>();
+  return concreteComponentDescriptorProvider<RaTeXViewMeasuringComponentDescriptor>();
 }
 
 - (instancetype)initWithFrame:(CGRect)frame

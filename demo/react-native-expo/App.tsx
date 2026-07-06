@@ -14,7 +14,7 @@
  */
 
 import { StatusBar } from "expo-status-bar";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useLayoutEffect, useRef } from "react";
 import {
   StyleSheet,
   Text,
@@ -46,6 +46,113 @@ const PAGES = [
   },
   { id: "7", latex: String.raw`\text{😊} \quad E=mc^2` },
 ];
+
+// ─── Case #120: useLayoutEffect measurement drives an absolute decoration ─────
+// https://github.com/erweixin/RaTeX/issues/120
+//
+// The dashed frame and blue baseline are positioned absolutely from geometry
+// computed *inside useLayoutEffect* via ref.measure(). React flushes layout
+// effects (and the state they set) before paint, so:
+//   - Fixed:   the view reports its real size on the first commit → the frame
+//              hugs the formula the instant it appears (no flash).
+//   - Broken:  the view reports 0×0 on the first commit → the frame starts
+//              collapsed and only jumps into place a few frames later.
+// The caption records what the FIRST useLayoutEffect pass measured, so the
+// per-platform behavior is visible even if the jump is quick.
+function MeasuredFormula({ latex }: { latex: string }) {
+  const hostRef = useRef<View>(null);
+  const [deco, setDeco] = useState<{ w: number; h: number } | null>(null);
+  const [firstPass, setFirstPass] = useState<{ w: number; h: number } | null>(
+    null
+  );
+  const measure = useCallback(() => {
+    const node = hostRef.current;
+    if (!node) return;
+    node.measure((_x, _y, w, h) => {
+      // Capture only the FIRST commit's measurement (the #120 signal).
+      setFirstPass((prev) => prev ?? { w, h });
+      // Guard object identity so an unchanged size doesn't re-trigger a render.
+      setDeco((prev) => (prev && prev.w === w && prev.h === h ? prev : { w, h }));
+    });
+  }, []);
+
+  // Runs once after the first commit; the component is keyed so remounts re-test.
+  useLayoutEffect(() => {
+    measure();
+  }, [measure]);
+
+  const ok = firstPass ? firstPass.w > 0 && firstPass.h > 0 : null;
+
+  return (
+    <View style={styles.measureBody}>
+      <View style={styles.measureStage}>
+        {/* collapsable={false} keeps the wrapper in the native tree on Android
+            so measure() targets it instead of being flattened away. */}
+        <View ref={hostRef} collapsable={false} style={styles.measureHost}>
+          <RaTeXView
+            latex={latex}
+            fontSize={30}
+            displayMode={true}
+            onContentSizeChange={measure}
+          />
+          {deco && deco.w > 0 && deco.h > 0 ? (
+            <>
+              <View
+                pointerEvents="none"
+                style={[styles.decoFrame, { width: deco.w, height: deco.h }]}
+              />
+              <View
+                pointerEvents="none"
+                style={[styles.decoBaseline, { width: deco.w, top: deco.h }]}
+              />
+            </>
+          ) : null}
+        </View>
+      </View>
+      <Text style={styles.measureMeta}>
+        {"useLayoutEffect measure(): "}
+        {firstPass
+          ? `${firstPass.w.toFixed(0)}×${firstPass.h.toFixed(0)}`
+          : "—"}
+        {ok === null
+          ? ""
+          : ok
+          ? "  ✓ real size on first commit"
+          : "  ✗ 0×0 on first commit (flash)"}
+      </Text>
+    </View>
+  );
+}
+
+function CaseLayoutEffectMeasure() {
+  const [remount, setRemount] = useState(0);
+  const [idx, setIdx] = useState(0);
+  const latex = idx === 0 ? EXPR : idx === 1 ? EXPR2 : EXPR3;
+
+  return (
+    <View style={[styles.card, styles.measureCard]}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>
+          #120: useLayoutEffect measure → absolute decoration
+        </Text>
+      </View>
+      <Text style={styles.measureHint}>
+        The dashed frame + blue baseline are sized from ref.measure() inside
+        useLayoutEffect. Fixed → they hug the formula immediately. Broken → they
+        start at 0 and jump. Press Remount to re-test the first commit.
+      </Text>
+      <MeasuredFormula key={`${remount}-${idx}`} latex={latex} />
+      <View style={styles.smokeRow}>
+        <Pressable style={styles.smokeBtn} onPress={() => setRemount((r) => r + 1)}>
+          <Text style={styles.smokeBtnText}>Remount</Text>
+        </Pressable>
+        <Pressable style={styles.smokeBtn} onPress={() => setIdx((i) => (i + 1) % 3)}>
+          <Text style={styles.smokeBtnText}>Next formula</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
 
 // ─── Status indicator ────────────────────────────────────────────────
 function StatusDot({ status }: { status: "pending" | "ok" | "error" }) {
@@ -293,7 +400,7 @@ export default function App() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.title}>RaTeX Repro — Issue #42</Text>
+        <Text style={styles.title}>RaTeX Repro — Issues #120 / #42</Text>
         <Text style={styles.subtitle}>
           Render #{key} — gray dot = pending, green = rendered, red = error
         </Text>
@@ -302,6 +409,7 @@ export default function App() {
           <Text style={styles.buttonText}>Force Re-mount (key={key + 1})</Text>
         </Pressable>
 
+        <CaseLayoutEffectMeasure />
         <CasePR45Smoke />
         <CaseInlineTeXCustomFont />
 
@@ -353,6 +461,53 @@ const styles = StyleSheet.create({
     minHeight: 520,
     padding: 12,
     gap: 12,
+  },
+  measureCard: {
+    flex: 0,
+    marginHorizontal: 12,
+    marginTop: 8,
+    marginBottom: 8,
+    paddingBottom: 12,
+  },
+  measureHint: {
+    fontSize: 10,
+    color: "#6b7280",
+    paddingHorizontal: 12,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  measureBody: {
+    paddingHorizontal: 12,
+  },
+  measureStage: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 24,
+  },
+  measureHost: {
+    position: "relative",
+  },
+  decoFrame: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    borderWidth: 2,
+    borderColor: "#e11d48",
+    borderStyle: "dashed",
+    borderRadius: 2,
+  },
+  decoBaseline: {
+    position: "absolute",
+    left: 0,
+    height: 2,
+    backgroundColor: "#2563eb",
+  },
+  measureMeta: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#111827",
+    textAlign: "center",
+    marginTop: 4,
   },
   smokeCard: {
     flex: 0,
