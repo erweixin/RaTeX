@@ -19,7 +19,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.12"
+version = "0.1.13"
 edition = "2021"
 authors = ["RaTeX Contributors"]
 license = "MIT"
@@ -28,17 +28,17 @@ homepage = "https://github.com/erweixin/RaTeX"
 documentation = "https://github.com/erweixin/RaTeX#readme"
 
 [workspace.dependencies]
-ratex-types  = { path = "crates/ratex-types", version = "0.1.12" }
-ratex-font   = { path = "crates/ratex-font", version = "0.1.12" }
-ratex-lexer  = { path = "crates/ratex-lexer", version = "0.1.12" }
-ratex-parser = { path = "crates/ratex-parser", version = "0.1.12" }
-ratex-layout = { path = "crates/ratex-layout", version = "0.1.12" }
-ratex-katex-fonts = { path = "crates/ratex-katex-fonts", version = "0.1.12" }
-ratex-font-loader = { path = "crates/ratex-font-loader", version = "0.1.12" }
-ratex-cairo  = { path = "crates/ratex-cairo", version = "0.1.12" }
-ratex-svg    = { path = "crates/ratex-svg", version = "0.1.12" }
-ratex-pdf    = { path = "crates/ratex-pdf", version = "0.1.12" }
-ratex-unicode-font = { path = "crates/ratex-unicode-font", version = "0.1.12" }
+ratex-types  = { path = "crates/ratex-types", version = "0.1.13" }
+ratex-font   = { path = "crates/ratex-font", version = "0.1.13" }
+ratex-lexer  = { path = "crates/ratex-lexer", version = "0.1.13" }
+ratex-parser = { path = "crates/ratex-parser", version = "0.1.13" }
+ratex-layout = { path = "crates/ratex-layout", version = "0.1.13" }
+ratex-katex-fonts = { path = "crates/ratex-katex-fonts", version = "0.1.13" }
+ratex-font-loader = { path = "crates/ratex-font-loader", version = "0.1.13" }
+ratex-cairo  = { path = "crates/ratex-cairo", version = "0.1.13" }
+ratex-svg    = { path = "crates/ratex-svg", version = "0.1.13" }
+ratex-pdf    = { path = "crates/ratex-pdf", version = "0.1.13" }
+ratex-unicode-font = { path = "crates/ratex-unicode-font", version = "0.1.13" }
 
 phf        = { version = "0.11", features = ["macros"] }
 thiserror  = "1.0"
