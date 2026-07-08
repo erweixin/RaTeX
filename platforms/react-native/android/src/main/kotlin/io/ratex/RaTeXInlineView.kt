@@ -156,6 +156,20 @@ class RaTeXInlineView @JvmOverloads constructor(
         buildJob = null
     }
 
+    /**
+     * A view can be transiently detached and re-attached while its window is being built
+     * (React Native's Fabric does this when mounting large trees). The detach cancels a
+     * pending [buildJob], and since no prop changes afterwards, nothing would ever restart
+     * it — the view would stay blank forever. Re-kick the build on attach when there is no
+     * content built and no job in flight.
+     */
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (currentSpannable == null && content.isNotBlank() && buildJob?.isActive != true) {
+            rebuild()
+        }
+    }
+
     // MARK: - Private
 
     private fun rebuild() {

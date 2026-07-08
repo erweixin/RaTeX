@@ -10,10 +10,11 @@ import android.view.View
 import androidx.annotation.ColorInt
 import kotlin.math.ceil
 import kotlin.math.max
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -86,7 +87,7 @@ class RaTeXView @JvmOverloads constructor(
     // MARK: - Private state
 
     private var renderer: RaTeXRenderer? = null
-    private val scope = CoroutineScope(Dispatchers.Main)
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var renderJob: Job? = null
 
     // MARK: - Measure
@@ -124,7 +125,23 @@ class RaTeXView @JvmOverloads constructor(
 
     override fun onDetachedFromWindow() {
         super.onDetachedFromWindow()
-        scope.cancel()
+        renderJob?.cancel()
+        renderJob = null
+    }
+
+    /**
+     * A view can be transiently detached and re-attached while its window is being built
+     * (or when moved between parents, e.g. inside a RecyclerView). The detach cancels a
+     * pending [renderJob], and since no property changes afterwards, nothing would ever
+     * restart it — the view would stay blank forever. Re-kick the render on attach when
+     * there is nothing rendered and no job in flight.
+     *
+     * Note: the scope itself must survive detach (cancelling it would kill the view for
+     * good — a re-attached view could never render again), so only the job is cancelled.
+     */
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (renderer == null && latex.isNotBlank() && renderJob?.isActive != true) rerender()
     }
 
     // MARK: - Private
@@ -147,6 +164,10 @@ class RaTeXView @JvmOverloads constructor(
                     requestLayout()
                     invalidate()
                 }
+            } catch (e: CancellationException) {
+                // Not a render error: the job was cancelled (detach). Rethrow so the coroutine
+                // machinery completes cancellation; onAttachedToWindow restarts the render.
+                throw e
             } catch (e: RaTeXException) {
                 renderer = null
                 post { requestLayout(); invalidate() }
