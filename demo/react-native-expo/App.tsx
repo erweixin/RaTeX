@@ -154,6 +154,185 @@ function CaseLayoutEffectMeasure() {
   );
 }
 
+// ─── Detach-cancel repro: transient detach permanently blanks formulas ──
+//
+// RaTeXView launches its render as a coroutine and cancels it in
+// onDetachedFromWindow. On Android a view can be detached *transiently* and
+// come right back — most commonly when a Fabric commit changes an ancestor's
+// VIEW-FLATTENING status: the ancestor is removed and its children re-parented
+// (SurfaceMountingManager.removeViewAt + addView), firing detach/attach on
+// every descendant. Nothing ever restarts the cancelled job — every trigger
+// is a prop setter guarded by `if (field == value) return`, and the props
+// never change — so the view keeps its laid-out size but stays blank forever,
+// reporting the confusing onError "StandaloneCoroutine was cancelled".
+//
+// This case reproduces it the way a real markdown/math consumer hits it:
+//   1. each formula mounts via the two-pass measure→swap pattern (invisible
+//      probe → synchronous measure() in useLayoutEffect → pre-paint swap to
+//      a fitted view), inside a wrapper styled `opacity: 0` — an overlay
+//      hiding an extension until its frame is known;
+//   2. one frame later the wrapper is revealed by DROPPING the opacity
+//      style. Losing it makes the wrapper flattenable, Fabric restructures,
+//      and every formula view is detached while its render job is still in
+//      flight (the first job also blocks on the KaTeX font load on a fresh
+//      process, keeping the rest pending).
+//   Broken: formulas occupy space but stay blank — red dot, 0/32 rendered,
+//           "StandaloneCoroutine was cancelled" listed below the strip.
+//   Fixed:  onAttachedToWindow re-kicks the render — all 32 appear.
+// Cold start (kill + relaunch) is the most reliable; "Run repro" re-tests
+// warm.
+const DETACH_COUNT = 32;
+const DETACH_FORMULAS = Array.from({ length: DETACH_COUNT }, (_, i) =>
+  String.raw`\begin{aligned} \sum_{k=${i}}^{\infty} \frac{${i + 1}}{k^{${(i % 3) + 2}}} &= \int_0^\infty \frac{x^{${i}}}{e^x - 1}\,dx \\ \frac{-b \pm \sqrt{b^2 - 4a_{${i}}c}}{2a_{${i}}} &= \prod_{k=1}^{${i + 2}} \left(1 + \frac{x_k}{k!}\right) \end{aligned}`
+);
+
+function TwoPassFormula({
+  index,
+  latex,
+  onSized,
+  onErrorMsg,
+}: {
+  index: number;
+  latex: string;
+  onSized: (index: number) => void;
+  onErrorMsg: (message: string) => void;
+}) {
+  const probeRef = useRef<View>(null);
+  const [fit, setFit] = useState<{ w: number; h: number } | null>(null);
+
+  // Fabric's measure() is synchronous — the probe reports its real size in
+  // the mounting commit, and the sync setState swaps in the fitted view
+  // before paint.
+  useLayoutEffect(() => {
+    if (fit) return;
+    probeRef.current?.measure((_x, _y, w, h) => {
+      if (w > 0 && h > 0) setFit({ w, h });
+    });
+  }, [fit]);
+
+  if (!fit) {
+    return (
+      <View>
+        <View style={{ position: "absolute", width: 10000, height: 10000, opacity: 0 }}>
+          <View ref={probeRef} collapsable={false} style={{ alignSelf: "flex-start" }}>
+            <RaTeXView latex={latex} fontSize={13} displayMode={true} />
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  const scale = Math.min(1, 136 / fit.w, 52 / fit.h);
+  return (
+    <RaTeXView
+      latex={latex}
+      fontSize={13}
+      displayMode={true}
+      style={{ width: fit.w * scale, height: fit.h * scale }}
+      onContentSizeChange={(e) => {
+        const { width, height } = e.nativeEvent;
+        console.log(`[detach-${index}] size: ${width}x${height}`);
+        if (width > 0 && height > 0) onSized(index);
+      }}
+      onError={(e) => {
+        console.error(`[detach-${index}] error:`, e.nativeEvent.error);
+        onErrorMsg(`#${index}: ${e.nativeEvent.error}`);
+      }}
+    />
+  );
+}
+
+function CaseDetachCancel() {
+  const [gen, setGen] = useState(0);
+  const [chunks, setChunks] = useState(0);
+  const [sized, setSized] = useState<Record<number, true>>({});
+  const [errors, setErrors] = useState<string[]>([]);
+
+  const run = useCallback(() => {
+    setSized({});
+    setErrors([]);
+    setChunks(0);
+    setGen((g) => g + 1);
+  }, []);
+
+  // Overlay-style reveal churn: each formula mounts inside a wrapper View
+  // styled `opacity: 0` (the way a markdown overlay hides an extension until
+  // its frame is measured), and one frame later the wrapper is revealed by
+  // DROPPING that style. Losing `opacity` makes the wrapper eligible for
+  // Fabric view flattening, so the commit restructures the native tree by
+  // REMOVING and re-inserting the wrapper — transiently detaching the
+  // formula view while its render job is still in flight.
+  const [revealed, setRevealed] = useState(false);
+  useLayoutEffect(() => {
+    setRevealed(false);
+    let count = 0;
+    let raf = requestAnimationFrame(function tick() {
+      setChunks((c) => c + 1);
+      count += 1;
+      if (count === 1) setRevealed(true);
+      if (count < 3) raf = requestAnimationFrame(tick);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [gen]);
+
+  const onSized = useCallback((index: number) => {
+    setSized((s) => (s[index] ? s : { ...s, [index]: true }));
+  }, []);
+  const onErrorMsg = useCallback((message: string) => {
+    setErrors((errs) => [...errs, message]);
+  }, []);
+
+  const renderedCount = Object.keys(sized).length;
+  const status: "pending" | "ok" | "error" =
+    errors.length > 0
+      ? "error"
+      : renderedCount === DETACH_COUNT
+      ? "ok"
+      : "pending";
+
+  return (
+    <View style={[styles.card, styles.detachCard]}>
+      <View style={styles.cardHeader}>
+        <StatusDot status={status} />
+        <Text style={styles.cardTitle}>
+          Detach-cancel: clipped views stay blank (Android)
+        </Text>
+      </View>
+      <Text style={styles.smokeHint}>
+        {`Each formula mounts inside an opacity:0 wrapper that is revealed one frame later — the style drop flips the wrapper's view-flattening status, so Fabric re-parents it and transiently detaches every formula mid-render. Broken: they stay blank forever ("StandaloneCoroutine was cancelled" below). Fixed: all ${DETACH_COUNT} render. Kill + relaunch the app for the most reliable (cold-font) run.`}
+      </Text>
+      <View style={styles.smokeRow}>
+        <Pressable style={styles.smokeBtn} onPress={run}>
+          <Text style={styles.smokeBtnText}>Run repro</Text>
+        </Pressable>
+        <Text style={styles.detachMeta}>
+          rendered {renderedCount}/{DETACH_COUNT} · errors {errors.length}
+        </Text>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.detachStrip}>
+        {Array.from({ length: chunks }, (_, c) => (
+          <View key={`chunk-${gen}-${c}`} style={styles.detachChunk}>
+            <Text style={styles.detachChunkText}>chunk {c}</Text>
+          </View>
+        ))}
+        {DETACH_FORMULAS.map((latex, i) => (
+          <View key={`${gen}-${i}`} style={styles.detachBox}>
+            <View style={revealed ? undefined : { opacity: 0 }}>
+              <TwoPassFormula index={i} latex={latex} onSized={onSized} onErrorMsg={onErrorMsg} />
+            </View>
+            <Text style={styles.detachIndex}>#{i}</Text>
+          </View>
+        ))}
+      </ScrollView>
+      {errors.length > 0 ? (
+        <Text style={styles.detachErrors} numberOfLines={3}>
+          {errors.join("  ·  ")}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
 // ─── Status indicator ────────────────────────────────────────────────
 function StatusDot({ status }: { status: "pending" | "ok" | "error" }) {
   const color =
@@ -409,6 +588,7 @@ export default function App() {
           <Text style={styles.buttonText}>Force Re-mount (key={key + 1})</Text>
         </Pressable>
 
+        <CaseDetachCancel />
         <CaseLayoutEffectMeasure />
         <CasePR45Smoke />
         <CaseInlineTeXCustomFont />
@@ -515,6 +695,65 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 8,
     paddingBottom: 12,
+  },
+  detachCard: {
+    flex: 0,
+    marginHorizontal: 12,
+    marginTop: 8,
+    marginBottom: 8,
+    paddingBottom: 12,
+  },
+  detachMeta: {
+    fontSize: 11,
+    color: "#4b5563",
+    alignSelf: "center",
+  },
+  detachStrip: {
+    marginHorizontal: 12,
+    marginTop: 4,
+  },
+  detachBox: {
+    width: 148,
+    height: 76,
+    marginRight: 8,
+    borderRadius: 6,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#d1d5db",
+    backgroundColor: "#f9fafb",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detachFormula: {
+    width: 136,
+    height: 52,
+  },
+  detachIndex: {
+    position: "absolute",
+    top: 2,
+    right: 5,
+    fontSize: 9,
+    color: "#9ca3af",
+  },
+  detachChunk: {
+    width: 64,
+    height: 76,
+    marginRight: 8,
+    borderRadius: 6,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "#bfdbfe",
+    backgroundColor: "#eff6ff",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detachChunkText: {
+    fontSize: 10,
+    color: "#3b82f6",
+  },
+  detachErrors: {
+    fontSize: 10,
+    color: "#ef4444",
+    paddingHorizontal: 12,
+    marginTop: 6,
   },
   smokeMeta: {
     fontSize: 11,
