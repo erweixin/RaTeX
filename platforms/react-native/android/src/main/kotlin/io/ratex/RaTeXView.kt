@@ -91,6 +91,17 @@ class RaTeXView @JvmOverloads constructor(
     /** Called on the main thread when content size is known (width/height in dp). */
     var onContentSizeChange: ((width: Double, height: Double) -> Unit)? = null
 
+    /**
+     * When true, an external layout system owns this view's frame (React Native's
+     * Fabric, which sizes the view from the shadow node's measure and assigns the
+     * frame directly). Content changes then skip [requestLayout]: the classic
+     * Android traversal it triggers would re-run [onMeasure] and could override the
+     * externally assigned frame (e.g. escape a Yoga size clamp). When false
+     * (standalone XML / programmatic use), [requestLayout] is the only way the view
+     * can resize to new content, so it must run.
+     */
+    var sizingManagedExternally: Boolean = false
+
     // MARK: - Private state
 
     private var renderer: RaTeXRenderer? = null
@@ -100,6 +111,20 @@ class RaTeXView @JvmOverloads constructor(
     // MARK: - Measure
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        if (sizingManagedExternally) {
+            // The frame is assigned by RN (Fabric updateLayoutMetrics). A classic
+            // Android traversal — triggered by ANY sibling's requestLayout — must
+            // not resize this view away from that frame: reporting the desired
+            // content size here would let the view grow past a Yoga clamp and then
+            // snap back on the next Fabric layout, a visible scale flip. Report the
+            // current frame instead (resolveSize still honors EXACTLY specs).
+            setMeasuredDimension(
+                resolveSize(width, widthMeasureSpec),
+                resolveSize(height, heightMeasureSpec),
+            )
+            return
+        }
+
         val r = renderer
         val desiredWidth = max(
             (r?.widthPx?.let { ceil(it).toInt() } ?: 0) + paddingLeft + paddingRight,
@@ -174,7 +199,7 @@ class RaTeXView @JvmOverloads constructor(
         renderJob = null
         if (latex.isBlank()) {
             renderer = null
-            requestLayout()
+            requestSelfLayout()
             invalidate()
             return
         }
@@ -211,14 +236,22 @@ class RaTeXView @JvmOverloads constructor(
                 throw e
             } catch (e: RaTeXException) {
                 renderer = null
-                requestLayout(); invalidate()
+                requestSelfLayout(); invalidate()
                 onError?.invoke(e)
             } catch (e: Throwable) {
                 renderer = null
-                requestLayout(); invalidate()
+                requestSelfLayout(); invalidate()
                 onError?.invoke(RaTeXException(e.message ?: "unknown error"))
             }
         }
+    }
+
+    /**
+     * Request a layout pass to adopt the new content size — unless the frame is
+     * owned by an external layout system (see [sizingManagedExternally]).
+     */
+    private fun requestSelfLayout() {
+        if (!sizingManagedExternally) requestLayout()
     }
 
     /** Install a renderer for [dl] and publish layout + content size. Main thread only. */
@@ -227,7 +260,7 @@ class RaTeXView @JvmOverloads constructor(
         val density = context.resources.displayMetrics.density
         val r = RaTeXRenderer(dl, fontSize * density) { RaTeXFontLoader.getTypeface(it) }
         renderer = r
-        requestLayout()
+        requestSelfLayout()
         invalidate()
         val widthDp = r.widthPx / density
         val heightDp = r.totalHeightPx / density

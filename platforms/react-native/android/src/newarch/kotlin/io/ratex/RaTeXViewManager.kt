@@ -33,6 +33,10 @@ class RaTeXViewManager(private val reactContext: ReactApplicationContext) :
 
     override fun createViewInstance(ctx: ThemedReactContext): RaTeXView {
         val view = RaTeXView(ctx)
+        // Fabric owns the frame (assigned from the shadow node's measure); the view
+        // must not requestLayout itself, or the classic Android traversal could
+        // override the Yoga-assigned size (e.g. escape a style width/height clamp).
+        view.sizingManagedExternally = true
         view.onError = { exception ->
             val dispatcher = UIManagerHelper.getEventDispatcherForReactTag(ctx, view.id)
             val surfaceId = UIManagerHelper.getSurfaceId(ctx)
