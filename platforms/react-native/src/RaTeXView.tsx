@@ -27,8 +27,13 @@ export function RaTeXProvider({
   );
 }
 
+/** Instance handle of the underlying native view (measure, measureInWindow, …). */
+export type RaTeXViewRef = React.ComponentRef<typeof RaTeXViewNativeComponent>;
+
 export interface RaTeXViewProps {
   latex: string;
+  /** Ref to the underlying native view (React 19 ref-as-prop). */
+  ref?: React.Ref<RaTeXViewRef>;
   fontSize?: number;
   /** true (default) = display/block style ($$...$$); false = inline/text style ($...$). */
   displayMode?: boolean;
@@ -50,8 +55,9 @@ export interface RaTeXViewProps {
 // doesn't fit its container that disagreement is visible as a scale flip on
 // every update. The JS self-sizing pass exists only for the old architecture,
 // which has no shadow-node measure.
-const IS_FABRIC = (global as {nativeFabricUIManager?: unknown})
-  .nativeFabricUIManager != null;
+const IS_FABRIC =
+  (globalThis as {nativeFabricUIManager?: unknown}).nativeFabricUIManager !=
+  null;
 
 export function RaTeXView({
   latex,
@@ -61,6 +67,7 @@ export function RaTeXView({
   style,
   onError,
   onContentSizeChange,
+  ref,
 }: RaTeXViewProps): React.JSX.Element {
   const inheritedColor = useContext(RaTeXColorContext);
   const [contentSize, setContentSize] = useState<{
@@ -109,6 +116,7 @@ export function RaTeXView({
 
   return (
     <RaTeXViewNativeComponent
+      ref={ref}
       latex={latex}
       fontSize={fontSize}
       displayMode={displayMode}
