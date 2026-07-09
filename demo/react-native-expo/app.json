@@ -11,9 +11,12 @@
       [
         "expo-font",
         {
-          "fonts": ["./assets/fonts/cofosans-regular.ttf"]
+          "fonts": [
+            "./assets/fonts/cofosans-regular.ttf"
+          ]
         }
-      ]
+      ],
+      "expo-status-bar"
     ],
     "splash": {
       "image": "./assets/splash-icon.png",

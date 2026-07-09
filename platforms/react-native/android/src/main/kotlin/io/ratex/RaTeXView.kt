@@ -11,6 +11,7 @@ import androidx.annotation.ColorInt
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.min
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -154,6 +155,18 @@ class RaTeXView @JvmOverloads constructor(
         renderJob = null
     }
 
+    /**
+     * A view can be transiently detached and re-attached while its window is being built
+     * (React Native's Fabric does this when mounting large trees). The detach cancels a
+     * pending [renderJob], and since no prop changes afterwards, nothing would ever restart
+     * it — the view would keep its laid-out size but stay blank forever. Re-kick the render
+     * on attach when there is nothing rendered and no job in flight.
+     */
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        if (renderer == null && latex.isNotBlank() && renderJob?.isActive != true) rerender()
+    }
+
     // MARK: - Private
 
     private fun rerender() {
@@ -178,6 +191,10 @@ class RaTeXView @JvmOverloads constructor(
                 val widthDp = r.widthPx / density
                 val heightDp = r.totalHeightPx / density
                 onContentSizeChange?.invoke(widthDp.toDouble(), heightDp.toDouble())
+            } catch (e: CancellationException) {
+                // Not a render error: the job was cancelled (detach). Rethrow so the coroutine
+                // machinery completes cancellation; onAttachedToWindow restarts the render.
+                throw e
             } catch (e: RaTeXException) {
                 renderer = null
                 requestLayout(); invalidate()

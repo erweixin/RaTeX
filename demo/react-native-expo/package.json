@@ -10,16 +10,16 @@
     "prebuild": "expo prebuild"
   },
   "dependencies": {
-    "expo": "~55.0.0",
-    "expo-font": "~55.0.6",
-    "expo-status-bar": "~55.0.5",
+    "expo": "^57.0.4",
+    "expo-font": "~57.0.0",
+    "expo-status-bar": "~57.0.0",
     "ratex-react-native": "file:../../platforms/react-native",
-    "react": "19.2.0",
-    "react-native": "0.83.0"
+    "react": "19.2.3",
+    "react-native": "0.86.0"
   },
   "devDependencies": {
-    "@types/react": "~19.1.0",
-    "typescript": "~5.9.2"
+    "@types/react": "~19.2.4",
+    "typescript": "~6.0.3"
   },
   "private": true
 }
