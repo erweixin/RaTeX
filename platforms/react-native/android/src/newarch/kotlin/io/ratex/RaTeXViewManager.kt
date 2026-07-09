@@ -74,7 +74,9 @@ class RaTeXViewManager(private val reactContext: ReactApplicationContext) :
     // node's measureContent via FabricUIManager.measure. Gives the view its real
     // size on the first commit (e.g. at JS useLayoutEffect) instead of only after
     // the async onContentSizeChange event. Parsing is thread-safe and fonts are not
-    // needed for measurement; color does not affect size, so it is ignored here.
+    // needed for measurement. Color does not affect size, but it is part of the
+    // parse-cache key — parsing with the view's actual color makes this entry
+    // reusable by RaTeXView's synchronous render on the main thread.
     override fun measure(
         context: Context,
         localData: ReadableMap?,
@@ -94,9 +96,12 @@ class RaTeXViewManager(private val reactContext: ReactApplicationContext) :
         }
         val displayMode =
             if (props?.hasKey("displayMode") == true) props.getBoolean("displayMode") else true
+        val color =
+            if (props?.hasKey("color") == true && !props.isNull("color")) props.getInt("color")
+            else Color.BLACK
         return try {
             val density = context.resources.displayMetrics.density
-            val displayList = RaTeXEngine.parseBlocking(latex, displayMode, Color.BLACK)
+            val displayList = RaTeXEngine.parseCached(latex, displayMode, color)
             val renderer = RaTeXRenderer(displayList, fontSize * density)
             YogaMeasureOutput.make(renderer.widthPx / density, renderer.totalHeightPx / density)
         } catch (e: Throwable) {
