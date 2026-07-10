@@ -36,7 +36,7 @@ function ensureFontsLoaded(): void {
 
 export class RatexFormulaElement extends HTMLElement {
   static get observedAttributes(): string[] {
-    return ["latex", "font-size", "padding", "background-color", "color"];
+    return ["latex", "font-size", "padding", "background-color", "color", "display-mode"];
   }
 
   private _canvas: HTMLCanvasElement | null = null;
@@ -67,6 +67,15 @@ export class RatexFormulaElement extends HTMLElement {
   set latex(value: string) {
     if (value != null) this.setAttribute("latex", value);
     else this.removeAttribute("latex");
+  }
+
+  /** `true` (default) for display/block style; `false` for inline/text style. */
+  get displayMode(): boolean {
+    return this.getAttribute("display-mode")?.toLowerCase() !== "false";
+  }
+
+  set displayMode(value: boolean) {
+    this.setAttribute("display-mode", String(value));
   }
 
   private _getOptions(): Partial<WebRenderOptions> {
@@ -117,7 +126,7 @@ export class RatexFormulaElement extends HTMLElement {
       const em = opts.fontSize ?? DEFAULT_EM;
       const pad = opts.padding ?? DEFAULT_PAD;
       // Matching demo drawDisplayList order: get display list first, set canvas size from width/height/depth, then draw
-      const displayList = renderLatexToDisplayList(latex, color);
+      const displayList = renderLatexToDisplayList(latex, color, this.displayMode);
       this._setCanvasSizeFromDisplayList(
         displayList.width,
         displayList.height,

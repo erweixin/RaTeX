@@ -21,6 +21,7 @@ ratex-parser = { workspace = true }
 ratex-types  = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+js-sys = "0.3"
 wasm-bindgen = "0.2"
 
 [dev-dependencies]
