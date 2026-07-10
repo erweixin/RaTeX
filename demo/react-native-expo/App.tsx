@@ -47,6 +47,85 @@ const PAGES = [
   { id: "7", latex: String.raw`\text{😊} \quad E=mc^2` },
 ];
 
+// ─── Streaming math: already-rendered lines jump on each appended line ──
+//
+// Simulates an LLM streaming a multi-line formula: one line is appended to a
+// growing `\begin{aligned}` block on a timer. On Android (Fabric), the shadow
+// node measures the NEW latex synchronously at commit (the box grows), but the
+// view swaps its renderer asynchronously a frame later — so for one frame the
+// old (shorter) content is re-centered inside the taller box and every
+// already-rendered line visibly nudges down, then snaps back.
+//
+// Repro requirements (deliberate):
+//   - The RaTeXView key is STABLE across appends — a per-append key would
+//     remount the view and show a blank flash instead of the jump.
+//   - The formula is TOP-ALIGNED in its card — a centering parent would move
+//     the whole view on growth and mask the intra-view nudge.
+const STREAM_LINES = [
+  String.raw`f(x) &= (x + 1)^2`,
+  String.raw`&= x^2 + 2x + 1`,
+  String.raw`\int_0^\infty e^{-x^2}\,dx &= \frac{\sqrt{\pi}}{2}`,
+  String.raw`\sum_{n=1}^{\infty} \frac{1}{n^2} &= \frac{\pi^2}{6}`,
+  String.raw`e^{i\pi} + 1 &= 0`,
+  String.raw`\frac{d}{dx}\left(\frac{u}{v}\right) &= \frac{u'v - uv'}{v^2}`,
+  String.raw`x &= \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}`,
+  String.raw`\lim_{x \to 0} \frac{\sin x}{x} &= 1`,
+];
+
+function CaseStreamingMath() {
+  const [lineCount, setLineCount] = useState(1);
+  const [running, setRunning] = useState(true);
+  const [autoGrow, setAutoGrow] = useState(false);
+
+  useLayoutEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => {
+      // Wrap around so the jump can be observed continuously.
+      setLineCount((n) => (n >= STREAM_LINES.length ? 1 : n + 1));
+    }, 700);
+    return () => clearInterval(id);
+  }, [running]);
+
+  const latex =
+    String.raw`\begin{aligned}` +
+    STREAM_LINES.slice(0, lineCount).join(String.raw` \\ `) +
+    String.raw`\end{aligned}`;
+
+  return (
+    <View style={[styles.card, styles.streamCard]}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardTitle}>
+          Streaming math — watch rendered lines jump (Android)
+        </Text>
+      </View>
+      <Text style={styles.streamHint}>
+        A line is appended every 700 ms ({lineCount}/{STREAM_LINES.length}).
+        Broken: on each append the already-rendered lines nudge down for one
+        frame, then snap back. Fixed / iOS: lines never move.
+      </Text>
+      <Pressable
+        style={styles.button}
+        onPress={() => setRunning((r) => !r)}
+      >
+        <Text style={styles.buttonText}>{running ? "Pause" : "Resume"}</Text>
+      </Pressable>
+      <Pressable
+        style={styles.streamCheckbox}
+        onPress={() => setAutoGrow((a) => !a)}
+      >
+        <Text style={styles.streamCheckboxText}>
+          {autoGrow
+            ? "☑ Auto-grow (no fixed height)"
+            : "☐ Fixed height (will downscale)"}
+        </Text>
+      </Pressable>
+      <View style={[styles.streamStage, autoGrow && styles.streamStageAuto]}>
+        <RaTeXView latex={latex} fontSize={20} displayMode={true} />
+      </View>
+    </View>
+  );
+}
+
 // ─── Case #120: useLayoutEffect measurement drives an absolute decoration ─────
 // https://github.com/erweixin/RaTeX/issues/120
 //
@@ -588,6 +667,7 @@ export default function App() {
           <Text style={styles.buttonText}>Force Re-mount (key={key + 1})</Text>
         </Pressable>
 
+        <CaseStreamingMath />
         <CaseDetachCancel />
         <CaseLayoutEffectMeasure />
         <CasePR45Smoke />
@@ -695,6 +775,45 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 8,
     paddingBottom: 12,
+  },
+  streamCard: {
+    flex: 0,
+    marginHorizontal: 12,
+    marginTop: 8,
+    marginBottom: 8,
+    paddingBottom: 12,
+  },
+  streamHint: {
+    fontSize: 11,
+    color: "#4b5563",
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  streamStage: {
+    // Fixed height + top/left alignment: the card never resizes and the
+    // formula's top-left corner never moves, so the only thing that CAN move
+    // is the content inside the RaTeXView — the artifact under test.
+    // Deliberately shorter than the full 8-line block (~363dp at fontSize 20):
+    // the last appends also exercise the clamped case, where the content must
+    // scale to fit its container uniformly and without flicker.
+    height: 340,
+    alignItems: "flex-start",
+    justifyContent: "flex-start",
+    paddingHorizontal: 12,
+    overflow: "hidden",
+  },
+  streamStageAuto: {
+    // No fixed height: the stage grows with the content, exercising the
+    // auto-sizing streaming path (no clamp, no scale-to-fit).
+    height: "auto",
+  },
+  streamCheckbox: {
+    paddingHorizontal: 12,
+    marginBottom: 8,
+  },
+  streamCheckboxText: {
+    fontSize: 13,
+    color: "#111827",
   },
   detachCard: {
     flex: 0,

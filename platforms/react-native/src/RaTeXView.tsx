@@ -27,8 +27,13 @@ export function RaTeXProvider({
   );
 }
 
+/** Instance handle of the underlying native view (measure, measureInWindow, …). */
+export type RaTeXViewRef = React.ComponentRef<typeof RaTeXViewNativeComponent>;
+
 export interface RaTeXViewProps {
   latex: string;
+  /** Ref to the underlying native view (React 19 ref-as-prop). */
+  ref?: React.Ref<RaTeXViewRef>;
   fontSize?: number;
   /** true (default) = display/block style ($$...$$); false = inline/text style ($...$). */
   displayMode?: boolean;
@@ -41,6 +46,19 @@ export interface RaTeXViewProps {
   }) => void;
 }
 
+// On the new architecture (Fabric) the native component self-sizes synchronously
+// during layout via the shadow node's measureContent, so feeding the async
+// onContentSizeChange measurement back as an explicit width/height style is
+// redundant — and actively harmful: the event carries the UNCONSTRAINED content
+// size, so re-applying it as an explicit style overrides whatever clamp the
+// parent imposed during the measured pass, one commit later. When the content
+// doesn't fit its container that disagreement is visible as a scale flip on
+// every update. The JS self-sizing pass exists only for the old architecture,
+// which has no shadow-node measure.
+const IS_FABRIC =
+  (globalThis as {nativeFabricUIManager?: unknown}).nativeFabricUIManager !=
+  null;
+
 export function RaTeXView({
   latex,
   fontSize = 24,
@@ -49,6 +67,7 @@ export function RaTeXView({
   style,
   onError,
   onContentSizeChange,
+  ref,
 }: RaTeXViewProps): React.JSX.Element {
   const inheritedColor = useContext(RaTeXColorContext);
   const [contentSize, setContentSize] = useState<{
@@ -57,18 +76,23 @@ export function RaTeXView({
   } | null>(null);
   const resolvedColor = color ?? inheritedColor;
 
-  // When inputs change, drop the cached measurement so the view can shrink/grow
-  // immediately instead of keeping a stale width/height until the next event arrives.
+  // Old architecture only (contentSize is never set on Fabric): when inputs
+  // change, drop the cached measurement so the view can shrink/grow instead of
+  // keeping a stale width/height until the next event arrives.
   useEffect(() => {
-    setContentSize(null);
+    if (!IS_FABRIC) {
+      setContentSize(null);
+    }
   }, [latex, fontSize, displayMode, resolvedColor]);
 
   const handleContentSizeChange = useCallback(
     (e: {nativeEvent: {width: number; height: number}}) => {
-      setContentSize({
-        width: e.nativeEvent.width,
-        height: e.nativeEvent.height,
-      });
+      if (!IS_FABRIC) {
+        setContentSize({
+          width: e.nativeEvent.width,
+          height: e.nativeEvent.height,
+        });
+      }
       onContentSizeChange?.(e);
     },
     [onContentSizeChange],
@@ -92,6 +116,7 @@ export function RaTeXView({
 
   return (
     <RaTeXViewNativeComponent
+      ref={ref}
       latex={latex}
       fontSize={fontSize}
       displayMode={displayMode}

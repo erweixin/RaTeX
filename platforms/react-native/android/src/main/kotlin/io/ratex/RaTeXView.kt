@@ -46,7 +46,7 @@ class RaTeXView @JvmOverloads constructor(
 
     // MARK: - Public properties
 
-    /** LaTeX math-mode string to render. Setting this triggers an async re-render. */
+    /** LaTeX math-mode string to render. Setting this triggers a re-render. */
     var latex: String = ""
         set(value) {
             if (field == value) return
@@ -56,7 +56,7 @@ class RaTeXView @JvmOverloads constructor(
 
     /**
      * Font size in density-independent units (dp), matching React Native / iOS points.
-     * Setting this triggers an async re-render.
+     * Setting this triggers a re-render.
      */
     var fontSize: Float = 24f
         set(value) {
@@ -67,7 +67,7 @@ class RaTeXView @JvmOverloads constructor(
 
     /**
      * Rendering mode. `true` (default) for display/block style (`$$...$$`);
-     * `false` for inline/text style (`$...$`). Setting this triggers an async re-render.
+     * `false` for inline/text style (`$...$`). Setting this triggers a re-render.
      */
     var displayMode: Boolean = true
         set(value) {
@@ -91,6 +91,17 @@ class RaTeXView @JvmOverloads constructor(
     /** Called on the main thread when content size is known (width/height in dp). */
     var onContentSizeChange: ((width: Double, height: Double) -> Unit)? = null
 
+    /**
+     * When true, an external layout system owns this view's frame (React Native's
+     * Fabric, which sizes the view from the shadow node's measure and assigns the
+     * frame directly). Content changes then skip [requestLayout]: the classic
+     * Android traversal it triggers would re-run [onMeasure] and could override the
+     * externally assigned frame (e.g. escape a Yoga size clamp). When false
+     * (standalone XML / programmatic use), [requestLayout] is the only way the view
+     * can resize to new content, so it must run.
+     */
+    var sizingManagedExternally: Boolean = false
+
     // MARK: - Private state
 
     private var renderer: RaTeXRenderer? = null
@@ -100,6 +111,20 @@ class RaTeXView @JvmOverloads constructor(
     // MARK: - Measure
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
+        if (sizingManagedExternally) {
+            // The frame is assigned by RN (Fabric updateLayoutMetrics). A classic
+            // Android traversal — triggered by ANY sibling's requestLayout — must
+            // not resize this view away from that frame: reporting the desired
+            // content size here would let the view grow past a Yoga clamp and then
+            // snap back on the next Fabric layout, a visible scale flip. Report the
+            // current frame instead (resolveSize still honors EXACTLY specs).
+            setMeasuredDimension(
+                resolveSize(width, widthMeasureSpec),
+                resolveSize(height, heightMeasureSpec),
+            )
+            return
+        }
+
         val r = renderer
         val desiredWidth = max(
             (r?.widthPx?.let { ceil(it).toInt() } ?: 0) + paddingLeft + paddingRight,
@@ -171,39 +196,74 @@ class RaTeXView @JvmOverloads constructor(
 
     private fun rerender() {
         renderJob?.cancel()
+        renderJob = null
         if (latex.isBlank()) {
             renderer = null
-            requestLayout()
+            requestSelfLayout()
             invalidate()
             return
         }
+
+        // Fast path: swap the renderer synchronously so the content changes in the
+        // same frame as the Fabric-assigned size. On the new architecture the shadow
+        // node's measure pass has already parsed this exact (latex, displayMode,
+        // color) during the commit — before setLatex reaches this view — so the
+        // lookup is a guaranteed hit and the main thread never parses. Without this,
+        // the box grows one frame before the content does and onDraw re-centers the
+        // stale (shorter) content inside the taller box: on streaming updates every
+        // already-rendered line visibly nudges down, then snaps back.
+        //
+        // Fonts are only used at draw time, but a formula rendered before they load
+        // would draw blank glyphs with nothing to trigger a redraw — so the fast
+        // path requires fonts to be loaded; otherwise fall through to the async
+        // path, which loads them first (only ever the case on app cold start).
+        if (RaTeXFontLoader.isLoaded) {
+            val dl = RaTeXEngine.lookupCached(latex, displayMode, color)
+            if (dl != null) {
+                applyRenderer(dl)
+                return
+            }
+        }
+
         renderJob = scope.launch {
             try {
                 withContext(Dispatchers.IO) { RaTeXFontLoader.ensureLoaded(context) }
                 val dl = RaTeXEngine.parse(latex, displayMode, color)
-                // RN passes logical size (dp); convert to px so physical size matches iOS points.
-                val density = context.resources.displayMetrics.density
-                val fontSizePx = fontSize * density
-                val r = RaTeXRenderer(dl, fontSizePx) { RaTeXFontLoader.getTypeface(it) }
-                renderer = r
-                requestLayout()
-                invalidate()
-                val widthDp = r.widthPx / density
-                val heightDp = r.totalHeightPx / density
-                onContentSizeChange?.invoke(widthDp.toDouble(), heightDp.toDouble())
+                applyRenderer(dl)
             } catch (e: CancellationException) {
                 // Not a render error: the job was cancelled (detach). Rethrow so the coroutine
                 // machinery completes cancellation; onAttachedToWindow restarts the render.
                 throw e
             } catch (e: RaTeXException) {
                 renderer = null
-                requestLayout(); invalidate()
+                requestSelfLayout(); invalidate()
                 onError?.invoke(e)
             } catch (e: Throwable) {
                 renderer = null
-                requestLayout(); invalidate()
+                requestSelfLayout(); invalidate()
                 onError?.invoke(RaTeXException(e.message ?: "unknown error"))
             }
         }
+    }
+
+    /**
+     * Request a layout pass to adopt the new content size — unless the frame is
+     * owned by an external layout system (see [sizingManagedExternally]).
+     */
+    private fun requestSelfLayout() {
+        if (!sizingManagedExternally) requestLayout()
+    }
+
+    /** Install a renderer for [dl] and publish layout + content size. Main thread only. */
+    private fun applyRenderer(dl: DisplayList) {
+        // RN passes logical size (dp); convert to px so physical size matches iOS points.
+        val density = context.resources.displayMetrics.density
+        val r = RaTeXRenderer(dl, fontSize * density) { RaTeXFontLoader.getTypeface(it) }
+        renderer = r
+        requestSelfLayout()
+        invalidate()
+        val widthDp = r.widthPx / density
+        val heightDp = r.totalHeightPx / density
+        onContentSizeChange?.invoke(widthDp.toDouble(), heightDp.toDouble())
     }
 }

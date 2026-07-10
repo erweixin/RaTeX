@@ -16,6 +16,10 @@ object RaTeXFontLoader {
     private val fontsLoaded = AtomicBoolean(false)
     private val loadLock = Any()
 
+    /** Whether fonts have been loaded (cheap atomic read; safe on the main thread). */
+    @JvmStatic
+    val isLoaded: Boolean get() = fontsLoaded.get()
+
     /** KaTeX font IDs (Rust FontId.as_str()) → TTF filename without path. */
     private val fontFileNames = listOf(
         "AMS-Regular" to "KaTeX_AMS-Regular.ttf",

@@ -10,6 +10,7 @@
 #import <react/renderer/components/RNRaTeXSpec/RCTComponentViewHelpers.h>
 #import <react/renderer/core/LayoutConstraints.h>
 #import <react/renderer/core/LayoutContext.h>
+#include <cmath>
 #else
 #import "RaTeXViewManager.h"
 #import <React/RCTUIManager.h>
@@ -79,7 +80,12 @@ class RaTeXViewMeasuringShadowNode final : public RaTeXViewShadowNode {
     CGSize measured = [RaTeXMeasure measureLatex:latex
                                         fontSize:static_cast<CGFloat>(props.fontSize)
                                      displayMode:props.displayMode ? YES : NO];
-    facebook::react::Size size{static_cast<Float>(measured.width), static_cast<Float>(measured.height)};
+    // Snap up to the pixel grid so Yoga's position-dependent edge rounding can't vary the
+    // reported height across placements of the same formula. Uses Yoga's own scale factor.
+    Float scale = layoutContext.pointScaleFactor > 0 ? layoutContext.pointScaleFactor : 1;
+    Float width = std::ceil(static_cast<Float>(measured.width) * scale) / scale;
+    Float height = std::ceil(static_cast<Float>(measured.height) * scale) / scale;
+    facebook::react::Size size{width, height};
     return layoutConstraints.clamp(size);
   }
 };
