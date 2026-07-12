@@ -62,11 +62,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Install wasm-pack
         run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-      - name: Build ratex-wasm npm package (platforms/web)
+      - name: Build and test ratex-wasm npm package (platforms/web)
         run: |
           cd platforms/web
           npm ci
-          npm run build
+          npm test
 
   gtk-gobject-smoke:
     runs-on: ubuntu-latest
