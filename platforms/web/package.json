@@ -33,7 +33,8 @@
     "build:wasm": "wasm-pack build ../../crates/ratex-wasm --target web --out-dir ../../platforms/web/pkg && node -e \"try{require('fs').unlinkSync('pkg/.gitignore')}catch(e){}\"",
     "prepack": "node -e \"const fs=require('fs');try{fs.unlinkSync('pkg/.gitignore')}catch(e){};for(const p of ['pkg/ratex_wasm.js','pkg/ratex_wasm_bg.wasm']){if(!fs.existsSync(p)){console.error('prepack: missing '+p+'. Run npm run build before pack/publish.');process.exit(1)}}\"",
     "copy-fonts": "node -e \"const fs=require('fs');const path=require('path');const src=path.join(process.cwd(),'node_modules/katex/dist/fonts');const dest=path.join(process.cwd(),'fonts');if(!fs.existsSync(src)){console.error('Run npm install first (katex is a devDependency)');process.exit(1);}fs.mkdirSync(dest,{recursive:true});fs.readdirSync(src).forEach(f=>fs.copyFileSync(path.join(src,f),path.join(dest,f)));console.log('Fonts copied to fonts/');\"",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "npm run build",
+    "test": "npm run build && node --test tests/*.test.mjs"
   },
   "devDependencies": {
     "katex": "0.16.9",
