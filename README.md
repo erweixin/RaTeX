@@ -239,6 +239,7 @@ CLI notes
 - `render-svg --stdout`: write SVG documents to stdout instead of files; status messages go to stderr.
 - `--help`: show supported options and whether the current build uses embedded fonts.
 - `--color` / `--background-color` accept named colors (for example `black`, `red`, `teal`), 3- or 6-digit hex (`#f00`, `#ff0000`), and KaTeX / MathJax-style color model values (`[RGB]255,0,0`, `[rgb]1,0,0`, `[HTML]B22222`, `[gray]0.5`, `[cmyk]0,1,1,0`).
+- `render-svg --office-compatible-colors`: emit SVG paint colors as `rgb(...)` plus opacity attributes instead of the default `rgba(...)`, for Office versions that do not understand `rgba(...)` in SVG.
 - `ratex-render --background-color transparent` produces a transparent PNG.
 
 ### CJK / Unicode fallback
