@@ -7,6 +7,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.text.style.ReplacementSpan
+import android.graphics.Color
+import androidx.annotation.ColorInt
 import kotlin.math.ceil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -42,15 +44,24 @@ class RaTeXSpan private constructor(
          * Font loading and rendering run on [Dispatchers.IO]. Call from a coroutine or
          * `suspend` function; the result is delivered on the caller's dispatcher.
          *
-         * @param context  Any context; used only for asset access during font loading.
-         * @param latex    LaTeX math-mode string (no surrounding `$` or `\[…\]`).
-         * @param fontSize Font size in **dp** (density-independent pixels). Converted to px internally.
+         * @param context     Any context; used only for asset access during font loading.
+         * @param latex       LaTeX math-mode string (no surrounding `$` or `\[…\]`).
+         * @param fontSize    Font size in **dp** (density-independent pixels). Converted to px internally.
+         * @param color       Text color as an ARGB integer (default [Color.BLACK]).
+         * @param displayMode `true` (default) for display/block style; `false` for inline/text style.
          * @throws RaTeXException if the formula cannot be parsed.
          */
-        suspend fun create(context: Context, latex: String, fontSize: Float): RaTeXSpan =
+        @JvmOverloads
+        suspend fun create(
+            context: Context,
+            latex: String,
+            fontSize: Float,
+            @ColorInt color: Int = Color.BLACK,
+            displayMode: Boolean = true,
+        ): RaTeXSpan =
             withContext(Dispatchers.IO) {
                 RaTeXFontLoader.ensureLoaded(context)
-                val dl = RaTeXEngine.parse(latex)
+                val dl = RaTeXEngine.parse(latex, displayMode, color)
                 val fontSizePx = fontSize * context.resources.displayMetrics.density
                 val renderer = RaTeXRenderer(dl, fontSizePx) { RaTeXFontLoader.getTypeface(it) }
 
