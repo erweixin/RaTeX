@@ -51,6 +51,7 @@ class RaTeXSpan private constructor(
          * @param displayMode `true` (default) for display/block style; `false` for inline/text style.
          * @throws RaTeXException if the formula cannot be parsed.
          */
+        @JvmOverloads
         suspend fun create(
             context: Context,
             latex: String,
