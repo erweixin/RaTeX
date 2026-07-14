@@ -11,6 +11,8 @@ Native LaTeX math rendering for React Native — no WebView, no JavaScript math 
 - Measures rendered content size for scroll and dynamic layout
 - Error callback for parse failures
 - Bundles all required KaTeX fonts — no extra setup
+- Baseline alignment in flex rows and inside `<Text>` via `alignSelf: 'baseline'`
+- Sync formula metrics (`getTexMetrics`) for custom text engines
 - `InlineTeX` component for mixed text + `$...$` formula strings
 
 ## Requirements
@@ -123,6 +125,24 @@ function Screen() {
 
 If you explicitly provide `style.width` and/or `style.height`, `RaTeXView` will **not** override those values with measurements. Instead, the native view will scale the formula down (never up) to fit the assigned layout size and clip to bounds when necessary.
 
+### Baseline alignment
+
+`RaTeXView` can sit on the text baseline like a glyph — in a flex row and inside `<Text>`:
+
+```tsx
+<View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+  <Text>f(x) =</Text>
+  <RaTeXView latex={'\\frac{a}{b}'} fontSize={16} displayMode={false} />
+</View>
+
+<Text>
+  compare y with{' '}
+  <RaTeXView latex="y" fontSize={16} displayMode={false}
+             style={{ alignSelf: 'baseline' }} />{' '}
+  mid-sentence
+</Text>
+```
+
 ### `<InlineTeX />`
 
 Renders a mixed string of plain text and `$...$` LaTeX formulas as a single native text flow. Formulas are embedded with `NSTextAttachment` on iOS/macOS and `ReplacementSpan` on Android, so line wrapping, word breaking, and baseline alignment are handled by the platform text layout engine.
@@ -145,6 +165,24 @@ Renders a mixed string of plain text and `$...$` LaTeX formulas as a single nati
 ### `<RaTeXProvider />`
 
 Provides a default formula color to descendant `RaTeXView` and `InlineTeX` components. Use a component-level `color` prop to override the inherited value.
+
+### `getTexMetrics()`
+
+Synchronous formula ink metrics — TeX's box *depth*: what KaTeX emits as `vertical-align: -depth`, MathML Core's *ink line-descent*. For custom text hosts (TextKit / Spannable engines, markdown renderers) that need the baseline offset as a number. Served from the same parse cache as measure/render — an on-screen formula never re-parses.
+
+```tsx
+import { getTexMetrics } from 'ratex-react-native';
+
+// Natural (unscaled) metrics for any formula — no view needed:
+const m = getTexMetrics('\\frac{a}{b}', 16, false);
+// { width, height, depth } | null — dp; the baseline sits at height - depth
+
+// Drawn metrics on a mounted view (fit scale + centering applied):
+const d = ref.current?.getTexMetrics(); // ref: RaTeXViewRef
+// { depth, scale, width, height } | null — apply depth directly
+```
+
+Both are safe to call from `useLayoutEffect`. 
 
 ## Architecture Support
 

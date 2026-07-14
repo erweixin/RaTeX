@@ -11,6 +11,8 @@ React Native 原生 LaTeX 数学公式渲染库——无 WebView，无 JavaScrip
 - 测量渲染内容尺寸，便于滚动视图和动态布局
 - 提供解析失败的错误回调
 - 内置所有 KaTeX 字体，无需额外配置
+- 通过 `alignSelf: 'baseline'` 在 flex 行和 `<Text>` 内实现基线对齐
+- 同步公式度量 API（`getTexMetrics`），供自定义文本引擎使用
 - `InlineTeX` 组件支持文字与 `$...$` 公式混排
 
 ## 环境要求
@@ -123,6 +125,24 @@ function Screen() {
 
 如果你在 `style` 中显式指定了 `width` 和/或 `height`，`RaTeXView` **不会**再用测量结果覆盖这些值；原生视图会在绘制阶段把公式**按比例缩小（不会放大）**以适配给定布局尺寸，并在必要时按边界裁剪。
 
+### 基线对齐
+
+`RaTeXView` 可以像普通字符一样落在文字基线上——既支持 flex 行，也支持 `<Text>` 内嵌：
+
+```tsx
+<View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+  <Text>f(x) =</Text>
+  <RaTeXView latex={'\\frac{a}{b}'} fontSize={16} displayMode={false} />
+</View>
+
+<Text>
+  compare y with{' '}
+  <RaTeXView latex="y" fontSize={16} displayMode={false}
+             style={{ alignSelf: 'baseline' }} />{' '}
+  mid-sentence
+</Text>
+```
+
 ### `<InlineTeX />`
 
 将包含 `$...$` 标记的混合字符串渲染为原生内联文本流。公式在 iOS/macOS 上通过 `NSTextAttachment` 嵌入，在 Android 上通过 `ReplacementSpan` 嵌入，因此换行、断词和基线对齐都交给平台文本排版引擎处理。
@@ -145,6 +165,24 @@ function Screen() {
 ### `<RaTeXProvider />`
 
 为后代 `RaTeXView` 和 `InlineTeX` 提供默认公式颜色。若组件自身传入 `color`，则会覆盖继承值。
+
+### `getTexMetrics()`
+
+同步获取公式的墨迹度量——即 TeX 盒模型中的 *depth*：KaTeX 在 Web 端以 `vertical-align: -depth` 输出，MathML Core 中称为 *ink line-descent*。适用于需要以数值形式拿到基线偏移的自定义文本引擎（TextKit / Spannable、markdown 渲染器等）。度量与 measure/render 共享同一解析缓存，屏幕上已有的公式不会重复解析。
+
+```tsx
+import { getTexMetrics } from 'ratex-react-native';
+
+// 任意公式的自然（未缩放）度量——无需挂载视图：
+const m = getTexMetrics('\\frac{a}{b}', 16, false);
+// { width, height, depth } | null —— 单位 dp；基线位于 height - depth 处
+
+// 已挂载视图的实际绘制度量（已应用适配缩放与居中）：
+const d = ref.current?.getTexMetrics(); // ref: RaTeXViewRef
+// { depth, scale, width, height } | null —— depth 可直接使用
+```
+
+两者都可在 `useLayoutEffect` 中安全调用。
 
 ## 架构支持
 
