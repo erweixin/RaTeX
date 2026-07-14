@@ -119,6 +119,9 @@ jobs:
           flutter pub get
           dart analyze
 
+      - name: Verify CocoaPods and SwiftPM iOS release linkage
+        run: bash platforms/flutter/tool/verify-ios-integration.sh
+
       - name: Publish to pub.dev
         run: |
           cd platforms/flutter

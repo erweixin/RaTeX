@@ -147,6 +147,23 @@ jobs:
       - name: Smoke executable (macOS)
         run: LIBRARY_PATH=$(pwd)/target/release swift run --package-path platforms/ios/tests ratex-smoke
 
+  flutter-ios-linkage:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios
+      - uses: Swatinem/rust-cache@v2
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Build iOS XCFramework
+        run: bash platforms/ios/build-ios.sh
+      - name: Verify Flutter CocoaPods and SwiftPM release linkage
+        run: bash platforms/flutter/tool/verify-ios-integration.sh
+
   # Compiles the real SPM package's Swift wrapper (platforms/ios/Sources/Ratex/*.swift)
   # for macOS/AppKit through the published Package.swift + RaTeX.xcframework binary
   # target. The ios-swift-smoke job above only exercises a separate macOS-compatible

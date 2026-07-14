@@ -47,6 +47,16 @@ dependencies:
 
 Then run `flutter pub get`. No native build required — the published package includes prebuilt Android `.so`, iOS `RaTeX.xcframework`, macOS `.dylib`, Windows `.dll`, and Linux `.so`.
 
+#### iOS dependency manager
+
+The plugin supports both Swift Package Manager and CocoaPods. Flutter 3.44 and later use SwiftPM by default. On Flutter 3.24 through 3.43, or if SwiftPM was previously disabled, enable it before running `flutter pub get` or building the app:
+
+```bash
+flutter config --enable-swift-package-manager
+```
+
+Flutter versions earlier than 3.24 should continue using CocoaPods because they do not support SwiftPM project migration. When SwiftPM is disabled, Flutter uses the CocoaPods integration instead. Both dependency managers use the same packaged `RaTeX.xcframework`.
+
 #### Font setup
 
 Flutter requires host apps to explicitly declare fonts from plugin packages ([Flutter docs](https://docs.flutter.dev/cookbook/design/package-fonts#from-a-package)). Add the following to the `flutter:` section of your `pubspec.yaml`:
