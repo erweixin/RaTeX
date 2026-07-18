@@ -1,6 +1,5 @@
-// RaTeXViewManager.mm — Apple bridge for RaTeXView (supports old arch & Fabric new arch).
+// RaTeXViewManager.mm — Apple bridge for RaTeXView (Fabric / New Architecture).
 
-#ifdef RCT_NEW_ARCH_ENABLED
 #import <React/RCTComponentViewProtocol.h>
 #import <React/RCTFabricComponentsPlugins.h>
 #import <React/RCTViewComponentView.h>
@@ -12,10 +11,6 @@
 #import <react/renderer/core/LayoutContext.h>
 #include <algorithm>
 #include <cmath>
-#else
-#import "RaTeXViewManager.h"
-#import <React/RCTUIManager.h>
-#endif
 
 #if TARGET_OS_OSX
 #import <AppKit/AppKit.h>
@@ -41,12 +36,6 @@
 #import "ratex_react_native-Swift.h"
 #endif
 #import "RaTeXColorUtils.h"
-
-// ---------------------------------------------------------------------------
-// MARK: - New Architecture (Fabric)
-// ---------------------------------------------------------------------------
-
-#ifdef RCT_NEW_ARCH_ENABLED
 
 using namespace facebook::react;
 
@@ -264,38 +253,3 @@ Class<RCTComponentViewProtocol> RaTeXViewCls(void)
 {
   return RaTeXViewComponentView.class;
 }
-
-// ---------------------------------------------------------------------------
-// MARK: - Old Architecture (Bridge)
-// ---------------------------------------------------------------------------
-
-#else // !RCT_NEW_ARCH_ENABLED
-
-@implementation RaTeXViewManager
-
-RCT_EXPORT_MODULE(RaTeXView)
-
-#if TARGET_OS_OSX
-- (NSView *)view
-#else
-- (UIView *)view
-#endif
-{
-  return [[RaTeXRNView alloc] init];
-}
-
-RCT_EXPORT_VIEW_PROPERTY(latex, NSString)
-RCT_EXPORT_VIEW_PROPERTY(fontSize, CGFloat)
-RCT_EXPORT_VIEW_PROPERTY(displayMode, BOOL)
-RCT_EXPORT_VIEW_PROPERTY(inlineAlign, NSString)
-#if TARGET_OS_OSX
-RCT_EXPORT_VIEW_PROPERTY(color, NSColor)
-#else
-RCT_EXPORT_VIEW_PROPERTY(color, UIColor)
-#endif
-RCT_EXPORT_VIEW_PROPERTY(onError, RCTDirectEventBlock)
-RCT_EXPORT_VIEW_PROPERTY(onContentSizeChange, RCTDirectEventBlock)
-
-@end
-
-#endif // RCT_NEW_ARCH_ENABLED

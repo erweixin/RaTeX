@@ -1,6 +1,5 @@
-// RaTeXInlineViewManager.mm — Apple bridge for RaTeXInlineView (old arch & Fabric).
+// RaTeXInlineViewManager.mm — Apple bridge for RaTeXInlineView (Fabric / New Architecture).
 
-#ifdef RCT_NEW_ARCH_ENABLED
 #import <React/RCTComponentViewProtocol.h>
 #import <React/RCTFabricComponentsPlugins.h>
 #import <React/RCTViewComponentView.h>
@@ -8,10 +7,6 @@
 #import <react/renderer/components/RNRaTeXSpec/EventEmitters.h>
 #import <react/renderer/components/RNRaTeXSpec/Props.h>
 #import <react/renderer/components/RNRaTeXSpec/RCTComponentViewHelpers.h>
-#else
-#import "RaTeXInlineViewManager.h"
-#import <React/RCTUIManager.h>
-#endif
 
 #if TARGET_OS_OSX
 #import <AppKit/AppKit.h>
@@ -32,12 +27,6 @@
 #import "ratex_react_native-Swift.h"
 #endif
 #import "RaTeXColorUtils.h"
-
-// ---------------------------------------------------------------------------
-// MARK: - New Architecture (Fabric)
-// ---------------------------------------------------------------------------
-
-#ifdef RCT_NEW_ARCH_ENABLED
 
 using namespace facebook::react;
 
@@ -165,42 +154,3 @@ Class<RCTComponentViewProtocol> RaTeXInlineViewCls(void)
 {
   return RaTeXInlineViewComponentView.class;
 }
-
-// ---------------------------------------------------------------------------
-// MARK: - Old Architecture (Bridge)
-// ---------------------------------------------------------------------------
-
-#else // !RCT_NEW_ARCH_ENABLED
-
-@implementation RaTeXInlineViewManager
-
-RCT_EXPORT_MODULE(RaTeXInlineView)
-
-#if TARGET_OS_OSX
-- (NSView *)view
-#else
-- (UIView *)view
-#endif
-{
-  return [[RaTeXInlineRNView alloc] init];
-}
-
-RCT_EXPORT_VIEW_PROPERTY(content, NSString)
-RCT_EXPORT_VIEW_PROPERTY(fontSize, CGFloat)
-#if TARGET_OS_OSX
-RCT_EXPORT_VIEW_PROPERTY(color, NSColor)
-RCT_EXPORT_VIEW_PROPERTY(textColor, NSColor)
-#else
-RCT_EXPORT_VIEW_PROPERTY(color, UIColor)
-RCT_EXPORT_VIEW_PROPERTY(textColor, UIColor)
-#endif
-RCT_EXPORT_VIEW_PROPERTY(textFontSize, CGFloat)
-RCT_EXPORT_VIEW_PROPERTY(textFontFamily, NSString)
-RCT_EXPORT_VIEW_PROPERTY(textItalic, BOOL)
-RCT_EXPORT_VIEW_PROPERTY(textUnderline, BOOL)
-RCT_EXPORT_VIEW_PROPERTY(textLineThrough, BOOL)
-RCT_EXPORT_VIEW_PROPERTY(onContentSizeChange, RCTDirectEventBlock)
-
-@end
-
-#endif // RCT_NEW_ARCH_ENABLED

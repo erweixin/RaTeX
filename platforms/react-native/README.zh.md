@@ -7,7 +7,7 @@ React Native 原生 LaTeX 数学公式渲染库——无 WebView，无 JavaScrip
 ## 特性
 
 - 在 iOS、Android 与 macOS（[React Native macOS](https://github.com/microsoft/react-native-macos)）上原生渲染 LaTeX 数学公式
-- 同时支持**新架构**（Fabric / JSI）和**旧架构**（Bridge）
+- 基于**新架构**（Fabric / JSI / TurboModules）构建 —— React Native ≥ 0.84 仅支持新架构
 - 测量渲染内容尺寸，便于滚动视图和动态布局
 - 提供解析失败的错误回调
 - 内置所有 KaTeX 字体，无需额外配置
@@ -19,8 +19,8 @@ React Native 原生 LaTeX 数学公式渲染库——无 WebView，无 JavaScrip
 
 | 依赖 | 版本 |
 |-----|------|
-| React Native | ≥ 0.73 |
-| React | ≥ 18 |
+| React Native | ≥ 0.84 |
+| React | ≥ 19.2 |
 | iOS | ≥ 14.0 |
 | macOS | ≥ 13.0（使用 React Native macOS 时） |
 | Android | minSdk 21（Android 5.0+）|
@@ -186,7 +186,7 @@ const d = ref.current?.getTexMetrics(); // ref: RaTeXViewRef
 
 ## 架构支持
 
-同时支持**新架构**（Fabric / Codegen）和**旧架构**（Bridge），无需任何配置。React Native ≥ 0.73 开启 `newArchEnabled=true` 后自动使用 Fabric；旧项目则回退到 Bridge 管理器。
+仅支持**新架构**（Fabric / Codegen / TurboModules），与 [React Native 官方支持版本](https://reactnative.dev/versions)（≥ 0.84）保持一致，新架构在这些版本中默认开启。不再支持旧架构（Bridge/Paper）。
 
 ## fontSize 说明
 

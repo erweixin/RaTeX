@@ -1,11 +1,8 @@
-// RaTeXModule.mm — sync TeX metrics for JS (old & new arch). Sync by design
+// RaTeXModule.mm — sync TeX metrics for JS (TurboModule). Sync by design
 // (callers need it in useLayoutEffect); backed by RaTeXMeasure's parse cache.
 
 #import <React/RCTBridgeModule.h>
-
-#ifdef RCT_NEW_ARCH_ENABLED
 #import <RNRaTeXSpec/RNRaTeXSpec.h>
-#endif
 
 // Swift-generated header — same framework/static-library dance as RaTeXViewManager.mm.
 #if __has_include(<ratex_react_native/ratex_react_native-Swift.h>)
@@ -14,12 +11,7 @@
 #import "ratex_react_native-Swift.h"
 #endif
 
-@interface RaTeXModule : NSObject <RCTBridgeModule
-#ifdef RCT_NEW_ARCH_ENABLED
-                                   ,
-                                   NativeRaTeXModuleSpec
-#endif
-                                   >
+@interface RaTeXModule : NSObject <RCTBridgeModule, NativeRaTeXModuleSpec>
 @end
 
 @implementation RaTeXModule
@@ -48,8 +40,6 @@ RCT_EXPORT_MODULE(RaTeXModule)
   };
 }
 
-#ifdef RCT_NEW_ARCH_ENABLED
-
 // `color` exists for Android's color-keyed cache; iOS metrics are color-blind.
 - (NSDictionary *_Nullable)getTexMetrics:(NSString *)latex
                                 fontSize:(double)fontSize
@@ -64,18 +54,5 @@ RCT_EXPORT_MODULE(RaTeXModule)
 {
   return std::make_shared<facebook::react::NativeRaTeXModuleSpecJSI>(params);
 }
-
-#else // !RCT_NEW_ARCH_ENABLED
-
-RCT_EXPORT_BLOCKING_SYNCHRONOUS_METHOD(getTexMetrics
-                                       : (NSString *)latex fontSize
-                                       : (double)fontSize displayMode
-                                       : (BOOL)displayMode color
-                                       : (double)color)
-{
-  return [self texMetricsForLatex:latex fontSize:fontSize displayMode:displayMode];
-}
-
-#endif // RCT_NEW_ARCH_ENABLED
 
 @end

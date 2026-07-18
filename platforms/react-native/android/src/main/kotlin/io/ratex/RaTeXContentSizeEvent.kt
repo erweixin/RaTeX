@@ -1,4 +1,4 @@
-// RaTeXContentSizeEvent.kt — Fabric/legacy event for RaTeXView onContentSizeChange.
+// RaTeXContentSizeEvent.kt — Fabric event for RaTeXView onContentSizeChange.
 
 package io.ratex
 

@@ -7,7 +7,7 @@ import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.WritableMap
 
 /**
- * Shared body of the new-arch/old-arch RaTeXModule classes. Sync by design
+ * Shared body of the RaTeXModule TurboModule. Sync by design
  * (callers need it in useLayoutEffect); [RaTeXMetrics] is parse-cache-backed.
  */
 object RaTeXModuleImpl {

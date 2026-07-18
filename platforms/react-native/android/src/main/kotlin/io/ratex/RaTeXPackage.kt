@@ -3,7 +3,6 @@
 package io.ratex
 
 import com.facebook.react.BaseReactPackage
-import io.ratex.rn.BuildConfig
 import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.module.model.ReactModuleInfo
@@ -26,7 +25,7 @@ class RaTeXPackage : BaseReactPackage() {
                     false, // canOverrideExistingModule
                     false, // needsEagerInit
                     false, // isCxxModule
-                    BuildConfig.IS_NEW_ARCHITECTURE_ENABLED, // isTurboModule
+                    true, // isTurboModule
                 ),
             )
         }

@@ -71,12 +71,6 @@ public class RaTeXInlineRNView: PlatformView {
 
     // MARK: - Event callbacks
 
-    @objc public var onContentSizeChange: ((NSDictionary?) -> Void)? {
-        didSet {
-            resetContentSizeReporting()
-        }
-    }
-
     @objc public func setContentSizeCallback(_ handler: ((CGFloat, CGFloat) -> Void)?) {
         contentSizeCallback = handler
         resetContentSizeReporting()
@@ -135,7 +129,6 @@ public class RaTeXInlineRNView: PlatformView {
         }
 
         innerView.onContentSizeChange = { [weak self] w, h in
-            self?.onContentSizeChange?(["width": w, "height": h])
             self?.contentSizeCallback?(w, h)
         }
     }

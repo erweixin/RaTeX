@@ -3,9 +3,11 @@
 This folder contains the **RaTeX** React Native demo app for iOS, Android, and **macOS**.
 
 > **Version constraint**: macOS support is provided by [react-native-macos](https://github.com/microsoft/react-native-macos), which must stay on the same minor version as `react-native`.
-> This demo is pinned to **`react-native@0.81.6`** + **`react-native-macos@0.81.7`** to satisfy peer dependency constraints.
+> This demo is pinned to **`react-native@0.81.6`** + **`react-native-macos@0.81.7`** because that is the newest minor react-native-macos has released.
+>
+> **Note**: `ratex-react-native` officially supports **React Native ≥ 0.84** (New Architecture only, matching the [supported RN versions](https://reactnative.dev/versions)). This demo runs on 0.81 with the New Architecture enabled and installs with `legacy-peer-deps` (see `.npmrc`) to bypass the peer range; it works because 0.81 already ships full Fabric support, but it is a best-effort setup until react-native-macos catches up.
 
-> **Upgrade path**: when `react-native-macos` releases a new minor (for example `0.82.x`), upgrade `react-native` and `react-native-macos` together, then align `@react-native/*` toolchain packages, Gradle wrapper, and Node engines in one pass.
+> **Upgrade path**: when `react-native-macos` releases a new minor (for example `0.84.x`), upgrade `react-native` and `react-native-macos` together, then align `@react-native/*` toolchain packages, Gradle wrapper, and Node engines in one pass, and remove `legacy-peer-deps` from `.npmrc` once ≥ 0.84.
 
 ## Prerequisites
 

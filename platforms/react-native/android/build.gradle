@@ -16,11 +16,13 @@ apply plugin: 'com.android.library'
 apply plugin: 'org.jetbrains.kotlin.android'
 apply plugin: 'org.jetbrains.kotlin.plugin.serialization'
 
+// RaTeX supports only the React Native New Architecture (Fabric), i.e. RN >= 0.84.
 def isNewArchEnabled = project.hasProperty("newArchEnabled") && project.newArchEnabled == "true"
-
-if (isNewArchEnabled) {
-    apply plugin: "com.facebook.react"
+if (!isNewArchEnabled) {
+    throw new GradleException("ratex-react-native requires the New Architecture (newArchEnabled=true). React Native >= 0.84 enables it by default.")
 }
+
+apply plugin: "com.facebook.react"
 
 android {
     compileSdk safeExtGet('compileSdkVersion', 34)
@@ -29,28 +31,18 @@ android {
     defaultConfig {
         minSdk safeExtGet('minSdkVersion', 24)
         targetSdk safeExtGet('targetSdkVersion', 34)
-        buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchEnabled.toString()
     }
 
     sourceSets {
         main {
-            java.srcDirs = ['src/main/kotlin']
-            if (isNewArchEnabled) {
-                java.srcDirs += [
-                    'src/newarch/kotlin',
-                    "${project.buildDir}/generated/source/codegen/java"
-                ]
-            } else {
-                java.srcDirs += ['src/oldarch/kotlin']
-            }
+            java.srcDirs = [
+                'src/main/kotlin',
+                "${project.buildDir}/generated/source/codegen/java"
+            ]
             jniLibs.srcDirs = ['src/main/jniLibs']
             assets.srcDirs = ['src/main/assets']
             manifest.srcFile 'src/main/AndroidManifest.xml'
         }
-    }
-
-    buildFeatures {
-        buildConfig true
     }
 }
 

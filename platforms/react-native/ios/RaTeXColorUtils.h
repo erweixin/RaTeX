@@ -1,6 +1,9 @@
 #pragma once
 
-#ifdef RCT_NEW_ARCH_ENABLED
+// C++-only helper (uses facebook::react types). The guard keeps this header
+// inert when CocoaPods pulls it into non-C++ contexts (umbrella header /
+// Swift module compilation), where the React C++ headers cannot be parsed.
+#ifdef __cplusplus
 
 #import <TargetConditionals.h>
 #import <react/renderer/graphics/Color.h>
@@ -35,4 +38,4 @@ inline RaTeXPlatformColor *_Nullable RaTeXPlatformColorFromSharedColor(
 #endif
 }
 
-#endif
+#endif  // __cplusplus

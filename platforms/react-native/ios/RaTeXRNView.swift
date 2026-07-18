@@ -8,8 +8,7 @@ import UIKit
 
 /// ObjC-compatible view wrapper around `RaTeXView` used as the React Native native view.
 ///
-/// Exposes `@objc` properties so React Native can set them via KVC (old arch) or direct
-/// property access from ObjC++ (new arch / Fabric).
+/// Exposes `@objc` properties for direct property access from ObjC++ (Fabric).
 @objc(RaTeXRNView)
 @MainActor
 public class RaTeXRNView: PlatformView {
@@ -230,37 +229,13 @@ public class RaTeXRNView: PlatformView {
         }
     }
 
-    /// Old-arch event block set by React Native via KVC.
-    /// When called, passes `{ "error": "<message>" }` as the body.
-    @objc public var onError: ((NSDictionary?) -> Void)? {
-        didSet {
-            if let block = onError {
-                innerView.onError = { error in
-                    block(["error": error.localizedDescription])
-                }
-            } else {
-                innerView.onError = nil
-            }
-        }
-    }
-
-    /// New-arch (Fabric) helper: lets ObjC++ install an error handler without
-    /// needing to bridge the Swift `Error` type.
+    /// Lets ObjC++ install an error handler without needing to bridge the
+    /// Swift `Error` type.
     @objc public func setErrorCallback(_ handler: @escaping (String) -> Void) {
         innerView.onError = { error in handler(error.localizedDescription) }
     }
 
-    /// Old-arch: set by RN via KVC. Called with @{ @"width": @(w), @"height": @(h) }.
-    @objc public var onContentSizeChange: ((NSDictionary?) -> Void)? {
-        didSet {
-            // Fast Refresh can remount JS without remounting the native view.
-            // Reset so the next layout pass re-emits size to the new JS listener.
-            lastReportedContentSize = .zero
-            platformSetNeedsLayout()
-        }
-    }
-
-    /// New-arch: set by ComponentView to dispatch content size events.
+    /// Set by ComponentView to dispatch content size events.
     @objc public func setContentSizeCallback(_ handler: ((CGFloat, CGFloat) -> Void)?) {
         contentSizeCallback = handler
         lastReportedContentSize = .zero
@@ -322,7 +297,6 @@ public class RaTeXRNView: PlatformView {
         guard size != lastReportedContentSize else { return }
         lastReportedContentSize = size
         contentSizeCallback?(size.width, size.height)
-        onContentSizeChange?(["width": size.width, "height": size.height])
     }
 
     // MARK: - Baseline (native AutoLayout)

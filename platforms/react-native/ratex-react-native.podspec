@@ -33,7 +33,7 @@ Pod::Spec.new do |s|
     "RaTeXFonts" => ["ios/Fonts/*.ttf"]
   }
 
-  # install_modules_dependencies handles React Core / Fabric / Codegen
-  # dependencies automatically based on RCT_NEW_ARCH_ENABLED.
+  # install_modules_dependencies wires up React Core / Fabric / Codegen
+  # dependencies. RaTeX supports only the New Architecture (RN >= 0.84).
   install_modules_dependencies(s)
 end

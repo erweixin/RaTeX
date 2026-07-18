@@ -7,7 +7,7 @@ Native LaTeX math rendering for React Native — no WebView, no JavaScript math 
 ## Features
 
 - Renders LaTeX math natively on iOS, Android, and macOS (via [React Native macOS](https://github.com/microsoft/react-native-macos))
-- Supports both the **New Architecture** (Fabric / JSI) and the **Old Architecture** (Bridge)
+- Built for the **New Architecture** (Fabric / JSI / TurboModules) — the only architecture supported by React Native ≥ 0.84
 - Measures rendered content size for scroll and dynamic layout
 - Error callback for parse failures
 - Bundles all required KaTeX fonts — no extra setup
@@ -19,8 +19,8 @@ Native LaTeX math rendering for React Native — no WebView, no JavaScript math 
 
 | Dependency | Version |
 |-----------|---------|
-| React Native | ≥ 0.73 |
-| React | ≥ 18 |
+| React Native | ≥ 0.84 |
+| React | ≥ 19.2 |
 | iOS | ≥ 14.0 |
 | macOS | ≥ 13.0 (when using React Native macOS) |
 | Android | minSdk 21 (Android 5.0+) |
@@ -186,7 +186,7 @@ Both are safe to call from `useLayoutEffect`.
 
 ## Architecture Support
 
-Supports both **New Architecture** (Fabric / Codegen) and **Old Architecture** (Bridge) — no configuration needed. React Native ≥ 0.73 with `newArchEnabled=true` uses Fabric automatically; older projects fall back to the Bridge manager.
+Only the **New Architecture** (Fabric / Codegen / TurboModules) is supported, matching the [officially supported React Native versions](https://reactnative.dev/versions) (≥ 0.84), where it is enabled by default. The legacy Bridge/Paper architecture is not supported.
 
 ## Font size note
 
