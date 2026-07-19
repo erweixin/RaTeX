@@ -21,7 +21,7 @@ UIView / NSView / SwiftUI View
 
 ## Out of the box
 
-1. **Add dependency** — via Swift Package Manager (see [Installation](#add-to-your-xcode-project) below).
+1. **Add dependency** — via Swift Package Manager or the core-only CocoaPods target (see [Installation](#add-to-your-xcode-project) below).
 2. **Use** — Use `RaTeXView` or `RaTeXFormula`; fonts load automatically on first render.
    ```swift
    // SwiftUI
@@ -83,6 +83,28 @@ For a runnable macOS SPM integration check, see `demo/spm-macos`.
 2. In **Build Phases → Link Binary With Libraries**, ensure it is listed.
 3. Copy the `platforms/ios/Sources/Ratex/*.swift` files into your project, including `PlatformCompat.swift`.
 4. Add the `Fonts` folder from `platforms/ios/Sources/Ratex/Fonts/` to your target’s **Copy Bundle Resources**; fonts load automatically on first render, or call `RaTeXFontLoader.loadFromBundle()` at startup.
+
+### Option C — CocoaPods (core only)
+
+Add the repository pod to your `Podfile`:
+
+```ruby
+pod "RaTeXCore", :git => "https://github.com/erweixin/RaTeX.git", :branch => "main"
+```
+
+For reproducible builds, replace `:branch => "main"` with a released RaTeX
+tag after the first release containing `RaTeXCore.podspec`.
+
+```swift
+import RaTeXCore
+
+let displayList = try RaTeXEngine.shared.parse(#"\frac{1}{2}"#)
+let renderer = RaTeXRenderer(displayList: displayList, fontSize: 20)
+```
+
+`RaTeXCore` is a static, UI-free target. It contains the FFI XCFramework,
+display-list types, engine, renderer, font loader, and KaTeX font bundle, but
+does not depend on React, React Native, Fabric, Codegen, or JavaScript.
 
 ---
 
