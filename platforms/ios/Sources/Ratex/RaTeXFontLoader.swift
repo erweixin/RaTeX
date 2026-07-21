@@ -1,8 +1,9 @@
 // RaTeXFontLoader.swift — Register KaTeX fonts with CoreText so they can be used by the renderer.
 //
-// Fonts are loaded automatically on first render (RaTeXView/RaTeXFormula call ensureLoaded()).
+// Fonts are loaded automatically on first draw (RaTeXRenderer calls ensureLoaded()).
 // Optional — call at app startup to load earlier:
 //   RaTeXFontLoader.loadFromPackageBundle()        // Swift Package Manager (recommended)
+//   RaTeXFontLoader.loadFromCocoaPodsBundle()       // RaTeXCore CocoaPod
 //   RaTeXFontLoader.loadFromBundle()               // when fonts are in the app bundle
 //   RaTeXFontLoader.loadFromDirectory(fontsURL)    // custom directory with .ttf files
 

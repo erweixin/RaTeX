@@ -14,7 +14,10 @@ Pod::Spec.new do |s|
   s.author           = { "erweixin" => "https://github.com/erweixin" }
   s.source           = {
     :git => "https://github.com/erweixin/RaTeX.git",
-    :tag => "v#{s.version}"
+    # RaTeXCore is not present in the current v#{s.version} tag yet. Keep the
+    # development podspec aligned with the documented git-branch installation;
+    # the first RaTeXCore release should switch this to :tag.
+    :branch => "main"
   }
 
   s.ios.deployment_target = "14.0"

@@ -21,13 +21,29 @@ UIView / NSView / SwiftUI View
 
 ## Out of the box
 
-1. **Add dependency** — via Swift Package Manager or the core-only CocoaPods target (see [Installation](#add-to-your-xcode-project) below).
-2. **Use** — Use `RaTeXView` or `RaTeXFormula`; fonts load automatically on first render.
-   ```swift
-   // SwiftUI
-   RaTeXFormula(latex: #"\frac{-b \pm \sqrt{b^2-4ac}}{2a}"#, fontSize: 24)
-   ```
-   **Optional:** To preload fonts at startup, call `RaTeXFontLoader.loadFromPackageBundle()` when the app launches.
+1. **Add the dependency** — use Swift Package Manager for the complete native UI
+   package, or CocoaPods for the core-only renderer (see
+   [Installation](#add-to-your-xcode-project)).
+2. **Choose the API that matches the dependency:**
+   - **Swift Package Manager:** use `RaTeXView` or `RaTeXFormula`.
+
+     ```swift
+     // SwiftUI
+     RaTeXFormula(latex: #"\frac{-b \pm \sqrt{b^2-4ac}}{2a}"#, fontSize: 24)
+     ```
+
+   - **RaTeXCore CocoaPod:** use `RaTeXEngine` and `RaTeXRenderer` from your
+     custom `UIView`, `NSView`, or `CGContext` drawing code.
+
+     ```swift
+     let displayList = try RaTeXEngine.shared.parse(#"\frac{1}{2}"#)
+     let renderer = RaTeXRenderer(displayList: displayList, fontSize: 20)
+     renderer.draw(in: context)
+     ```
+
+Fonts load automatically on the first `RaTeXRenderer.draw(in:)` call. To preload
+them at startup, use `RaTeXFontLoader.loadFromPackageBundle()` with Swift Package
+Manager or `RaTeXFontLoader.loadFromCocoaPodsBundle()` with `RaTeXCore`.
 
 ---
 
@@ -100,6 +116,9 @@ import RaTeXCore
 
 let displayList = try RaTeXEngine.shared.parse(#"\frac{1}{2}"#)
 let renderer = RaTeXRenderer(displayList: displayList, fontSize: 20)
+
+// In your UIView.draw(_:) or CGContext block:
+renderer.draw(in: context)
 ```
 
 `RaTeXCore` is a static, UI-free target. It contains the FFI XCFramework,
