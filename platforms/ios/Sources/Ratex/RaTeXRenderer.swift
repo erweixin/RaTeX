@@ -4,7 +4,8 @@
 // not real glyph outlines. Glyphs must be drawn with CTFont using font + char_code.
 // Non-glyph items (Line, Rect, Path) use their commands directly.
 //
-// Fonts are registered automatically on first use via RaTeXFontLoader.ensureLoaded(); or call loadFromBundle() at startup.
+// Fonts are registered automatically on first draw via RaTeXFontLoader.ensureLoaded();
+// or preload them at startup via RaTeXFontLoader.
 
 import CoreGraphics
 import CoreText
@@ -32,6 +33,8 @@ public struct RaTeXRenderer {
     /// Draw the formula into `context`.
     /// The origin is the top-left of the formula's bounding box.
     public func draw(in context: CGContext) {
+        RaTeXFontLoader.ensureLoaded()
+
         for item in displayList.items {
             switch item {
             case .glyphPath(let g): drawGlyph(g, in: context)
