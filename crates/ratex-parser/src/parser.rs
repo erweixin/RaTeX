@@ -52,6 +52,7 @@ impl<'a> Parser<'a> {
     /// Return the current lookahead token (fetching from gullet if needed).
     pub fn fetch(&mut self) -> ParseResult<Token> {
         if self.next_token.is_none() {
+            self.gullet.set_parser_recursion_depth(self.recursion_depth);
             self.next_token = Some(self.gullet.expand_next_token()?);
         }
         Ok(self.next_token.clone().unwrap())

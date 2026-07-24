@@ -21,6 +21,7 @@ use serde_json::Value;
 /// Context for recursive `go` (used by actions).
 pub struct ParserCtx<'a> {
     pub data: &'a MhchemData,
+    pub parser_recursion_depth: usize,
 }
 
 impl ParserCtx<'_> {
@@ -31,8 +32,19 @@ impl ParserCtx<'_> {
 
 /// Parse `\ce` / `\pu` argument to TeX fragment (wrap `\mathrm` etc. is done here).
 pub fn chem_parse_str(input: &str, mode: &str) -> MhchemResult<String> {
+    chem_parse_str_with_parser_depth(input, mode, 0)
+}
+
+pub(crate) fn chem_parse_str_with_parser_depth(
+    input: &str,
+    mode: &str,
+    parser_recursion_depth: usize,
+) -> MhchemResult<String> {
     let d = data();
-    let ctx = ParserCtx { data: d };
+    let ctx = ParserCtx {
+        data: d,
+        parser_recursion_depth,
+    };
     let sm = match mode {
         "ce" => "ce",
         "pu" => "pu",
@@ -108,7 +120,10 @@ mod tests {
         let nested_empty_ce =
             |depth: usize| format!("{}{}", r"\ce{".repeat(depth), "}".repeat(depth));
         let d = data();
-        let ctx = ParserCtx { data: d };
+        let ctx = ParserCtx {
+            data: d,
+            parser_recursion_depth: 0,
+        };
 
         assert!(ctx.go(&nested_ce(30), "ce").is_ok());
         let error = ctx.go(&nested_ce(31), "ce").unwrap_err();

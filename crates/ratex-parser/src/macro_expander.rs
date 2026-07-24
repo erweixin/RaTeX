@@ -55,6 +55,7 @@ struct MacroExpansion {
 pub struct MacroExpander<'a> {
     pub lexer: Lexer<'a>,
     pub mode: Mode,
+    parser_recursion_depth: usize,
     stack: Vec<Token>,
     macros: MacroNamespace,
     expansion_count: usize,
@@ -164,6 +165,7 @@ impl<'a> MacroExpander<'a> {
         let mut me = Self {
             lexer: Lexer::new(input),
             mode,
+            parser_recursion_depth: 0,
             stack: Vec::new(),
             macros: MacroNamespace::new(),
             expansion_count: 0,
@@ -171,6 +173,10 @@ impl<'a> MacroExpander<'a> {
         };
         me.load_builtins();
         me
+    }
+
+    pub fn set_parser_recursion_depth(&mut self, depth: usize) {
+        self.parser_recursion_depth = depth;
     }
 
     fn load_builtins(&mut self) {
@@ -898,8 +904,12 @@ impl<'a> MacroExpander<'a> {
             MacroDefinition::Function(|me: &mut MacroExpander| -> ParseResult<Vec<Token>> {
                 let args = me.consume_args(1)?;
                 let s = crate::mhchem::mhchem_arg_tokens_to_string(&args[0]);
-                let tex = crate::mhchem::chem_parse_str(&s, "ce")
-                    .map_err(|e| ParseError::msg(format!("\\ce: {e}")))?;
+                let tex = crate::mhchem::chem_parse_str_with_parser_depth(
+                    &s,
+                    "ce",
+                    me.parser_recursion_depth,
+                )
+                .map_err(|e| ParseError::msg(format!("\\ce: {e}")))?;
                 Ok(lex_string_to_stack_tokens(&tex))
             }),
         );
@@ -908,8 +918,12 @@ impl<'a> MacroExpander<'a> {
             MacroDefinition::Function(|me: &mut MacroExpander| -> ParseResult<Vec<Token>> {
                 let args = me.consume_args(1)?;
                 let s = crate::mhchem::mhchem_arg_tokens_to_string(&args[0]);
-                let tex = crate::mhchem::chem_parse_str(&s, "pu")
-                    .map_err(|e| ParseError::msg(format!("\\pu: {e}")))?;
+                let tex = crate::mhchem::chem_parse_str_with_parser_depth(
+                    &s,
+                    "pu",
+                    me.parser_recursion_depth,
+                )
+                .map_err(|e| ParseError::msg(format!("\\pu: {e}")))?;
                 Ok(lex_string_to_stack_tokens(&tex))
             }),
         );
