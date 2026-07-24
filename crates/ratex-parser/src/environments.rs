@@ -9,6 +9,7 @@ use crate::parse_node::{
     StyleStr,
 };
 use crate::parser::Parser;
+use crate::parser::MAX_RECURSION_DEPTH;
 
 // ── Environment registry ─────────────────────────────────────────────────
 
@@ -1283,7 +1284,9 @@ fn parse_prooftree_arg(parser: &mut Parser, command: &str) -> ParseResult<Vec<Pa
 }
 
 fn parse_prooftree(parser: &mut Parser) -> ParseResult<ParseNode> {
-    let mut stack: Vec<ProofBranch> = Vec::new();
+    // Track structural depth alongside each branch.  A prooftree is assembled
+    // iteratively, so Parser::recursion_depth cannot protect this tree shape.
+    let mut stack: Vec<(ProofBranch, usize)> = Vec::new();
     let mut left_label: Option<Vec<ParseNode>> = None;
     let mut right_label: Option<Vec<ParseNode>> = None;
     let mut next_line_style = ProofLineStyle::Solid;
@@ -1304,14 +1307,17 @@ fn parse_prooftree(parser: &mut Parser) -> ParseResult<ParseNode> {
         match command.as_str() {
             "\\AxiomC" | "\\Axiom" | "\\AXC" => {
                 let conclusion = parse_prooftree_arg(parser, &command)?;
-                stack.push(ProofBranch {
-                    conclusion,
-                    premises: Vec::new(),
-                    left_label: None,
-                    right_label: None,
-                    line_style: ProofLineStyle::None,
-                    root_at_top: false,
-                });
+                stack.push((
+                    ProofBranch {
+                        conclusion,
+                        premises: Vec::new(),
+                        left_label: None,
+                        right_label: None,
+                        line_style: ProofLineStyle::None,
+                        root_at_top: false,
+                    },
+                    1,
+                ));
             }
             "\\LeftLabel" | "\\LL" => {
                 left_label = Some(parse_prooftree_arg(parser, &command)?);
@@ -1366,15 +1372,31 @@ fn parse_prooftree(parser: &mut Parser) -> ParseResult<ParseNode> {
                 }
                 let conclusion = parse_prooftree_arg(parser, name)?;
                 let start = stack.len() - arity;
-                let premises = stack.split_off(start);
-                stack.push(ProofBranch {
-                    conclusion,
-                    premises,
-                    left_label: left_label.take(),
-                    right_label: right_label.take(),
-                    line_style: next_line_style.clone(),
-                    root_at_top: next_root_at_top,
-                });
+                let premise_entries = stack.split_off(start);
+                let depth = premise_entries
+                    .iter()
+                    .map(|(_, depth)| *depth)
+                    .max()
+                    .unwrap_or(0)
+                    + 1;
+                if depth > MAX_RECURSION_DEPTH {
+                    return Err(ParseError::recursion_limit_exceeded());
+                }
+                let premises = premise_entries
+                    .into_iter()
+                    .map(|(branch, _)| branch)
+                    .collect();
+                stack.push((
+                    ProofBranch {
+                        conclusion,
+                        premises,
+                        left_label: left_label.take(),
+                        right_label: right_label.take(),
+                        line_style: next_line_style.clone(),
+                        root_at_top: next_root_at_top,
+                    },
+                    depth,
+                ));
                 next_line_style = default_line_style.clone();
                 next_root_at_top = default_root_at_top;
             }
@@ -1402,7 +1424,7 @@ fn parse_prooftree(parser: &mut Parser) -> ParseResult<ParseNode> {
 
     Ok(ParseNode::ProofTree {
         mode: parser.mode,
-        tree: stack.pop().unwrap(),
+        tree: stack.pop().unwrap().0,
         loc: None,
     })
 }

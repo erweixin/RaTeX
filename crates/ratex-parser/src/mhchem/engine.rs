@@ -1,11 +1,20 @@
 //! `mhchemParser.go` state machine driver.
 
+use std::cell::Cell;
+
 use crate::mhchem::actions;
 use crate::mhchem::buffer::Buffer;
 use crate::mhchem::error::{MhchemError, MhchemResult};
 use crate::mhchem::patterns::match_pattern;
 use crate::mhchem::ParserCtx;
+use crate::parser::MAX_RECURSION_DEPTH;
 use serde_json::Value;
+
+thread_local! {
+    /// mhchem recursively invokes sub-machines from actions, independently of the
+    /// main parser's recursion counter.
+    static MHCHEM_RECURSION_DEPTH: Cell<usize> = const { Cell::new(0) };
+}
 
 fn normalize_input(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -25,6 +34,20 @@ pub(crate) fn go_machine(
     input: &str,
     machine: &str,
 ) -> MhchemResult<Vec<Value>> {
+    let previous_depth = MHCHEM_RECURSION_DEPTH.with(Cell::get);
+    // mhchem inputs fan out through helper machines before texify. Guard the
+    // active engine-call depth directly so engine callers fail before building
+    // an over-budget AST, while preserving the public parser boundary.
+    if previous_depth > MAX_RECURSION_DEPTH {
+        return Err(MhchemError::msg("Recursion limit exceeded"));
+    }
+    MHCHEM_RECURSION_DEPTH.with(|depth| depth.set(previous_depth + 1));
+    let result = go_machine_impl(ctx, input, machine);
+    MHCHEM_RECURSION_DEPTH.with(|depth| depth.set(previous_depth));
+    result
+}
+
+fn go_machine_impl(ctx: &ParserCtx<'_>, input: &str, machine: &str) -> MhchemResult<Vec<Value>> {
     let mut input = normalize_input(input);
     if input.is_empty() {
         return Ok(vec![]);

@@ -9,7 +9,11 @@ use crate::parse_node::{AtomFamily, Mode, ParseNode};
 /// End-of-expression tokens.
 static END_OF_EXPRESSION: &[&str] = &["}", "\\endgroup", "\\end", "\\right", "&"];
 
-const MAX_RECURSION_DEPTH: usize = 512;
+/// Maximum supported nesting for input-controlled recursive structures.
+///
+/// Keep this conservative: parsing is used from mobile and WebAssembly hosts whose
+/// worker stacks can be substantially smaller than a desktop main-thread stack.
+pub(crate) const MAX_RECURSION_DEPTH: usize = 32;
 
 /// The LaTeX parser. Converts a token stream into a ParseNode AST.
 ///
@@ -25,6 +29,7 @@ pub struct Parser<'a> {
     pub gullet: MacroExpander<'a>,
     pub leftright_depth: i32,
     recursion_depth: usize,
+    input_depth_exceeded: bool,
     next_token: Option<Token>,
     pub equation_counter: usize,
 }
@@ -36,6 +41,7 @@ impl<'a> Parser<'a> {
             gullet: MacroExpander::new(input, Mode::Math),
             leftright_depth: 0,
             recursion_depth: 0,
+            input_depth_exceeded: input_exceeds_max_depth(input),
             next_token: None,
             equation_counter: 0,
         }
@@ -94,9 +100,14 @@ impl<'a> Parser<'a> {
 
     /// Parse the entire input and return the AST.
     pub fn parse(&mut self) -> ParseResult<Vec<ParseNode>> {
+        if self.input_depth_exceeded {
+            return Err(ParseError::recursion_limit_exceeded());
+        }
         self.gullet.begin_group();
 
-        let result = self.parse_expression(false, None);
+        // The root expression itself is not input nesting.  Only recursive
+        // expressions below it consume the structural-depth budget.
+        let result = self.parse_expression_impl(false, None);
 
         match result {
             Ok(parse) => {
@@ -119,6 +130,9 @@ impl<'a> Parser<'a> {
         break_on_infix: bool,
         break_on_token_text: Option<&str>,
     ) -> ParseResult<Vec<ParseNode>> {
+        if self.input_depth_exceeded {
+            return Err(ParseError::recursion_limit_exceeded());
+        }
         self.recursion_depth += 1;
         if self.recursion_depth > MAX_RECURSION_DEPTH {
             self.recursion_depth -= 1;
@@ -499,9 +513,10 @@ impl<'a> Parser<'a> {
                 loc,
             }))
         } else {
-            let result = self
-                .parse_function(break_on_token_text, Some(name))?
-                .or_else(|| self.parse_symbol_inner().ok().flatten());
+            let result = match self.parse_function(break_on_token_text, Some(name))? {
+                some @ Some(_) => some,
+                None => self.parse_symbol_inner()?,
+            };
 
             if result.is_none()
                 && text.starts_with('\\')
@@ -1066,6 +1081,11 @@ impl<'a> Parser<'a> {
             return Ok(None);
         }
 
+        let accent_count = chars.len() - split_idx - 1;
+        if accent_count > MAX_RECURSION_DEPTH {
+            return Err(ParseError::new("Recursion limit exceeded", Some(nucleus)));
+        }
+
         // Only decompose Latin-script base characters
         let base_char = chars[0];
         if !is_latin_base_char(base_char) {
@@ -1162,6 +1182,86 @@ impl<'a> Parser<'a> {
         self.next_token = old_token;
         Ok(parse)
     }
+}
+
+/// Reject visibly over-nested source before recursive descent starts.
+///
+/// The runtime counter remains authoritative for macro-expanded input.  This
+/// inexpensive source pass is what makes obviously adversarial input safe even
+/// on debug builds and hosts with very small thread stacks.
+fn input_exceeds_max_depth(input: &str) -> bool {
+    let bytes = input.as_bytes();
+    let mut index = 0;
+    let mut depth = 0usize;
+
+    while index < bytes.len() {
+        match bytes[index] {
+            b'%' => {
+                index += 1;
+                while index < bytes.len() && bytes[index] != b'\n' {
+                    index += 1;
+                }
+            }
+            b'{' => {
+                depth += 1;
+                if depth > MAX_RECURSION_DEPTH {
+                    return true;
+                }
+                index += 1;
+            }
+            b'}' => {
+                depth = depth.saturating_sub(1);
+                index += 1;
+            }
+            b'\\' => {
+                index += 1;
+                if index >= bytes.len() {
+                    break;
+                }
+
+                if bytes[index].is_ascii_alphabetic() {
+                    let command_start = index;
+                    while index < bytes.len() && bytes[index].is_ascii_alphabetic() {
+                        index += 1;
+                    }
+                    let command = &input[command_start..index];
+                    match command {
+                        "left" | "begingroup" => {
+                            depth += 1;
+                            if depth > MAX_RECURSION_DEPTH {
+                                return true;
+                            }
+                        }
+                        "right" | "endgroup" => depth = depth.saturating_sub(1),
+                        "verb" => {
+                            if index < bytes.len() && bytes[index] == b'*' {
+                                index += 1;
+                            }
+                            if index < bytes.len() {
+                                let delimiter = input[index..].chars().next().unwrap();
+                                index += delimiter.len_utf8();
+                                while index < bytes.len() {
+                                    let current = input[index..].chars().next().unwrap();
+                                    index += current.len_utf8();
+                                    if current == delimiter {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                } else {
+                    // A control symbol quotes exactly one following byte for the
+                    // ASCII structural characters relevant to this scan.
+                    index += 1;
+                }
+            }
+            _ => index += 1,
+        }
+    }
+
+    false
 }
 
 fn is_latin_base_char(ch: char) -> bool {

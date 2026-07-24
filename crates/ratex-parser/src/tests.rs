@@ -1172,24 +1172,63 @@ mod recursion_limit {
         assert!(err.to_string().contains("Recursion limit exceeded"));
     }
 
-    // Needs release-sized stacks; debug overflows before MAX (512) is reached.
-    #[cfg(not(debug_assertions))]
-    mod release_only {
-        use super::*;
+    #[test]
+    fn nested_braces_at_limit_succeeds() {
+        assert!(parse(&nested_braces(32)).is_ok());
+    }
 
-        #[test]
-        fn nested_braces_at_limit_succeeds() {
-            assert!(parse(&nested_braces(511)).is_ok());
-        }
+    #[test]
+    fn nested_braces_over_limit_fails() {
+        assert_recursion_limit_err(&nested_braces(33));
+    }
 
-        #[test]
-        fn nested_braces_over_limit_fails() {
-            assert_recursion_limit_err(&nested_braces(512));
-        }
+    #[test]
+    fn poc_deep_nesting_does_not_abort() {
+        assert_recursion_limit_err(&nested_braces(300));
+    }
 
-        #[test]
-        fn poc_deep_nesting_does_not_abort() {
-            assert_recursion_limit_err(&nested_braces(200_000));
-        }
+    #[test]
+    fn source_preflight_ignores_non_structural_braces() {
+        assert!(parse(&format!(r"\verb|{}|", "{".repeat(300))).is_ok());
+        assert!(parse(&format!(r"\verbéà{}é", "{".repeat(300))).is_ok());
+        assert!(parse(&format!("% {}\nx", "{".repeat(300))).is_ok());
+        assert!(parse(&r"\{".repeat(300)).is_ok());
+    }
+
+    #[test]
+    fn unicode_accent_depth_is_bounded_in_math_and_text() {
+        let accents_32 = "\u{301}".repeat(32);
+        let accents_33 = "\u{301}".repeat(33);
+        let accents_4200 = "\u{301}".repeat(4_200);
+
+        assert!(parse(&format!("x{accents_32}")).is_ok());
+        assert!(parse(&format!(r"\text{{x{accents_32}}}")).is_ok());
+        assert_recursion_limit_err(&format!("x{accents_33}"));
+        assert_recursion_limit_err(&format!(r"\text{{x{accents_33}}}"));
+        assert_recursion_limit_err(&format!("x{accents_4200}"));
+        assert_recursion_limit_err(&format!(r"\text{{x{accents_4200}}}"));
+    }
+
+    fn unary_prooftree(inferences: usize) -> String {
+        format!(
+            r"\begin{{prooftree}}\AxiomC{{P}}{}\end{{prooftree}}",
+            r"\UnaryInfC{P}".repeat(inferences)
+        )
+    }
+
+    fn nested_ce(depth: usize) -> String {
+        format!("{}H{}", r"\ce{".repeat(depth), "}".repeat(depth))
+    }
+
+    #[test]
+    fn prooftree_depth_is_bounded() {
+        assert!(parse(&unary_prooftree(31)).is_ok());
+        assert_recursion_limit_err(&unary_prooftree(32));
+    }
+
+    #[test]
+    fn mhchem_depth_matches_the_public_boundary() {
+        assert!(parse(&nested_ce(32)).is_ok());
+        assert_recursion_limit_err(&nested_ce(33));
     }
 }

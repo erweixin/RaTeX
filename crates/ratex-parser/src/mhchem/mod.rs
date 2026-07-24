@@ -89,6 +89,34 @@ mod tests {
     }
 
     #[test]
+    fn nested_submachines_have_a_depth_budget() {
+        let nested_ce = |depth: usize| format!("{}H{}", r"\ce{".repeat(depth), "}".repeat(depth));
+
+        // chem_parse_str starts the root machine, so 31 nested \ce calls make
+        // a total structural depth of 32.
+        assert!(chem_parse_str(&nested_ce(31), "ce").is_ok());
+        let error = chem_parse_str(&nested_ce(32), "ce").unwrap_err();
+        assert!(
+            error.to_string().contains("Recursion limit exceeded"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn nested_submachine_engine_depth_is_bounded_before_texify() {
+        let nested_ce = |depth: usize| format!("{}H{}", r"\ce{".repeat(depth), "}".repeat(depth));
+        let d = data();
+        let ctx = ParserCtx { data: d };
+
+        assert!(ctx.go(&nested_ce(31), "ce").is_ok());
+        let error = ctx.go(&nested_ce(32), "ce").unwrap_err();
+        assert!(
+            error.to_string().contains("Recursion limit exceeded"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
     fn pu_scientific_lowercase_e_cdot_uppercase_e_times() {
         for src in ["1.2e3 kJ", "1,2e3 kJ"] {
             let t = chem_parse_str(src, "pu").expect("mhchem");

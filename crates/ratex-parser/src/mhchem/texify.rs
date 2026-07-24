@@ -1,9 +1,17 @@
 //! `texify.go` — turn parser output into TeX (KaTeX mhchem 3.3).
 
 use crate::mhchem::error::{MhchemError, MhchemResult};
+use crate::parser::MAX_RECURSION_DEPTH;
 use serde_json::Value;
 
 pub fn go(input: &[Value], is_inner: bool) -> MhchemResult<String> {
+    go_with_depth(input, is_inner, 0)
+}
+
+fn go_with_depth(input: &[Value], is_inner: bool, depth: usize) -> MhchemResult<String> {
+    if depth > MAX_RECURSION_DEPTH {
+        return Err(MhchemError::msg("Recursion limit exceeded"));
+    }
     let mut res = String::new();
     let mut cee = false;
     for inputi in input {
@@ -13,7 +21,7 @@ pub fn go(input: &[Value], is_inner: bool) -> MhchemResult<String> {
                 if type_str(v).as_deref() == Some("1st-level escape") {
                     cee = true;
                 }
-                res.push_str(&go2(v)?);
+                res.push_str(&go2(v, depth)?);
             }
         }
     }
@@ -23,29 +31,29 @@ pub fn go(input: &[Value], is_inner: bool) -> MhchemResult<String> {
     Ok(res)
 }
 
-fn arr_inner(v: &Value, key: &str) -> MhchemResult<String> {
+fn arr_inner(v: &Value, key: &str, depth: usize) -> MhchemResult<String> {
     let sl = v
         .get(key)
         .and_then(|x| x.as_array())
         .map(|a| a.as_slice())
         .unwrap_or(&[]);
-    go(sl, true)
+    go_with_depth(sl, true, depth)
 }
 
 fn type_str(v: &Value) -> Option<String> {
     v.get("type_").and_then(|x| x.as_str()).map(String::from)
 }
 
-fn go2(buf: &Value) -> MhchemResult<String> {
+fn go2(buf: &Value, depth: usize) -> MhchemResult<String> {
     let typ = type_str(buf).ok_or_else(|| MhchemError::msg("texify: missing type_"))?;
     Ok(match typ.as_str() {
         "chemfive" => {
-            let b5a = arr_inner(buf, "a")?;
-            let b5b = arr_inner(buf, "b")?;
-            let b5p = arr_inner(buf, "p")?;
-            let b5o = arr_inner(buf, "o")?;
-            let b5q = arr_inner(buf, "q")?;
-            let b5d = arr_inner(buf, "d")?;
+            let b5a = arr_inner(buf, "a", depth + 1)?;
+            let b5b = arr_inner(buf, "b", depth + 1)?;
+            let b5p = arr_inner(buf, "p", depth + 1)?;
+            let b5o = arr_inner(buf, "o", depth + 1)?;
+            let b5q = arr_inner(buf, "q", depth + 1)?;
+            let b5d = arr_inner(buf, "d", depth + 1)?;
             let mut res = String::new();
             if !b5a.is_empty() {
                 let a = if b5a.starts_with('+') || b5a.starts_with('-') {
@@ -134,11 +142,11 @@ fn go2(buf: &Value) -> MhchemResult<String> {
             format!("\\mathrm{{{p1}}}")
         }
         "state of aggregation" => {
-            let i = arr_inner(buf, "p1")?;
+            let i = arr_inner(buf, "p1", depth + 1)?;
             format!("\\mskip2mu {i}")
         }
         "state of aggregation subscript" => {
-            let i = arr_inner(buf, "p1")?;
+            let i = arr_inner(buf, "p1", depth + 1)?;
             format!("\\mskip1mu {i}")
         }
         "bond" => {
@@ -154,8 +162,8 @@ fn go2(buf: &Value) -> MhchemResult<String> {
             format!(r"\mathchoice{{\textstyle{}}}{{{}}}{{{}}}{{{}}}", c, c, c, c)
         }
         "pu-frac" => {
-            let p1 = arr_inner(buf, "p1")?;
-            let p2 = arr_inner(buf, "p2")?;
+            let p1 = arr_inner(buf, "p1", depth + 1)?;
+            let p2 = arr_inner(buf, "p2", depth + 1)?;
             let d = format!("\\frac{{{p1}}}{{{p2}}}");
             format!(r"\mathchoice{{\textstyle{}}}{{{}}}{{{}}}{{{}}}", d, d, d, d)
         }
@@ -164,28 +172,28 @@ fn go2(buf: &Value) -> MhchemResult<String> {
             format!("{p1} ")
         }
         "frac-ce" => {
-            let p1 = arr_inner(buf, "p1")?;
-            let p2 = arr_inner(buf, "p2")?;
+            let p1 = arr_inner(buf, "p1", depth + 1)?;
+            let p2 = arr_inner(buf, "p2", depth + 1)?;
             format!("\\frac{{{p1}}}{{{p2}}}")
         }
         "overset" => {
-            let p1 = arr_inner(buf, "p1")?;
-            let p2 = arr_inner(buf, "p2")?;
+            let p1 = arr_inner(buf, "p1", depth + 1)?;
+            let p2 = arr_inner(buf, "p2", depth + 1)?;
             format!("\\overset{{{p1}}}{{{p2}}}")
         }
         "underset" => {
-            let p1 = arr_inner(buf, "p1")?;
-            let p2 = arr_inner(buf, "p2")?;
+            let p1 = arr_inner(buf, "p1", depth + 1)?;
+            let p2 = arr_inner(buf, "p2", depth + 1)?;
             format!("\\underset{{{p1}}}{{{p2}}}")
         }
         "underbrace" => {
-            let p1 = arr_inner(buf, "p1")?;
-            let p2 = arr_inner(buf, "p2")?;
+            let p1 = arr_inner(buf, "p1", depth + 1)?;
+            let p2 = arr_inner(buf, "p2", depth + 1)?;
             format!("\\underbrace{{{p1}}}_{{{p2}}}")
         }
         "color" => {
             let c1 = buf.get("color1").and_then(|x| x.as_str()).unwrap_or("");
-            let c2 = arr_inner(buf, "color2")?;
+            let c2 = arr_inner(buf, "color2", depth + 1)?;
             format!("{{\\color{{{c1}}}{{{c2}}}}}")
         }
         "color0" => {
@@ -193,8 +201,8 @@ fn go2(buf: &Value) -> MhchemResult<String> {
             format!("\\color{{{c}}}")
         }
         "arrow" => {
-            let rd = arr_inner(buf, "rd")?;
-            let rq = arr_inner(buf, "rq")?;
+            let rd = arr_inner(buf, "rd", depth + 1)?;
+            let rq = arr_inner(buf, "rq", depth + 1)?;
             let r = buf.get("r").and_then(|x| x.as_str()).unwrap_or("");
             let mut arrow = format!("\\x{}", get_arrow(r)?);
             if !rq.is_empty() {
@@ -305,4 +313,32 @@ fn get_operator(a: &str) -> Option<String> {
         "^" | "(^)" => " \\uparrow{} ".to_string(),
         _ => return None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::{json, Value};
+
+    use super::go;
+
+    fn nested_texify_value(depth: usize) -> Value {
+        let mut value = json!({"type_": "rm", "p1": "H"});
+        for _ in 0..depth {
+            value = json!({
+                "type_": "state of aggregation",
+                "p1": [value],
+            });
+        }
+        value
+    }
+
+    #[test]
+    fn nested_values_have_a_depth_budget() {
+        assert!(go(&[nested_texify_value(32)], false).is_ok());
+        let error = go(&[nested_texify_value(33)], false).unwrap_err();
+        assert!(
+            error.to_string().contains("Recursion limit exceeded"),
+            "unexpected error: {error}"
+        );
+    }
 }
