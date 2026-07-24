@@ -25,6 +25,15 @@ pub(crate) fn go_machine(
     input: &str,
     machine: &str,
 ) -> MhchemResult<Vec<Value>> {
+    let _guard = ctx
+        .depth_budget
+        .enter()
+        .map_err(|_| MhchemError::msg("Recursion limit exceeded"))?;
+
+    go_machine_impl(ctx, input, machine)
+}
+
+fn go_machine_impl(ctx: &ParserCtx<'_>, input: &str, machine: &str) -> MhchemResult<Vec<Value>> {
     let mut input = normalize_input(input);
     if input.is_empty() {
         return Ok(vec![]);

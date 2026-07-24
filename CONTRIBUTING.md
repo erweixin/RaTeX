@@ -46,6 +46,13 @@ Ink score for that suite:
 cargo test -p ratex-render golden_mhchem_pass_rate -- --nocapture
 ```
 
+## Stack safety
+
+Parser-driven rendering uses a shared depth budget for input-controlled
+recursive structures. Before adding or changing recursive syntax, read
+[`docs/STACK_SAFETY.md`](docs/STACK_SAFETY.md) and add the boundary and
+small-stack regressions described there.
+
 RaTeX renders for inspection: `./scripts/update_golden_output.sh` (writes `tests/golden/output_ce/`). Compare with KaTeX refs using `python3 tools/golden_compare/compare_golden.py --ce` (same ink metric as the main golden script).
 
 **bussproofs / `prooftree` golden**: test cases live in `tests/golden/test_cases_prooftree.txt`. KaTeX does not support `prooftree`, so reference PNGs are generated with MathJax and its bussproofs extension:

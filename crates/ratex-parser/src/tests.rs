@@ -1172,24 +1172,200 @@ mod recursion_limit {
         assert!(err.to_string().contains("Recursion limit exceeded"));
     }
 
-    // Needs release-sized stacks; debug overflows before MAX (512) is reached.
-    #[cfg(not(debug_assertions))]
-    mod release_only {
-        use super::*;
+    #[test]
+    fn nested_braces_at_limit_succeeds() {
+        assert!(parse(&nested_braces(32)).is_ok());
+    }
 
-        #[test]
-        fn nested_braces_at_limit_succeeds() {
-            assert!(parse(&nested_braces(511)).is_ok());
-        }
+    #[test]
+    fn nested_braces_over_limit_fails() {
+        assert_recursion_limit_err(&nested_braces(33));
+    }
 
-        #[test]
-        fn nested_braces_over_limit_fails() {
-            assert_recursion_limit_err(&nested_braces(512));
-        }
+    #[test]
+    fn poc_deep_nesting_does_not_abort() {
+        assert_recursion_limit_err(&nested_braces(300));
+    }
 
-        #[test]
-        fn poc_deep_nesting_does_not_abort() {
-            assert_recursion_limit_err(&nested_braces(200_000));
+    #[test]
+    fn runtime_depth_ignores_non_structural_braces() {
+        assert!(parse(&format!(r"\verb|{}|", "{".repeat(300))).is_ok());
+        assert!(parse(&format!(r"\verbéà{}é", "{".repeat(300))).is_ok());
+        assert!(parse(&format!("% {}\nx", "{".repeat(300))).is_ok());
+        assert!(parse(&r"\{".repeat(300)).is_ok());
+        assert!(parse(&format!(r"{}x", r"\def\foo{\left(}".repeat(32))).is_ok());
+    }
+
+    #[test]
+    fn unicode_accent_depth_is_bounded_in_math_and_text() {
+        let accents_31 = "\u{301}".repeat(31);
+        let accents_32 = "\u{301}".repeat(32);
+        let accents_33 = "\u{301}".repeat(33);
+        let accents_4200 = "\u{301}".repeat(4_200);
+
+        assert!(parse(&format!("x{accents_32}")).is_ok());
+        assert!(parse(&format!(r"\text{{x{accents_31}}}")).is_ok());
+        assert_recursion_limit_err(&format!(r"\text{{x{accents_32}}}"));
+        assert_recursion_limit_err(&format!("x{accents_33}"));
+        assert_recursion_limit_err(&format!(r"\text{{x{accents_33}}}"));
+        assert_recursion_limit_err(&format!("x{accents_4200}"));
+        assert_recursion_limit_err(&format!(r"\text{{x{accents_4200}}}"));
+    }
+
+    #[test]
+    fn unicode_accent_depth_accounts_for_enclosing_groups() {
+        let accent = "\u{301}";
+
+        assert!(parse(&format!("{}x{accent}{}", "{".repeat(31), "}".repeat(31))).is_ok());
+        assert_recursion_limit_err(&format!("{}x{accent}{}", "{".repeat(32), "}".repeat(32)));
+    }
+
+    #[test]
+    fn non_latin_combining_marks_are_not_accent_trees() {
+        let accents_33 = "\u{301}".repeat(33);
+        let accents_4200 = "\u{301}".repeat(4_200);
+
+        assert!(parse(&format!("α{accents_33}")).is_ok());
+        assert!(parse(&format!("α{accents_4200}")).is_ok());
+    }
+
+    fn unary_prooftree(inferences: usize) -> String {
+        format!(
+            r"\begin{{prooftree}}\AxiomC{{P}}{}\end{{prooftree}}",
+            r"\UnaryInfC{P}".repeat(inferences)
+        )
+    }
+
+    fn braced_body(depth: usize) -> String {
+        format!("{}x{}", "{".repeat(depth), "}".repeat(depth))
+    }
+
+    fn nested_ce(depth: usize) -> String {
+        format!("{}H{}", r"\ce{".repeat(depth), "}".repeat(depth))
+    }
+
+    fn nested_tag(depth: usize) -> String {
+        format!("{}{{x}}", r"\tag".repeat(depth))
+    }
+
+    fn unbraced_sqrt(depth: usize) -> String {
+        format!("{}x", r"\sqrt".repeat(depth))
+    }
+
+    fn nested_braket(depth: usize) -> String {
+        let mut input = "x".to_string();
+        for _ in 0..depth {
+            input = format!(r"\Braket{{{input}}}");
         }
+        input
+    }
+
+    fn prooftree_axiom_payload(payload_depth: usize) -> String {
+        format!(
+            r"\begin{{prooftree}}\AxiomC{{{}}}\end{{prooftree}}",
+            braced_body(payload_depth)
+        )
+    }
+
+    fn prooftree_left_label_payload(payload_depth: usize) -> String {
+        format!(
+            r"\begin{{prooftree}}\LeftLabel{{{}}}\AxiomC{{P}}\UnaryInfC{{Q}}\end{{prooftree}}",
+            braced_body(payload_depth)
+        )
+    }
+
+    fn macro_expanded_nested_ce(enclosing_depth: usize, ce_depth: usize) -> String {
+        format!(
+            r"\def\foo{{{}}}{}{}{}",
+            nested_ce(ce_depth),
+            "{".repeat(enclosing_depth),
+            r"\foo",
+            "}".repeat(enclosing_depth)
+        )
+    }
+
+    #[test]
+    fn prooftree_depth_is_bounded() {
+        assert!(parse(&unary_prooftree(31)).is_ok());
+        assert_recursion_limit_err(&unary_prooftree(32));
+    }
+
+    #[test]
+    fn prooftree_depth_accounts_for_enclosing_groups() {
+        assert!(parse(&format!(
+            "{}{}{}",
+            "{".repeat(31),
+            unary_prooftree(0),
+            "}".repeat(31)
+        ))
+        .is_ok());
+        assert_recursion_limit_err(&format!(
+            "{}{}{}",
+            "{".repeat(31),
+            unary_prooftree(1),
+            "}".repeat(31)
+        ));
+    }
+
+    #[test]
+    fn prooftree_depth_includes_conclusion_and_label_payloads() {
+        assert!(parse(&prooftree_axiom_payload(31)).is_ok());
+        assert_recursion_limit_err(&prooftree_axiom_payload(32));
+
+        assert!(parse(&prooftree_left_label_payload(31)).is_ok());
+        assert_recursion_limit_err(&prooftree_left_label_payload(32));
+    }
+
+    #[test]
+    fn unbraced_structural_arguments_are_bounded() {
+        assert!(parse(&unbraced_sqrt(4_200)).is_err());
+
+        assert!(parse(&nested_tag(32)).is_ok());
+        assert_recursion_limit_err(&nested_tag(33));
+        assert_recursion_limit_err(&nested_tag(4_200));
+    }
+
+    #[test]
+    fn nested_braket_expansion_uses_the_shared_budget() {
+        assert!(parse(&nested_braket(16)).is_ok());
+        assert_recursion_limit_err(&nested_braket(33));
+    }
+
+    #[test]
+    fn flat_macro_prefix_chains_are_iterative() {
+        let input = format!(r"{}\def\foo{{x}}\foo", r"\global".repeat(4_200));
+        assert!(parse(&input).is_ok());
+    }
+
+    #[test]
+    fn mhchem_depth_matches_the_public_boundary() {
+        assert!(parse(&nested_ce(31)).is_ok());
+        assert_recursion_limit_err(&nested_ce(32));
+    }
+
+    #[test]
+    fn mhchem_depth_accounts_for_macro_expanded_enclosing_groups() {
+        assert!(parse(&macro_expanded_nested_ce(10, 10)).is_ok());
+        assert_recursion_limit_err(&macro_expanded_nested_ce(20, 20));
+    }
+
+    #[test]
+    fn runtime_depth_ignores_latex_macro_definition_bodies() {
+        let deep_body = braced_body(40);
+        assert!(parse(&format!(r"\newcommand{{\foo}}[1]{{{deep_body}}}x")).is_ok());
+        assert!(parse(&format!(
+            r"\def\foo{{x}}\renewcommand{{\foo}}{{{deep_body}}}x"
+        ))
+        .is_ok());
+        assert!(parse(&format!(r"\providecommand{{\foo}}{{{deep_body}}}x")).is_ok());
+    }
+
+    #[test]
+    fn runtime_depth_ignores_flat_string_arguments() {
+        let deep_body = braced_body(40);
+
+        assert!(parse(&format!(r"\url{{{deep_body}}}")).is_ok());
+        assert!(parse(&format!(r"\href{{{deep_body}}}{{x}}")).is_ok());
+        assert!(parse(&format!(r"\htmlStyle{{{deep_body}}}{{x}}")).is_ok());
     }
 }

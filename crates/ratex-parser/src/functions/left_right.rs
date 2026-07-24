@@ -59,8 +59,9 @@ fn handle_left(
     let delim = get_delim_text(&args[0])?;
 
     ctx.parser.leftright_depth += 1;
-    let body = ctx.parser.parse_expression(false, None)?;
+    let body = ctx.parser.parse_expression(false, None);
     ctx.parser.leftright_depth -= 1;
+    let body = body?;
 
     // Expect \right, but don't consume it yet
     ctx.parser.expect("\\right", false)?;

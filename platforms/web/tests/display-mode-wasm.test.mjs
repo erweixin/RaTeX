@@ -44,3 +44,13 @@ test("the generated WASM honors displayMode through every public API", async () 
     positionalInline
   );
 });
+
+test("over-nested input returns a JS error instead of trapping WASM", async () => {
+  await initGeneratedWasm();
+
+  const overNested = `${"\\sqrt{".repeat(300)}x${"}".repeat(300)}`;
+  assert.throws(
+    () => wasmModule.renderLatex(overNested),
+    /Recursion limit exceeded/
+  );
+});

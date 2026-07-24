@@ -36,7 +36,7 @@ fn handle_tag(
 
     let arg = ctx
         .parser
-        .parse_group("\\tag", None)?
+        .parse_structural_group("\\tag", None)?
         .ok_or_else(|| ParseError::msg("\\tag requires an argument"))?;
 
     let inner = match arg {

@@ -1786,12 +1786,20 @@ const VEC_SKEW_EXTRA_RIGHT_EM: f64 = 0.018;
 /// Used by superscripts: KaTeX adds margin-right = italic_correction to italic math characters,
 /// so the superscript starts at advance_width + italic_correction (not just advance_width).
 fn glyph_italic(lb: &LayoutBox) -> f64 {
-    match &lb.content {
-        BoxContent::Glyph { font_id, char_code } => get_char_metrics(*font_id, *char_code)
-            .map(|m| m.italic)
-            .unwrap_or(0.0),
-        BoxContent::HBox(children) => children.last().map(glyph_italic).unwrap_or(0.0),
-        _ => 0.0,
+    let mut current = lb;
+    loop {
+        match &current.content {
+            BoxContent::Glyph { font_id, char_code } => {
+                return get_char_metrics(*font_id, *char_code)
+                    .map(|m| m.italic)
+                    .unwrap_or(0.0);
+            }
+            BoxContent::HBox(children) => match children.last() {
+                Some(last) => current = last,
+                None => return 0.0,
+            },
+            _ => return 0.0,
+        }
     }
 }
 
@@ -1807,12 +1815,20 @@ fn accent_ordgroup_len(base: &ParseNode) -> usize {
 }
 
 fn glyph_skew(lb: &LayoutBox) -> f64 {
-    match &lb.content {
-        BoxContent::Glyph { font_id, char_code } => get_char_metrics(*font_id, *char_code)
-            .map(|m| m.skew)
-            .unwrap_or(0.0),
-        BoxContent::HBox(children) => children.last().map(glyph_skew).unwrap_or(0.0),
-        _ => 0.0,
+    let mut current = lb;
+    loop {
+        match &current.content {
+            BoxContent::Glyph { font_id, char_code } => {
+                return get_char_metrics(*font_id, *char_code)
+                    .map(|m| m.skew)
+                    .unwrap_or(0.0);
+            }
+            BoxContent::HBox(children) => match children.last() {
+                Some(last) => current = last,
+                None => return 0.0,
+            },
+            _ => return 0.0,
+        }
     }
 }
 
@@ -2119,107 +2135,120 @@ fn layout_accent(
 /// scope) is a Middle node.  A nested LeftRight starts its own scope, so its
 /// `\middle`s are handled by that nested layout pass.
 fn node_contains_middle(node: &ParseNode, style: MathStyle) -> bool {
-    match node {
-        ParseNode::Middle { .. } => true,
-        ParseNode::OrdGroup { body, .. } | ParseNode::MClass { body, .. } => {
-            body.iter().any(|n| node_contains_middle(n, style))
+    let mut pending = vec![(node, style)];
+    while let Some((current, current_style)) = pending.pop() {
+        match current {
+            ParseNode::Middle { .. } => return true,
+            ParseNode::OrdGroup { body, .. } | ParseNode::MClass { body, .. } => {
+                pending.extend(body.iter().map(|node| (node, current_style)));
+            }
+            ParseNode::SupSub { base, sup, sub, .. } => {
+                if let Some(base) = base {
+                    pending.push((base, current_style));
+                }
+                if let Some(sup) = sup {
+                    pending.push((sup, current_style.superscript()));
+                }
+                if let Some(sub) = sub {
+                    pending.push((sub, current_style.subscript()));
+                }
+            }
+            ParseNode::GenFrac { numer, denom, .. } => {
+                pending.push((numer, current_style.numerator()));
+                pending.push((denom, current_style.denominator()));
+            }
+            ParseNode::Sqrt { body, index, .. } => {
+                pending.push((body, current_style.cramped()));
+                if let Some(index) = index {
+                    pending.push((index, current_style.superscript().superscript()));
+                }
+            }
+            ParseNode::Accent { base, .. } | ParseNode::AccentUnder { base, .. } => {
+                pending.push((base, current_style));
+            }
+            ParseNode::Op {
+                body: Some(body), ..
+            }
+            | ParseNode::OperatorName { body, .. }
+            | ParseNode::Color { body, .. }
+            | ParseNode::Phantom { body, .. }
+            | ParseNode::Pmb { body, .. }
+            | ParseNode::Href { body, .. }
+            | ParseNode::Html { body, .. } => {
+                pending.extend(body.iter().map(|node| (node, current_style)));
+            }
+            // A nested LeftRight starts a new \middle scope.
+            ParseNode::LeftRight { .. } => {}
+            ParseNode::Font { body, .. }
+            | ParseNode::Overline { body, .. }
+            | ParseNode::Underline { body, .. }
+            | ParseNode::VPhantom { body, .. }
+            | ParseNode::Smash { body, .. }
+            | ParseNode::Enclose { body, .. }
+            | ParseNode::Lap { body, .. }
+            | ParseNode::RaiseBox { body, .. }
+            | ParseNode::VCenter { body, .. }
+            | ParseNode::HorizBrace { base: body, .. } => {
+                pending.push((body, current_style));
+            }
+            ParseNode::Text { body, .. } | ParseNode::Sizing { body, .. } => {
+                pending.extend(body.iter().map(|node| (node, current_style.text())));
+            }
+            ParseNode::Styling {
+                style: node_style,
+                body,
+                ..
+            } => {
+                let new_style = style_str_to_math_style(node_style);
+                pending.extend(body.iter().map(|node| (node, new_style)));
+            }
+            ParseNode::Array { body, .. } => {
+                pending.extend(
+                    body.iter()
+                        .flat_map(|row| row.iter())
+                        .map(|node| (node, current_style)),
+                );
+            }
+            ParseNode::XArrow { body, below, .. } => {
+                pending.push((body, current_style.superscript()));
+                if let Some(below) = below {
+                    pending.push((below, current_style.subscript()));
+                }
+            }
+            ParseNode::CdArrow {
+                label_above,
+                label_below,
+                ..
+            } => {
+                if let Some(above) = label_above {
+                    pending.push((above, current_style.superscript()));
+                }
+                if let Some(below) = label_below {
+                    pending.push((below, current_style.subscript()));
+                }
+            }
+            ParseNode::MathChoice {
+                display,
+                text,
+                script,
+                scriptscript,
+                ..
+            } => {
+                let branch = match current_style {
+                    MathStyle::Display | MathStyle::DisplayCramped => display,
+                    MathStyle::Text | MathStyle::TextCramped => text,
+                    MathStyle::Script | MathStyle::ScriptCramped => script,
+                    MathStyle::ScriptScript | MathStyle::ScriptScriptCramped => scriptscript,
+                };
+                pending.extend(branch.iter().map(|node| (node, current_style)));
+            }
+            ParseNode::HtmlMathMl { html, .. } => {
+                pending.extend(html.iter().map(|node| (node, current_style)));
+            }
+            _ => {}
         }
-        ParseNode::SupSub { base, sup, sub, .. } => {
-            base.as_deref()
-                .is_some_and(|n| node_contains_middle(n, style))
-                || sup
-                    .as_deref()
-                    .is_some_and(|n| node_contains_middle(n, style.superscript()))
-                || sub
-                    .as_deref()
-                    .is_some_and(|n| node_contains_middle(n, style.subscript()))
-        }
-        ParseNode::GenFrac { numer, denom, .. } => {
-            node_contains_middle(numer, style.numerator())
-                || node_contains_middle(denom, style.denominator())
-        }
-        ParseNode::Sqrt { body, index, .. } => {
-            node_contains_middle(body, style.cramped())
-                || index
-                    .as_deref()
-                    .is_some_and(|n| node_contains_middle(n, style.superscript().superscript()))
-        }
-        ParseNode::Accent { base, .. } | ParseNode::AccentUnder { base, .. } => {
-            node_contains_middle(base, style)
-        }
-        ParseNode::Op { body, .. } => body
-            .as_ref()
-            .is_some_and(|b| b.iter().any(|n| node_contains_middle(n, style))),
-        ParseNode::LeftRight { .. } => false,
-        ParseNode::OperatorName { body, .. } => body.iter().any(|n| node_contains_middle(n, style)),
-        ParseNode::Font { body, .. } => node_contains_middle(body, style),
-        ParseNode::Text { body, .. } | ParseNode::Sizing { body, .. } => {
-            body.iter().any(|n| node_contains_middle(n, style.text()))
-        }
-        ParseNode::Color { body, .. } => body.iter().any(|n| node_contains_middle(n, style)),
-        ParseNode::Styling {
-            style: node_style,
-            body,
-            ..
-        } => {
-            let new_style = style_str_to_math_style(node_style);
-            body.iter().any(|n| node_contains_middle(n, new_style))
-        }
-        ParseNode::Overline { body, .. } | ParseNode::Underline { body, .. } => {
-            node_contains_middle(body, style)
-        }
-        ParseNode::Phantom { body, .. } => body.iter().any(|n| node_contains_middle(n, style)),
-        ParseNode::VPhantom { body, .. } | ParseNode::Smash { body, .. } => {
-            node_contains_middle(body, style)
-        }
-        ParseNode::Array { body, .. } => body
-            .iter()
-            .any(|row| row.iter().any(|n| node_contains_middle(n, style))),
-        ParseNode::Enclose { body, .. }
-        | ParseNode::Lap { body, .. }
-        | ParseNode::RaiseBox { body, .. }
-        | ParseNode::VCenter { body, .. } => node_contains_middle(body, style),
-        ParseNode::Pmb { body, .. } => body.iter().any(|n| node_contains_middle(n, style)),
-        ParseNode::XArrow { body, below, .. } => {
-            node_contains_middle(body, style.superscript())
-                || below
-                    .as_deref()
-                    .is_some_and(|n| node_contains_middle(n, style.subscript()))
-        }
-        ParseNode::CdArrow {
-            label_above,
-            label_below,
-            ..
-        } => {
-            label_above
-                .as_deref()
-                .is_some_and(|n| node_contains_middle(n, style.superscript()))
-                || label_below
-                    .as_deref()
-                    .is_some_and(|n| node_contains_middle(n, style.subscript()))
-        }
-        ParseNode::MathChoice {
-            display,
-            text,
-            script,
-            scriptscript,
-            ..
-        } => {
-            let branch = match style {
-                MathStyle::Display | MathStyle::DisplayCramped => display,
-                MathStyle::Text | MathStyle::TextCramped => text,
-                MathStyle::Script | MathStyle::ScriptCramped => script,
-                MathStyle::ScriptScript | MathStyle::ScriptScriptCramped => scriptscript,
-            };
-            branch.iter().any(|n| node_contains_middle(n, style))
-        }
-        ParseNode::HorizBrace { base, .. } => node_contains_middle(base, style),
-        ParseNode::Href { body, .. } | ParseNode::Html { body, .. } => {
-            body.iter().any(|n| node_contains_middle(n, style))
-        }
-        ParseNode::HtmlMathMl { html, .. } => html.iter().any(|n| node_contains_middle(n, style)),
-        _ => false,
     }
+    false
 }
 
 /// Returns true if any node in the slice contains a Middle node governed by the
@@ -3781,42 +3810,52 @@ fn layout_underline_laid_out_with_rule(
 }
 
 fn box_contains_font(lbox: &LayoutBox, font_id: FontId) -> bool {
-    match &lbox.content {
-        BoxContent::Glyph { font_id: fid, .. } => *fid == font_id,
-        BoxContent::HBox(children) => children
-            .iter()
-            .any(|child| box_contains_font(child, font_id)),
-        BoxContent::Scaled { body, .. } | BoxContent::RaiseBox { body, .. } => {
-            box_contains_font(body, font_id)
+    let mut pending = vec![lbox];
+    while let Some(current) = pending.pop() {
+        match &current.content {
+            BoxContent::Glyph { font_id: fid, .. } if *fid == font_id => return true,
+            BoxContent::HBox(children) => pending.extend(children.iter()),
+            BoxContent::Scaled { body, .. } | BoxContent::RaiseBox { body, .. } => {
+                pending.push(body);
+            }
+            _ => {}
         }
-        _ => false,
     }
+    false
 }
 
 fn link_underline_skip_cuts(lbox: &LayoutBox, x: f64, scale: f64, cuts: &mut Vec<(f64, f64)>) {
-    match &lbox.content {
-        BoxContent::HBox(children) => {
-            let mut cur_x = x;
-            for child in children {
-                link_underline_skip_cuts(child, cur_x, scale, cuts);
-                cur_x += child.width * scale;
+    let mut pending = vec![(lbox, x, scale)];
+    while let Some((current, current_x, current_scale)) = pending.pop() {
+        match &current.content {
+            BoxContent::HBox(children) => {
+                let mut child_positions = Vec::with_capacity(children.len());
+                let mut child_x = current_x;
+                for child in children {
+                    child_positions.push((child, child_x, current_scale));
+                    child_x += child.width * current_scale;
+                }
+                pending.extend(child_positions.into_iter().rev());
             }
-        }
-        BoxContent::Glyph { char_code, .. } => {
-            if let Some(ch) = char::from_u32(*char_code) {
-                if matches!(ch, 'g' | 'j' | 'p' | 'q' | 'y') {
-                    let pad = (0.04 * scale).min(lbox.width * scale / 3.0);
-                    cuts.push((x + pad, x + lbox.width * scale - pad));
+            BoxContent::Glyph { char_code, .. } => {
+                if let Some(ch) = char::from_u32(*char_code) {
+                    if matches!(ch, 'g' | 'j' | 'p' | 'q' | 'y') {
+                        let pad = (0.04 * current_scale).min(current.width * current_scale / 3.0);
+                        cuts.push((
+                            current_x + pad,
+                            current_x + current.width * current_scale - pad,
+                        ));
+                    }
                 }
             }
+            BoxContent::Scaled { body, child_scale } => {
+                pending.push((body, current_x, current_scale * child_scale));
+            }
+            BoxContent::RaiseBox { body, .. } => {
+                pending.push((body, current_x, current_scale));
+            }
+            _ => {}
         }
-        BoxContent::Scaled { body, child_scale } => {
-            link_underline_skip_cuts(body, x, scale * child_scale, cuts);
-        }
-        BoxContent::RaiseBox { body, .. } => {
-            link_underline_skip_cuts(body, x, scale, cuts);
-        }
-        _ => {}
     }
 }
 
@@ -3953,64 +3992,68 @@ fn measurement_to_em(m: &ratex_parser::parse_node::Measurement, options: &Layout
 
 /// Determine the math class of a ParseNode for spacing purposes.
 fn node_math_class(node: &ParseNode) -> Option<MathClass> {
-    match node {
-        ParseNode::MathOrd { .. } | ParseNode::TextOrd { .. } => Some(MathClass::Ord),
-        ParseNode::Atom { family, .. } => Some(family_to_math_class(*family)),
-        ParseNode::OpToken { .. } | ParseNode::Op { .. } | ParseNode::OperatorName { .. } => {
-            Some(MathClass::Op)
-        }
-        ParseNode::OrdGroup { .. } => Some(MathClass::Ord),
-        // KaTeX genfrac.js: with delimiters (e.g. \binom) → mord; without (e.g. \frac) → minner.
-        ParseNode::GenFrac {
-            left_delim,
-            right_delim,
-            ..
-        } => {
-            let has_delim = left_delim
-                .as_ref()
-                .is_some_and(|d| !d.is_empty() && d != ".")
-                || right_delim
+    // SupSub and HTML wrappers can form input-controlled chains.  Walk them
+    // explicitly so spacing classification does not consume one call frame per node.
+    let mut pending = vec![node];
+    while let Some(current) = pending.pop() {
+        match current {
+            ParseNode::MathOrd { .. } | ParseNode::TextOrd { .. } => {
+                return Some(MathClass::Ord);
+            }
+            ParseNode::Atom { family, .. } => return Some(family_to_math_class(*family)),
+            ParseNode::OpToken { .. } | ParseNode::Op { .. } | ParseNode::OperatorName { .. } => {
+                return Some(MathClass::Op);
+            }
+            ParseNode::OrdGroup { .. } => return Some(MathClass::Ord),
+            // KaTeX genfrac.js: with delimiters (e.g. \binom) → mord; without
+            // (e.g. \frac) → minner.
+            ParseNode::GenFrac {
+                left_delim,
+                right_delim,
+                ..
+            } => {
+                let has_delim = left_delim
                     .as_ref()
-                    .is_some_and(|d| !d.is_empty() && d != ".");
-            if has_delim {
-                Some(MathClass::Ord)
-            } else {
-                Some(MathClass::Inner)
+                    .is_some_and(|d| !d.is_empty() && d != ".")
+                    || right_delim
+                        .as_ref()
+                        .is_some_and(|d| !d.is_empty() && d != ".");
+                return Some(if has_delim {
+                    MathClass::Ord
+                } else {
+                    MathClass::Inner
+                });
             }
-        }
-        ParseNode::Sqrt { .. } => Some(MathClass::Ord),
-        ParseNode::SupSub { base, .. } => base.as_ref().and_then(|b| node_math_class(b)),
-        ParseNode::MClass { mclass, .. } => Some(mclass_str_to_math_class(mclass)),
-        ParseNode::SpacingNode { .. } => None,
-        ParseNode::Kern { .. } => None,
-        ParseNode::HtmlMathMl { html, .. } => {
-            // Derive math class from the first meaningful child in the HTML branch
-            for child in html {
-                if let Some(cls) = node_math_class(child) {
-                    return Some(cls);
+            ParseNode::Sqrt { .. } => return Some(MathClass::Ord),
+            ParseNode::SupSub { base, .. } => {
+                if let Some(base) = base {
+                    pending.push(base);
                 }
             }
-            None
-        }
-        ParseNode::Html { body, .. } => {
-            for child in body {
-                if let Some(cls) = node_math_class(child) {
-                    return Some(cls);
-                }
+            ParseNode::MClass { mclass, .. } => {
+                return Some(mclass_str_to_math_class(mclass));
             }
-            None
+            ParseNode::SpacingNode { .. } | ParseNode::Kern { .. } | ParseNode::Lap { .. } => {}
+            ParseNode::HtmlMathMl { html, .. } => {
+                pending.extend(html.iter().rev());
+            }
+            ParseNode::Html { body, .. } => {
+                pending.extend(body.iter().rev());
+            }
+            ParseNode::LeftRight { .. } => return Some(MathClass::Inner),
+            ParseNode::AccentToken { .. } => return Some(MathClass::Ord),
+            // \xrightarrow and CD arrows are relations for TeX spacing.
+            ParseNode::XArrow { .. } | ParseNode::CdArrow { .. } => {
+                return Some(MathClass::Rel);
+            }
+            ParseNode::DelimSizing { mclass, .. } => {
+                return Some(mclass_str_to_math_class(mclass));
+            }
+            ParseNode::Middle { .. } => return Some(MathClass::Ord),
+            _ => return Some(MathClass::Ord),
         }
-        ParseNode::Lap { .. } => None,
-        ParseNode::LeftRight { .. } => Some(MathClass::Inner),
-        ParseNode::AccentToken { .. } => Some(MathClass::Ord),
-        // \xrightarrow etc. are mathrel in TeX/KaTeX; without this they collapse to Ord–Ord (no kern).
-        ParseNode::XArrow { .. } => Some(MathClass::Rel),
-        // CD arrows are structural; treat as Rel for spacing.
-        ParseNode::CdArrow { .. } => Some(MathClass::Rel),
-        ParseNode::DelimSizing { mclass, .. } => Some(mclass_str_to_math_class(mclass)),
-        ParseNode::Middle { .. } => Some(MathClass::Ord),
-        _ => Some(MathClass::Ord),
     }
+    None
 }
 
 fn mclass_str_to_math_class(mclass: &str) -> MathClass {
@@ -4031,12 +4074,15 @@ fn mclass_str_to_math_class(mclass: &str) -> MathClass {
 /// KaTeX `getBaseElem` (`utils.js`): unwrap `ordgroup` / `color` with a single child, and `font`.
 /// Used for TeX "character box" checks in superscript Rule 18a (`supsub.js`).
 fn get_base_elem(node: &ParseNode) -> &ParseNode {
-    match node {
-        ParseNode::OrdGroup { body, .. } if body.len() == 1 => get_base_elem(&body[0]),
-        ParseNode::Color { body, .. } if body.len() == 1 => get_base_elem(&body[0]),
-        ParseNode::Html { body, .. } if body.len() == 1 => get_base_elem(&body[0]),
-        ParseNode::Font { body, .. } => get_base_elem(body),
-        _ => node,
+    let mut current = node;
+    loop {
+        current = match current {
+            ParseNode::OrdGroup { body, .. } if body.len() == 1 => &body[0],
+            ParseNode::Color { body, .. } if body.len() == 1 => &body[0],
+            ParseNode::Html { body, .. } if body.len() == 1 => &body[0],
+            ParseNode::Font { body, .. } => body,
+            _ => return current,
+        };
     }
 }
 
