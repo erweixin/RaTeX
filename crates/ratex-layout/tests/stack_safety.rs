@@ -17,6 +17,10 @@ fn nested_superscript(depth: usize) -> String {
     format!(r"{}x{}", r"x^{".repeat(depth), "}".repeat(depth))
 }
 
+fn unbraced_command_chain(command: &str, depth: usize) -> String {
+    format!("{}x", command.repeat(depth))
+}
+
 fn unary_prooftree(inferences: usize) -> String {
     format!(
         r"\begin{{prooftree}}\AxiomC{{P}}{}\end{{prooftree}}",
@@ -36,6 +40,10 @@ fn assert_recursion_limit(input: &str) {
         error.to_string().contains("Recursion limit exceeded"),
         "unexpected error: {error}"
     );
+}
+
+fn assert_parse_error(input: &str) {
+    parse(input).expect_err("adversarial input unexpectedly parsed");
 }
 
 fn run_small_stack_cases() {
@@ -71,6 +79,12 @@ fn run_small_stack_cases() {
     assert_recursion_limit(&format!("x{accents_4200}"));
     assert_recursion_limit(&format!(r"\text{{x{accents_4200}}}"));
     assert_recursion_limit(&unary_prooftree(32));
+
+    // Unbraced primitive/function arguments must also terminate with a regular
+    // parse error. This guards against accidentally turning command chains such
+    // as `\sqrt\sqrt...x` into an unbounded parse_group -> parse_function path
+    // that bypasses the expression-depth counter.
+    assert_parse_error(&unbraced_command_chain(r"\sqrt", 4_200));
 }
 
 fn run_boundary_cases() {
