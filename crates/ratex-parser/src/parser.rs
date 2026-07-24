@@ -5,12 +5,15 @@ use crate::error::{ParseError, ParseResult};
 use crate::functions::{self, ArgType, FunctionContext, FUNCTIONS};
 use crate::macro_expander::{MacroExpander, IMPLICIT_COMMANDS};
 use crate::parse_node::{AtomFamily, Mode, ParseNode};
+use crate::stack_safety::{validate_parse_nodes_depth, DepthBudget, MAX_INPUT_DEPTH};
 
 /// End-of-expression tokens.
 static END_OF_EXPRESSION: &[&str] = &["}", "\\endgroup", "\\end", "\\right", "&"];
 
-const MAX_RECURSION_DEPTH: usize = 512;
-
+/// Maximum supported nesting for input-controlled recursive structures.
+///
+/// Keep this conservative: parsing is used from mobile and WebAssembly hosts whose
+/// worker stacks can be substantially smaller than a desktop main-thread stack.
 /// The LaTeX parser. Converts a token stream into a ParseNode AST.
 ///
 /// Follows KaTeX's Parser.ts closely:
@@ -24,18 +27,19 @@ pub struct Parser<'a> {
     pub mode: Mode,
     pub gullet: MacroExpander<'a>,
     pub leftright_depth: i32,
-    recursion_depth: usize,
+    depth_budget: DepthBudget,
     next_token: Option<Token>,
     pub equation_counter: usize,
 }
 
 impl<'a> Parser<'a> {
     pub fn new(input: &'a str) -> Self {
+        let depth_budget = DepthBudget::new(MAX_INPUT_DEPTH);
         Self {
             mode: Mode::Math,
-            gullet: MacroExpander::new(input, Mode::Math),
+            gullet: MacroExpander::new_with_budget(input, Mode::Math, depth_budget.clone()),
             leftright_depth: 0,
-            recursion_depth: 0,
+            depth_budget,
             next_token: None,
             equation_counter: 0,
         }
@@ -90,18 +94,27 @@ impl<'a> Parser<'a> {
         self.gullet.switch_mode(new_mode);
     }
 
+    pub(crate) fn depth_budget(&self) -> &DepthBudget {
+        &self.depth_budget
+    }
+
     // ── Main parse entry ────────────────────────────────────────────────
 
     /// Parse the entire input and return the AST.
     pub fn parse(&mut self) -> ParseResult<Vec<ParseNode>> {
         self.gullet.begin_group();
 
-        let result = self.parse_expression(false, None);
+        // The root expression itself is not input nesting.  Only recursive
+        // expressions below it consume the structural-depth budget.
+        let result = self.parse_expression_impl(false, None);
 
         match result {
             Ok(parse) => {
-                self.expect("EOF", true)?;
+                let eof_result = self.expect("EOF", true);
                 self.gullet.end_group();
+                eof_result?;
+                validate_parse_nodes_depth(&parse, MAX_INPUT_DEPTH)
+                    .map_err(|_| ParseError::recursion_limit_exceeded())?;
                 Ok(parse)
             }
             Err(e) => {
@@ -119,14 +132,12 @@ impl<'a> Parser<'a> {
         break_on_infix: bool,
         break_on_token_text: Option<&str>,
     ) -> ParseResult<Vec<ParseNode>> {
-        self.recursion_depth += 1;
-        if self.recursion_depth > MAX_RECURSION_DEPTH {
-            self.recursion_depth -= 1;
-            return Err(ParseError::recursion_limit_exceeded());
-        }
-        let result = self.parse_expression_impl(break_on_infix, break_on_token_text);
-        self.recursion_depth -= 1;
-        result
+        let _guard = self
+            .depth_budget
+            .enter()
+            .map_err(|_| ParseError::recursion_limit_exceeded())?;
+
+        self.parse_expression_impl(break_on_infix, break_on_token_text)
     }
 
     fn parse_expression_impl(
@@ -472,6 +483,46 @@ impl<'a> Parser<'a> {
         name: &str,
         break_on_token_text: Option<&str>,
     ) -> ParseResult<Option<ParseNode>> {
+        self.parse_group_impl(name, break_on_token_text, false)
+    }
+
+    pub(crate) fn parse_structural_group(
+        &mut self,
+        name: &str,
+        break_on_token_text: Option<&str>,
+    ) -> ParseResult<Option<ParseNode>> {
+        let _guard = self
+            .depth_budget
+            .enter()
+            .map_err(|_| ParseError::recursion_limit_exceeded())?;
+        self.parse_group_impl(name, break_on_token_text, true)
+    }
+
+    fn parse_delimiter_group(&mut self, name: &str) -> ParseResult<Option<ParseNode>> {
+        let first_token = self.fetch()?;
+        let text = first_token.text.clone();
+
+        if text == "{" || text == "\\begingroup" {
+            return self.parse_structural_group(name, None);
+        }
+
+        let result = self.parse_symbol_inner()?;
+        if result.is_none() {
+            return Err(ParseError::new(
+                format!("Expected delimiter as {}", name),
+                Some(&first_token),
+            ));
+        }
+
+        Ok(result)
+    }
+
+    fn parse_group_impl(
+        &mut self,
+        name: &str,
+        break_on_token_text: Option<&str>,
+        depth_already_counted: bool,
+    ) -> ParseResult<Option<ParseNode>> {
         let first_token = self.fetch()?;
         let text = first_token.text.clone();
 
@@ -479,11 +530,23 @@ impl<'a> Parser<'a> {
             self.consume();
             let group_end = if text == "{" { "}" } else { "\\endgroup" };
 
+            if !depth_already_counted && self.depth_budget.remaining() == 0 {
+                return Err(ParseError::recursion_limit_exceeded());
+            }
+
             self.gullet.begin_group();
-            let expression = self.parse_expression(false, Some(group_end))?;
-            let last_token = self.fetch()?;
-            self.expect(group_end, true)?;
+            let result = (|| {
+                let expression = if depth_already_counted {
+                    self.parse_expression_impl(false, Some(group_end))?
+                } else {
+                    self.parse_expression(false, Some(group_end))?
+                };
+                let last_token = self.fetch()?;
+                self.expect(group_end, true)?;
+                Ok((expression, last_token))
+            })();
             self.gullet.end_group();
+            let (expression, last_token) = result?;
 
             let loc = Some(SourceLocation::range(&first_token.loc, &last_token.loc));
             let semisimple = if text == "\\begingroup" {
@@ -499,9 +562,10 @@ impl<'a> Parser<'a> {
                 loc,
             }))
         } else {
-            let result = self
-                .parse_function(break_on_token_text, Some(name))?
-                .or_else(|| self.parse_symbol_inner().ok().flatten());
+            let result = match self.parse_function(break_on_token_text, Some(name))? {
+                some @ Some(_) => some,
+                None => self.parse_symbol_inner()?,
+            };
 
             if result.is_none()
                 && text.starts_with('\\')
@@ -623,11 +687,13 @@ impl<'a> Parser<'a> {
             } else {
                 arg_type
             };
+            let structural = argument_consumes_depth(func, func_data, effective_type);
 
             let arg = self.parse_group_of_type(
                 &format!("argument to '{}'", func),
                 effective_type,
                 is_optional,
+                structural,
             )?;
 
             if is_optional {
@@ -650,6 +716,7 @@ impl<'a> Parser<'a> {
         name: &str,
         arg_type: Option<ArgType>,
         optional: bool,
+        structural: bool,
     ) -> ParseResult<Option<ParseNode>> {
         match arg_type {
             Some(ArgType::Color) => self.parse_color_group(optional),
@@ -658,7 +725,11 @@ impl<'a> Parser<'a> {
                 if optional {
                     return Err(ParseError::msg("A primitive argument cannot be optional"));
                 }
-                let group = self.parse_group(name, None)?;
+                let group = if structural {
+                    self.parse_structural_group(name, None)?
+                } else {
+                    self.parse_delimiter_group(name)?
+                };
                 match group {
                     Some(g) => Ok(Some(g)),
                     None => Err(ParseError::new(format!("Expected group as {}", name), None)),
@@ -896,20 +967,27 @@ impl<'a> Parser<'a> {
         }
 
         self.gullet.begin_group();
-        let expression = self.parse_expression(false, Some("EOF"))?;
-        self.expect("EOF", true)?;
+        let result = (|| {
+            let expression = self.parse_expression(false, Some("EOF"))?;
+            self.expect("EOF", true)?;
+            Ok(expression)
+        })();
         self.gullet.end_group();
-
-        let result = ParseNode::OrdGroup {
-            mode: self.mode,
-            loc: Some(arg_token.loc.clone()),
-            body: expression,
-            semisimple: None,
-        };
+        let result_mode = self.mode;
+        let expression = result;
 
         if mode.is_some() {
             self.switch_mode(outer_mode);
         }
+
+        let expression = expression?;
+
+        let result = ParseNode::OrdGroup {
+            mode: result_mode,
+            loc: Some(arg_token.loc.clone()),
+            body: expression,
+            semisimple: None,
+        };
 
         Ok(Some(result))
     }
@@ -1066,11 +1144,16 @@ impl<'a> Parser<'a> {
             return Ok(None);
         }
 
-        // Only decompose Latin-script base characters
+        // Only decompose Latin-script base characters.
         let base_char = chars[0];
         if !is_latin_base_char(base_char) {
             return Ok(None);
         }
+
+        let accent_count = chars.len() - split_idx - 1;
+        self.depth_budget
+            .ensure_additional(accent_count)
+            .map_err(|_| ParseError::new("Recursion limit exceeded", Some(nucleus)))?;
 
         let loc = Some(SourceLocation::range(&nucleus.loc, &nucleus.loc));
 
@@ -1231,6 +1314,21 @@ fn combining_to_accent_label(ch: char, mode: Mode) -> String {
             '\u{0327}' => "\\c".to_string(),
             _ => format!("\\char\"{:X}", ch as u32),
         },
+    }
+}
+
+fn argument_consumes_depth(
+    func_name: &str,
+    func_data: &functions::FunctionSpec,
+    arg_type: Option<ArgType>,
+) -> bool {
+    match arg_type {
+        Some(ArgType::Color | ArgType::Size | ArgType::Raw | ArgType::Url) => false,
+        Some(ArgType::Primitive) => {
+            !matches!(func_name, "\\left" | "\\right" | "\\middle")
+                && func_data.node_type != "delimsizing"
+        }
+        Some(ArgType::Math | ArgType::Text | ArgType::HBox | ArgType::Original) | None => true,
     }
 }
 

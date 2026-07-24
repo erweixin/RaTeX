@@ -30,6 +30,8 @@ jobs:
         run: cargo clippy --workspace -- -D warnings
       - name: Test
         run: cargo test --workspace
+      - name: Test release stack-safety boundary
+        run: cargo test --release -p ratex-layout --test stack_safety
       - name: Test ratex-font-loader (all features)
         run: cargo test -p ratex-font-loader --all-features
       - name: Test ratex-pdf (all features, embed-fonts + CLI)

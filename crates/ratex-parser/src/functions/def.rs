@@ -99,23 +99,41 @@ fn handle_prefix(
     _args: Vec<ParseNode>,
     _opt_args: Vec<Option<ParseNode>>,
 ) -> ParseResult<ParseNode> {
-    ctx.parser.consume_spaces()?;
-    let mut next_tok = ctx.parser.fetch()?.clone();
-    let token_text = next_tok.text.clone();
+    let mut force_global = matches!(ctx.func_name.as_str(), "\\global" | "\\\\globallong");
 
-    if let Some(global_ver) = global_version(&token_text) {
-        if ctx.func_name == "\\global" || ctx.func_name == "\\\\globallong" {
-            next_tok.text = global_ver.to_string();
-            ctx.parser.gullet.push_token(next_tok);
-            ctx.parser.consume();
+    loop {
+        ctx.parser.consume_spaces()?;
+        let mut next_tok = ctx.parser.fetch()?.clone();
+        let token_text = next_tok.text.clone();
+
+        match token_text.as_str() {
+            "\\global" => {
+                force_global = true;
+                ctx.parser.consume();
+            }
+            "\\long" => {
+                ctx.parser.consume();
+            }
+            "\\\\globallong" => {
+                force_global = true;
+                ctx.parser.consume();
+            }
+            _ => {
+                if let Some(global_ver) = global_version(&token_text) {
+                    if force_global {
+                        next_tok.text = global_ver.to_string();
+                        ctx.parser.gullet.push_token(next_tok);
+                        ctx.parser.consume();
+                    }
+                    let result = ctx.parser.parse_function(None, None)?;
+                    return match result {
+                        Some(node) => Ok(node),
+                        None => Err(ParseError::msg("Invalid token after macro prefix")),
+                    };
+                }
+                return Err(ParseError::msg("Invalid token after macro prefix"));
+            }
         }
-        let result = ctx.parser.parse_function(None, None)?;
-        match result {
-            Some(node) => Ok(node),
-            None => Err(ParseError::msg("Invalid token after macro prefix")),
-        }
-    } else {
-        Err(ParseError::msg("Invalid token after macro prefix"))
     }
 }
 

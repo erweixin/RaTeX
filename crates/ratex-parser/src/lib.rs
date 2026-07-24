@@ -5,6 +5,7 @@ pub mod macro_expander;
 pub mod mhchem;
 pub mod parse_node;
 pub mod parser;
+pub(crate) mod stack_safety;
 pub mod unicode_sup_sub;
 
 #[cfg(test)]

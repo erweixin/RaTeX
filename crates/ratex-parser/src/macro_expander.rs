@@ -6,6 +6,7 @@ use ratex_lexer::Lexer;
 use crate::error::{ParseError, ParseResult};
 use crate::functions::FUNCTIONS;
 use crate::parse_node::Mode;
+use crate::stack_safety::{DepthBudget, MAX_INPUT_DEPTH};
 
 /// Commands that act like macros but aren't defined as a macro, function, or symbol.
 /// Used in `is_defined`.
@@ -59,6 +60,8 @@ pub struct MacroExpander<'a> {
     macros: MacroNamespace,
     expansion_count: usize,
     max_expand: usize,
+    depth_budget: DepthBudget,
+    expand_tokens_depth: usize,
 }
 
 /// Scoped macro namespace supporting group nesting.
@@ -161,6 +164,10 @@ fn dotsc_space_after(next: &str) -> bool {
 
 impl<'a> MacroExpander<'a> {
     pub fn new(input: &'a str, mode: Mode) -> Self {
+        Self::new_with_budget(input, mode, DepthBudget::new(MAX_INPUT_DEPTH))
+    }
+
+    pub(crate) fn new_with_budget(input: &'a str, mode: Mode, depth_budget: DepthBudget) -> Self {
         let mut me = Self {
             lexer: Lexer::new(input),
             mode,
@@ -168,6 +175,8 @@ impl<'a> MacroExpander<'a> {
             macros: MacroNamespace::new(),
             expansion_count: 0,
             max_expand: 1000,
+            depth_budget,
+            expand_tokens_depth: 0,
         };
         me.load_builtins();
         me
@@ -824,8 +833,9 @@ impl<'a> MacroExpander<'a> {
                 to_expand.extend(left);
 
                 me.begin_group();
-                let expanded = me.expand_tokens(to_expand)?;
+                let expanded = me.expand_tokens(to_expand);
                 me.end_group();
+                let expanded = expanded?;
 
                 Ok(expanded)
             }),
@@ -885,8 +895,9 @@ impl<'a> MacroExpander<'a> {
                 to_expand.extend(left);
 
                 me.begin_group();
-                let expanded = me.expand_tokens(to_expand)?;
+                let expanded = me.expand_tokens(to_expand);
                 me.end_group();
+                let expanded = expanded?;
 
                 Ok(expanded)
             }),
@@ -898,8 +909,9 @@ impl<'a> MacroExpander<'a> {
             MacroDefinition::Function(|me: &mut MacroExpander| -> ParseResult<Vec<Token>> {
                 let args = me.consume_args(1)?;
                 let s = crate::mhchem::mhchem_arg_tokens_to_string(&args[0]);
-                let tex = crate::mhchem::chem_parse_str(&s, "ce")
-                    .map_err(|e| ParseError::msg(format!("\\ce: {e}")))?;
+                let tex =
+                    crate::mhchem::chem_parse_str_with_budget(&s, "ce", me.depth_budget.clone())
+                        .map_err(|e| ParseError::msg(format!("\\ce: {e}")))?;
                 Ok(lex_string_to_stack_tokens(&tex))
             }),
         );
@@ -908,8 +920,9 @@ impl<'a> MacroExpander<'a> {
             MacroDefinition::Function(|me: &mut MacroExpander| -> ParseResult<Vec<Token>> {
                 let args = me.consume_args(1)?;
                 let s = crate::mhchem::mhchem_arg_tokens_to_string(&args[0]);
-                let tex = crate::mhchem::chem_parse_str(&s, "pu")
-                    .map_err(|e| ParseError::msg(format!("\\pu: {e}")))?;
+                let tex =
+                    crate::mhchem::chem_parse_str_with_budget(&s, "pu", me.depth_budget.clone())
+                        .map_err(|e| ParseError::msg(format!("\\pu: {e}")))?;
                 Ok(lex_string_to_stack_tokens(&tex))
             }),
         );
@@ -934,28 +947,44 @@ impl<'a> MacroExpander<'a> {
 
     /// Expand a list of tokens fully (for \edef/\xdef).
     pub fn expand_tokens(&mut self, tokens: Vec<Token>) -> ParseResult<Vec<Token>> {
+        let nested = self.expand_tokens_depth > 0;
+        let _guard = if nested {
+            Some(
+                self.depth_budget
+                    .enter()
+                    .map_err(|_| ParseError::recursion_limit_exceeded())?,
+            )
+        } else {
+            None
+        };
+
+        self.expand_tokens_depth += 1;
         let saved_stack = std::mem::take(&mut self.stack);
         self.stack = tokens;
 
-        let mut result = Vec::new();
-        loop {
-            if self.stack.is_empty() {
-                break;
-            }
-            let expanded = self.expand_once(false)?;
-            if !expanded {
-                if let Some(tok) = self.stack.pop() {
-                    if tok.is_eof() {
-                        break;
+        let result = (|| {
+            let mut result = Vec::new();
+            loop {
+                if self.stack.is_empty() {
+                    break;
+                }
+                let expanded = self.expand_once(false)?;
+                if !expanded {
+                    if let Some(tok) = self.stack.pop() {
+                        if tok.is_eof() {
+                            break;
+                        }
+                        result.push(tok);
                     }
-                    result.push(tok);
                 }
             }
-        }
+            result.reverse();
+            Ok(result)
+        })();
 
         self.stack = saved_stack;
-        result.reverse();
-        Ok(result)
+        self.expand_tokens_depth -= 1;
+        result
     }
 
     pub fn switch_mode(&mut self, new_mode: Mode) {

@@ -4,7 +4,7 @@ use crate::mhchem::actions;
 use crate::mhchem::buffer::Buffer;
 use crate::mhchem::error::{MhchemError, MhchemResult};
 use crate::mhchem::patterns::match_pattern;
-use crate::mhchem::ParserCtx;
+use crate::mhchem::RuntimeCtx;
 use serde_json::Value;
 
 fn normalize_input(s: &str) -> String {
@@ -21,10 +21,19 @@ fn normalize_input(s: &str) -> String {
 }
 
 pub(crate) fn go_machine(
-    ctx: &ParserCtx<'_>,
+    ctx: &RuntimeCtx<'_>,
     input: &str,
     machine: &str,
 ) -> MhchemResult<Vec<Value>> {
+    let _guard = ctx
+        .depth_budget
+        .enter()
+        .map_err(|_| MhchemError::msg("Recursion limit exceeded"))?;
+
+    go_machine_impl(ctx, input, machine)
+}
+
+fn go_machine_impl(ctx: &RuntimeCtx<'_>, input: &str, machine: &str) -> MhchemResult<Vec<Value>> {
     let mut input = normalize_input(input);
     if input.is_empty() {
         return Ok(vec![]);

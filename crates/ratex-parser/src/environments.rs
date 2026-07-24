@@ -9,6 +9,7 @@ use crate::parse_node::{
     StyleStr,
 };
 use crate::parser::Parser;
+use crate::stack_safety::parse_nodes_logical_depth;
 
 // ── Environment registry ─────────────────────────────────────────────────
 
@@ -1283,7 +1284,9 @@ fn parse_prooftree_arg(parser: &mut Parser, command: &str) -> ParseResult<Vec<Pa
 }
 
 fn parse_prooftree(parser: &mut Parser) -> ParseResult<ParseNode> {
-    let mut stack: Vec<ProofBranch> = Vec::new();
+    // Track structural depth alongside each branch.  A prooftree is assembled
+    // iteratively, so expression recursion alone cannot protect this tree shape.
+    let mut stack: Vec<(ProofBranch, usize)> = Vec::new();
     let mut left_label: Option<Vec<ParseNode>> = None;
     let mut right_label: Option<Vec<ParseNode>> = None;
     let mut next_line_style = ProofLineStyle::Solid;
@@ -1304,14 +1307,22 @@ fn parse_prooftree(parser: &mut Parser) -> ParseResult<ParseNode> {
         match command.as_str() {
             "\\AxiomC" | "\\Axiom" | "\\AXC" => {
                 let conclusion = parse_prooftree_arg(parser, &command)?;
-                stack.push(ProofBranch {
-                    conclusion,
-                    premises: Vec::new(),
-                    left_label: None,
-                    right_label: None,
-                    line_style: ProofLineStyle::None,
-                    root_at_top: false,
-                });
+                let depth = 1 + parse_nodes_logical_depth(&conclusion);
+                parser
+                    .depth_budget()
+                    .ensure_additional(depth)
+                    .map_err(|_| ParseError::recursion_limit_exceeded())?;
+                stack.push((
+                    ProofBranch {
+                        conclusion,
+                        premises: Vec::new(),
+                        left_label: None,
+                        right_label: None,
+                        line_style: ProofLineStyle::None,
+                        root_at_top: false,
+                    },
+                    depth,
+                ));
             }
             "\\LeftLabel" | "\\LL" => {
                 left_label = Some(parse_prooftree_arg(parser, &command)?);
@@ -1366,15 +1377,45 @@ fn parse_prooftree(parser: &mut Parser) -> ParseResult<ParseNode> {
                 }
                 let conclusion = parse_prooftree_arg(parser, name)?;
                 let start = stack.len() - arity;
-                let premises = stack.split_off(start);
-                stack.push(ProofBranch {
-                    conclusion,
-                    premises,
-                    left_label: left_label.take(),
-                    right_label: right_label.take(),
-                    line_style: next_line_style.clone(),
-                    root_at_top: next_root_at_top,
-                });
+                let premise_entries = stack.split_off(start);
+                let payload_depth = parse_nodes_logical_depth(&conclusion)
+                    .max(
+                        left_label
+                            .as_deref()
+                            .map(parse_nodes_logical_depth)
+                            .unwrap_or(0),
+                    )
+                    .max(
+                        right_label
+                            .as_deref()
+                            .map(parse_nodes_logical_depth)
+                            .unwrap_or(0),
+                    );
+                let premise_depth = premise_entries
+                    .iter()
+                    .map(|(_, depth)| *depth)
+                    .max()
+                    .unwrap_or(0);
+                let depth = 1 + payload_depth.max(premise_depth);
+                parser
+                    .depth_budget()
+                    .ensure_additional(depth)
+                    .map_err(|_| ParseError::recursion_limit_exceeded())?;
+                let premises = premise_entries
+                    .into_iter()
+                    .map(|(branch, _)| branch)
+                    .collect();
+                stack.push((
+                    ProofBranch {
+                        conclusion,
+                        premises,
+                        left_label: left_label.take(),
+                        right_label: right_label.take(),
+                        line_style: next_line_style.clone(),
+                        root_at_top: next_root_at_top,
+                    },
+                    depth,
+                ));
                 next_line_style = default_line_style.clone();
                 next_root_at_top = default_root_at_top;
             }
@@ -1402,7 +1443,7 @@ fn parse_prooftree(parser: &mut Parser) -> ParseResult<ParseNode> {
 
     Ok(ParseNode::ProofTree {
         mode: parser.mode,
-        tree: stack.pop().unwrap(),
+        tree: stack.pop().unwrap().0,
         loc: None,
     })
 }
