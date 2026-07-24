@@ -498,6 +498,25 @@ impl<'a> Parser<'a> {
         self.parse_group_impl(name, break_on_token_text, true)
     }
 
+    fn parse_delimiter_group(&mut self, name: &str) -> ParseResult<Option<ParseNode>> {
+        let first_token = self.fetch()?;
+        let text = first_token.text.clone();
+
+        if text == "{" || text == "\\begingroup" {
+            return self.parse_structural_group(name, None);
+        }
+
+        let result = self.parse_symbol_inner()?;
+        if result.is_none() {
+            return Err(ParseError::new(
+                format!("Expected delimiter as {}", name),
+                Some(&first_token),
+            ));
+        }
+
+        Ok(result)
+    }
+
     fn parse_group_impl(
         &mut self,
         name: &str,
@@ -709,7 +728,7 @@ impl<'a> Parser<'a> {
                 let group = if structural {
                     self.parse_structural_group(name, None)?
                 } else {
-                    self.parse_group(name, None)?
+                    self.parse_delimiter_group(name)?
                 };
                 match group {
                     Some(g) => Ok(Some(g)),

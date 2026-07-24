@@ -33,6 +33,23 @@ fn nested_braket(depth: usize) -> String {
     input
 }
 
+fn nested_raisebox(depth: usize) -> String {
+    let mut body = "x".to_owned();
+    for _ in 0..depth {
+        body = format!(r"\raisebox{{0pt}}{{{body}}}");
+    }
+    body
+}
+
+fn environment_with_explicit_tag(environment: &str, tag: &str) -> String {
+    let body = if environment == "align" {
+        r"x &= y"
+    } else {
+        "x"
+    };
+    format!(r"\begin{{{environment}}}{body}\tag{{{tag}}}\end{{{environment}}}")
+}
+
 fn unary_prooftree(inferences: usize) -> String {
     format!(
         r"\begin{{prooftree}}\AxiomC{{P}}{}\end{{prooftree}}",
@@ -108,6 +125,14 @@ fn run_small_stack_cases() {
             "prooftree-left-label-payload-32",
             prooftree_left_label_payload(32),
         ),
+        (
+            "equation-explicit-tag-raisebox-12",
+            environment_with_explicit_tag("equation", &nested_raisebox(12)),
+        ),
+        (
+            "align-explicit-tag-raisebox-12",
+            environment_with_explicit_tag("align", &nested_raisebox(12)),
+        ),
     ];
     for (name, input) in &adversarial_cases {
         eprintln!("stack-safety adversarial case: {name}");
@@ -126,6 +151,15 @@ fn run_small_stack_cases() {
     // that bypasses the expression-depth counter.
     eprintln!("stack-safety parse-error case: unbraced-sqrt-4200");
     assert_parse_error(&unbraced_command_chain(r"\sqrt", 4_200));
+
+    eprintln!("stack-safety parse-error case: unbraced-bigl-4200");
+    assert_parse_error(&format!("{}(", r"\bigl".repeat(4_200)));
+
+    eprintln!("stack-safety parse-error case: unbraced-left-4200");
+    assert_parse_error(&format!("{}(", r"\left".repeat(4_200)));
+
+    eprintln!("stack-safety flat lexer case: comments-4200");
+    assert_pipeline_ok(&("%\n".repeat(4_200) + "x"));
 
     eprintln!("stack-safety flat prefix case: global-4200");
     assert_pipeline_ok(&format!(r"{}\def\foo{{x}}\foo", r"\global".repeat(4_200)));

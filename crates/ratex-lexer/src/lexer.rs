@@ -128,101 +128,102 @@ impl<'a> Lexer<'a> {
 
     /// Lex a single token from the current position.
     pub fn lex(&mut self) -> Token {
-        // Skip whitespace, returning a space token if any was found
-        if self.at_end() {
-            return Token::eof(self.pos);
-        }
-
-        let start = self.pos;
-        let ch = match self.current_char() {
-            Some(c) => c,
-            None => return Token::eof(self.pos),
-        };
-
-        // Whitespace → single space token
-        if let Some(b) = self.peek_byte() {
-            if Self::is_whitespace(b) {
-                self.skip_whitespace();
-                return Token::new(" ", start, self.pos);
+        loop {
+            // Skip whitespace, returning a space token if any was found
+            if self.at_end() {
+                return Token::eof(self.pos);
             }
-        }
 
-        // Comment character (catcode 14, default `%`)
-        if self.catcode(ch) == 14 {
-            self.advance_char();
-            // Skip to end of line
-            while !self.at_end() {
-                if self.peek_byte() == Some(b'\n') {
+            let start = self.pos;
+            let ch = match self.current_char() {
+                Some(c) => c,
+                None => return Token::eof(self.pos),
+            };
+
+            // Whitespace → single space token
+            if let Some(b) = self.peek_byte() {
+                if Self::is_whitespace(b) {
+                    self.skip_whitespace();
+                    return Token::new(" ", start, self.pos);
+                }
+            }
+
+            // Comment character (catcode 14, default `%`)
+            if self.catcode(ch) == 14 {
+                self.advance_char();
+                // Skip to end of line
+                while !self.at_end() {
+                    if self.peek_byte() == Some(b'\n') {
+                        self.pos += 1;
+                        break;
+                    }
                     self.pos += 1;
+                }
+                continue;
+            }
+
+            // Backslash → control sequence
+            if ch == '\\' {
+                self.pos += 1; // consume the backslash
+                if self.at_end() {
+                    return Token::new("\\", start, self.pos);
+                }
+
+                let next_byte = self.bytes[self.pos];
+
+                if Self::is_whitespace(next_byte) {
+                    // Control space: \<whitespace> → "\\ " token, then skip trailing whitespace
+                    self.pos += 1;
+                    self.skip_whitespace();
+                    return Token::new("\\ ", start, self.pos);
+                }
+
+                if Self::is_control_word_char(next_byte) {
+                    // Control word: \<letters or @>
+                    while self.pos < self.bytes.len()
+                        && Self::is_control_word_char(self.bytes[self.pos])
+                    {
+                        self.pos += 1;
+                    }
+                    let text = &self.input[start..self.pos];
+
+                    // Handle \verb and \verb* — verbatim content delimited by next char
+                    if text == "\\verb" {
+                        return self.lex_verb(start, false);
+                    }
+
+                    let end = self.pos;
+                    // Skip trailing whitespace after control word (KaTeX behavior)
+                    self.skip_whitespace();
+                    return Token::new(text, start, end);
+                }
+
+                // Control symbol: \<single non-letter char>
+                let sym_char = self.current_char().unwrap();
+                self.pos += sym_char.len_utf8();
+                let text = &self.input[start..self.pos];
+                return Token::new(text, start, self.pos);
+            }
+
+            // Active character (catcode 13, default `~`) → rendered as a space
+            if self.catcode(ch) == 13 {
+                self.advance_char();
+                return Token::new(ch.to_string(), start, self.pos);
+            }
+
+            // Regular character (including {, }, ^, _, &, etc.)
+            // Consume trailing combining diacritical marks (U+0300–U+036F) to form
+            // a single token, matching KaTeX's regex behavior.
+            self.advance_char();
+            while let Some(next) = self.current_char() {
+                if Self::is_combining_diacritical(next) {
+                    self.advance_char();
+                } else {
                     break;
                 }
-                self.pos += 1;
             }
-            // Recurse to get the next real token
-            return self.lex();
+            return Token::new(&self.input[start..self.pos], start, self.pos);
         }
-
-        // Backslash → control sequence
-        if ch == '\\' {
-            self.pos += 1; // consume the backslash
-            if self.at_end() {
-                return Token::new("\\", start, self.pos);
-            }
-
-            let next_byte = self.bytes[self.pos];
-
-            if Self::is_whitespace(next_byte) {
-                // Control space: \<whitespace> → "\\ " token, then skip trailing whitespace
-                self.pos += 1;
-                self.skip_whitespace();
-                return Token::new("\\ ", start, self.pos);
-            }
-
-            if Self::is_control_word_char(next_byte) {
-                // Control word: \<letters or @>
-                while self.pos < self.bytes.len()
-                    && Self::is_control_word_char(self.bytes[self.pos])
-                {
-                    self.pos += 1;
-                }
-                let text = &self.input[start..self.pos];
-
-                // Handle \verb and \verb* — verbatim content delimited by next char
-                if text == "\\verb" {
-                    return self.lex_verb(start, false);
-                }
-
-                let end = self.pos;
-                // Skip trailing whitespace after control word (KaTeX behavior)
-                self.skip_whitespace();
-                return Token::new(text, start, end);
-            }
-
-            // Control symbol: \<single non-letter char>
-            let sym_char = self.current_char().unwrap();
-            self.pos += sym_char.len_utf8();
-            let text = &self.input[start..self.pos];
-            return Token::new(text, start, self.pos);
-        }
-
-        // Active character (catcode 13, default `~`) → rendered as a space
-        if self.catcode(ch) == 13 {
-            self.advance_char();
-            return Token::new(ch.to_string(), start, self.pos);
-        }
-
-        // Regular character (including {, }, ^, _, &, etc.)
-        // Consume trailing combining diacritical marks (U+0300–U+036F) to form
-        // a single token, matching KaTeX's regex behavior.
-        self.advance_char();
-        while let Some(next) = self.current_char() {
-            if Self::is_combining_diacritical(next) {
-                self.advance_char();
-            } else {
-                break;
-            }
-        }
-        Token::new(&self.input[start..self.pos], start, self.pos)
     }
 
     /// Lex all remaining tokens until EOF.
@@ -595,6 +596,12 @@ mod tests {
     fn katex_multiple_comment_lines() {
         let tokens = lex_texts("% comment 1\n% comment 2\n");
         assert_eq!(tokens, vec!["EOF"]);
+    }
+
+    #[test]
+    fn many_consecutive_comment_lines_are_lexed_iteratively() {
+        let input = "%\n".repeat(4_200) + "x";
+        assert_eq!(lex_texts(&input), vec!["x", "EOF"]);
     }
 
     /// KaTeX: `it("should parse comments between subscript and superscript")`

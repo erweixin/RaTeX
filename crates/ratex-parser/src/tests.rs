@@ -1252,6 +1252,27 @@ mod recursion_limit {
         format!("{}x", r"\sqrt".repeat(depth))
     }
 
+    fn unbraced_delimiter_chain(command: &str, depth: usize) -> String {
+        format!("{}(", command.repeat(depth))
+    }
+
+    fn nested_raisebox(depth: usize) -> String {
+        let mut body = "x".to_owned();
+        for _ in 0..depth {
+            body = format!(r"\raisebox{{0pt}}{{{body}}}");
+        }
+        body
+    }
+
+    fn environment_with_explicit_tag(environment: &str, tag: &str) -> String {
+        let body = if environment == "align" {
+            r"x &= y"
+        } else {
+            "x"
+        };
+        format!(r"\begin{{{environment}}}{body}\tag{{{tag}}}\end{{{environment}}}")
+    }
+
     fn nested_braket(depth: usize) -> String {
         let mut input = "x".to_string();
         for _ in 0..depth {
@@ -1323,6 +1344,19 @@ mod recursion_limit {
         assert!(parse(&nested_tag(32)).is_ok());
         assert_recursion_limit_err(&nested_tag(33));
         assert_recursion_limit_err(&nested_tag(4_200));
+    }
+
+    #[test]
+    fn unbraced_delimiter_function_chains_fail_without_recursing() {
+        assert!(parse(&unbraced_delimiter_chain(r"\bigl", 4_200)).is_err());
+        assert!(parse(&unbraced_delimiter_chain(r"\left", 4_200)).is_err());
+    }
+
+    #[test]
+    fn explicit_array_tags_are_included_in_final_ast_depth() {
+        let tag = nested_raisebox(12);
+        assert_recursion_limit_err(&environment_with_explicit_tag("equation", &tag));
+        assert_recursion_limit_err(&environment_with_explicit_tag("align", &tag));
     }
 
     #[test]

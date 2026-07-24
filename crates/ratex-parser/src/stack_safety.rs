@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use crate::parse_node::{ParseNode, ProofBranch};
+use crate::parse_node::{ArrayTag, ParseNode, ProofBranch};
 
 pub(crate) const MAX_INPUT_DEPTH: usize = 32;
 
@@ -208,7 +208,14 @@ pub(crate) fn parse_nodes_logical_depth(nodes: &[ParseNode]) -> usize {
             | ParseNode::VCenter { body, .. } => {
                 push_node(&mut stack, body, visit.depth + 1, true);
             }
-            ParseNode::Array { body, .. } => {
+            ParseNode::Array { body, tags, .. } => {
+                if let Some(tags) = tags {
+                    for tag in tags.iter().rev() {
+                        if let ArrayTag::Explicit(nodes) = tag {
+                            push_nodes(&mut stack, nodes, visit.depth + 1);
+                        }
+                    }
+                }
                 for row in body.iter().rev() {
                     push_nodes(&mut stack, row, visit.depth + 1);
                 }
@@ -323,4 +330,48 @@ pub(crate) fn proof_branch_logical_depth(branch: &ProofBranch) -> usize {
     }
 
     0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parse_node::{ArrayTag, Mode};
+
+    fn nested_ord_group(depth: usize) -> ParseNode {
+        let mut node = ParseNode::MathOrd {
+            mode: Mode::Math,
+            text: "x".to_string(),
+            loc: None,
+        };
+        for _ in 0..depth {
+            node = ParseNode::OrdGroup {
+                mode: Mode::Math,
+                body: vec![node],
+                semisimple: None,
+                loc: None,
+            };
+        }
+        node
+    }
+
+    #[test]
+    fn logical_depth_includes_explicit_array_tags() {
+        let array = ParseNode::Array {
+            mode: Mode::Math,
+            body: vec![],
+            row_gaps: vec![],
+            hlines_before_row: vec![],
+            cols: None,
+            col_separation_type: None,
+            hskip_before_and_after: None,
+            add_jot: None,
+            arraystretch: 1.0,
+            tags: Some(vec![ArrayTag::Explicit(vec![nested_ord_group(3)])]),
+            leqno: None,
+            is_cd: None,
+            loc: None,
+        };
+
+        assert_eq!(parse_nodes_logical_depth(&[array]), 4);
+    }
 }
