@@ -96,6 +96,10 @@ impl<'a> Parser<'a> {
         self.gullet.switch_mode(new_mode);
     }
 
+    pub(crate) fn current_recursion_depth(&self) -> usize {
+        self.recursion_depth
+    }
+
     // ── Main parse entry ────────────────────────────────────────────────
 
     /// Parse the entire input and return the AST.
@@ -1229,6 +1233,9 @@ fn input_exceeds_max_depth(input: &str) -> bool {
                         "def" | "gdef" | "edef" | "xdef" => {
                             index = skip_macro_definition_body(input, bytes, index);
                         }
+                        "newcommand" | "renewcommand" | "providecommand" => {
+                            index = skip_latex_macro_definition_body(input, bytes, index);
+                        }
                         "left" | "begingroup" => {
                             depth += 1;
                             if depth > MAX_RECURSION_DEPTH {
@@ -1362,6 +1369,71 @@ fn skip_macro_definition_body(input: &str, bytes: &[u8], mut index: usize) -> us
     }
 
     index
+}
+
+fn skip_balanced_group(input: &str, bytes: &[u8], mut index: usize, open: u8, close: u8) -> usize {
+    if index >= bytes.len() || bytes[index] != open {
+        return index;
+    }
+
+    let mut depth = 0usize;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'%' => {
+                index += 1;
+                while index < bytes.len() && bytes[index] != b'\n' {
+                    index += 1;
+                }
+            }
+            b'\\' => {
+                index = skip_control_sequence(input, bytes, index);
+            }
+            byte if byte == open => {
+                depth += 1;
+                index += 1;
+            }
+            byte if byte == close => {
+                depth = depth.saturating_sub(1);
+                index += 1;
+                if depth == 0 {
+                    break;
+                }
+            }
+            _ => {
+                let ch = input[index..].chars().next().unwrap();
+                index += ch.len_utf8();
+            }
+        }
+    }
+
+    index
+}
+
+fn skip_macro_argument(input: &str, bytes: &[u8], mut index: usize) -> usize {
+    index = skip_ascii_whitespace(bytes, index);
+    if index >= bytes.len() {
+        return index;
+    }
+
+    if bytes[index] == b'{' {
+        skip_balanced_group(input, bytes, index, b'{', b'}')
+    } else if bytes[index] == b'\\' {
+        skip_control_sequence(input, bytes, index)
+    } else {
+        let ch = input[index..].chars().next().unwrap();
+        index + ch.len_utf8()
+    }
+}
+
+fn skip_latex_macro_definition_body(input: &str, bytes: &[u8], mut index: usize) -> usize {
+    index = skip_macro_argument(input, bytes, index);
+    index = skip_ascii_whitespace(bytes, index);
+
+    if index < bytes.len() && bytes[index] == b'[' {
+        index = skip_balanced_group(input, bytes, index, b'[', b']');
+    }
+
+    skip_macro_argument(input, bytes, index)
 }
 
 fn is_latin_base_char(ch: char) -> bool {

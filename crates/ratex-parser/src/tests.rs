@@ -1227,6 +1227,10 @@ mod recursion_limit {
         )
     }
 
+    fn braced_body(depth: usize) -> String {
+        format!("{}x{}", "{".repeat(depth), "}".repeat(depth))
+    }
+
     fn nested_ce(depth: usize) -> String {
         format!("{}H{}", r"\ce{".repeat(depth), "}".repeat(depth))
     }
@@ -1238,8 +1242,36 @@ mod recursion_limit {
     }
 
     #[test]
+    fn prooftree_depth_accounts_for_enclosing_groups() {
+        assert!(parse(&format!(
+            "{}{}{}",
+            "{".repeat(31),
+            unary_prooftree(0),
+            "}".repeat(31)
+        ))
+        .is_ok());
+        assert_recursion_limit_err(&format!(
+            "{}{}{}",
+            "{".repeat(31),
+            unary_prooftree(1),
+            "}".repeat(31)
+        ));
+    }
+
+    #[test]
     fn mhchem_depth_matches_the_public_boundary() {
         assert!(parse(&nested_ce(31)).is_ok());
         assert_recursion_limit_err(&nested_ce(32));
+    }
+
+    #[test]
+    fn source_preflight_ignores_latex_macro_definition_bodies() {
+        let deep_body = braced_body(40);
+        assert!(parse(&format!(r"\newcommand{{\foo}}[1]{{{deep_body}}}x")).is_ok());
+        assert!(parse(&format!(
+            r"\def\foo{{x}}\renewcommand{{\foo}}{{{deep_body}}}x"
+        ))
+        .is_ok());
+        assert!(parse(&format!(r"\providecommand{{\foo}}{{{deep_body}}}x")).is_ok());
     }
 }

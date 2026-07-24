@@ -1286,6 +1286,7 @@ fn parse_prooftree_arg(parser: &mut Parser, command: &str) -> ParseResult<Vec<Pa
 fn parse_prooftree(parser: &mut Parser) -> ParseResult<ParseNode> {
     // Track structural depth alongside each branch.  A prooftree is assembled
     // iteratively, so Parser::recursion_depth cannot protect this tree shape.
+    let enclosing_depth = parser.current_recursion_depth();
     let mut stack: Vec<(ProofBranch, usize)> = Vec::new();
     let mut left_label: Option<Vec<ParseNode>> = None;
     let mut right_label: Option<Vec<ParseNode>> = None;
@@ -1379,7 +1380,7 @@ fn parse_prooftree(parser: &mut Parser) -> ParseResult<ParseNode> {
                     .max()
                     .unwrap_or(0)
                     + 1;
-                if depth > MAX_RECURSION_DEPTH {
+                if enclosing_depth + depth > MAX_RECURSION_DEPTH {
                     return Err(ParseError::recursion_limit_exceeded());
                 }
                 let premises = premise_entries
