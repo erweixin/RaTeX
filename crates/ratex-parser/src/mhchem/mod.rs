@@ -19,14 +19,38 @@ use crate::mhchem::data::MhchemData;
 use crate::stack_safety::{DepthBudget, MAX_INPUT_DEPTH};
 use serde_json::Value;
 
-/// Context for recursive `go` (used by actions).
-pub(crate) struct ParserCtx<'a> {
+/// Context for recursive `go`.
+///
+/// ```
+/// let ctx = ratex_parser::mhchem::ParserCtx {
+///     data: ratex_parser::mhchem::data(),
+/// };
+/// let ast = ctx.go("H2O", "ce").expect("mhchem");
+/// assert!(!ast.is_empty());
+/// ```
+pub struct ParserCtx<'a> {
     pub data: &'a MhchemData,
-    pub depth_budget: DepthBudget,
 }
 
 impl ParserCtx<'_> {
     pub fn go(&self, input: &str, machine: &str) -> MhchemResult<Vec<Value>> {
+        RuntimeCtx {
+            data: self.data,
+            depth_budget: DepthBudget::new(MAX_INPUT_DEPTH),
+        }
+        .go(input, machine)
+    }
+}
+
+/// Internal mhchem context that shares the parser's depth budget across
+/// recursive state-machine calls.
+pub(crate) struct RuntimeCtx<'a> {
+    pub(crate) data: &'a MhchemData,
+    pub depth_budget: DepthBudget,
+}
+
+impl RuntimeCtx<'_> {
+    pub(crate) fn go(&self, input: &str, machine: &str) -> MhchemResult<Vec<Value>> {
         engine::go_machine(self, input, machine)
     }
 }
@@ -42,7 +66,7 @@ pub(crate) fn chem_parse_str_with_budget(
     depth_budget: DepthBudget,
 ) -> MhchemResult<String> {
     let d = data();
-    let ctx = ParserCtx {
+    let ctx = RuntimeCtx {
         data: d,
         depth_budget: depth_budget.clone(),
     };
@@ -121,7 +145,7 @@ mod tests {
         let nested_empty_ce =
             |depth: usize| format!("{}{}", r"\ce{".repeat(depth), "}".repeat(depth));
         let d = data();
-        let ctx = ParserCtx {
+        let ctx = RuntimeCtx {
             data: d,
             depth_budget: DepthBudget::new(MAX_INPUT_DEPTH),
         };

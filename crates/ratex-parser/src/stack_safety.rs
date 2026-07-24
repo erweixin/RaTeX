@@ -208,9 +208,7 @@ pub(crate) fn parse_nodes_logical_depth(nodes: &[ParseNode]) -> usize {
             | ParseNode::VCenter { body, .. } => {
                 push_node(&mut stack, body, visit.depth + 1, true);
             }
-            ParseNode::Array {
-                body, row_gaps: _, ..
-            } => {
+            ParseNode::Array { body, .. } => {
                 for row in body.iter().rev() {
                     push_nodes(&mut stack, row, visit.depth + 1);
                 }

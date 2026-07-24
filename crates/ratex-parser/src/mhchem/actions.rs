@@ -5,7 +5,7 @@ use crate::mhchem::engine;
 use crate::mhchem::error::{MhchemError, MhchemResult};
 use crate::mhchem::json::ActionSpec;
 use crate::mhchem::patterns::{match_pattern, MatchToken};
-use crate::mhchem::ParserCtx;
+use crate::mhchem::RuntimeCtx;
 use regex::Regex;
 use serde_json::{json, Value};
 use std::sync::LazyLock;
@@ -20,7 +20,7 @@ static RE_HALF: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 pub fn apply(
-    ctx: &ParserCtx,
+    ctx: &RuntimeCtx,
     machine: &str,
     buffer: &mut Buffer,
     m: &MatchToken,
@@ -235,7 +235,7 @@ fn ce_comma(buffer: &mut Buffer, m: &MatchToken) -> MhchemResult<Vec<Value>> {
     Ok(vec![json!({"type_": ty, "p1": trimmed})])
 }
 
-fn ce_o_after_d(ctx: &ParserCtx, buffer: &mut Buffer, m: &MatchToken) -> MhchemResult<Vec<Value>> {
+fn ce_o_after_d(ctx: &RuntimeCtx, buffer: &mut Buffer, m: &MatchToken) -> MhchemResult<Vec<Value>> {
     let mut ret = vec![];
     let digits_only = buffer
         .d
@@ -255,7 +255,7 @@ fn ce_o_after_d(ctx: &ParserCtx, buffer: &mut Buffer, m: &MatchToken) -> MhchemR
 }
 
 fn ce_charge_or_bond(
-    ctx: &ParserCtx,
+    ctx: &RuntimeCtx,
     buffer: &mut Buffer,
     m: &MatchToken,
 ) -> MhchemResult<Vec<Value>> {
@@ -270,7 +270,7 @@ fn ce_charge_or_bond(
 }
 
 fn ce_after_od(
-    ctx: &ParserCtx,
+    ctx: &RuntimeCtx,
     buffer: &mut Buffer,
     m: &MatchToken,
     is_after_d: bool,
@@ -325,7 +325,7 @@ fn ce_after_od(
 }
 
 fn ce_output(
-    ctx: &ParserCtx,
+    ctx: &RuntimeCtx,
     buffer: &mut Buffer,
     entity: Option<&Value>,
 ) -> MhchemResult<Vec<Value>> {
@@ -448,7 +448,7 @@ fn ce_output(
     }
 }
 
-fn pu_enumber(ctx: &ParserCtx, m: &MatchToken) -> MhchemResult<Vec<Value>> {
+fn pu_enumber(ctx: &RuntimeCtx, m: &MatchToken) -> MhchemResult<Vec<Value>> {
     let MatchToken::A(parts) = m else {
         return Ok(vec![]);
     };
@@ -499,7 +499,7 @@ fn pu_enumber(ctx: &ParserCtx, m: &MatchToken) -> MhchemResult<Vec<Value>> {
     Ok(ret)
 }
 
-fn pu_number_pow(ctx: &ParserCtx, m: &MatchToken) -> MhchemResult<Vec<Value>> {
+fn pu_number_pow(ctx: &RuntimeCtx, m: &MatchToken) -> MhchemResult<Vec<Value>> {
     let MatchToken::A(parts) = m else {
         return Ok(vec![]);
     };
@@ -519,7 +519,7 @@ fn pu_number_pow(ctx: &ParserCtx, m: &MatchToken) -> MhchemResult<Vec<Value>> {
     Ok(ret)
 }
 
-fn pu_output(ctx: &ParserCtx, buffer: &mut Buffer) -> MhchemResult<Vec<Value>> {
+fn pu_output(ctx: &RuntimeCtx, buffer: &mut Buffer) -> MhchemResult<Vec<Value>> {
     let mut d = buffer.d.clone().unwrap_or_default();
     if let Some(md) = match_pattern(ctx.data, "{(...)}", &d).ok().flatten() {
         if md.remainder.is_empty() {
@@ -564,7 +564,7 @@ fn pu_output(ctx: &ParserCtx, buffer: &mut Buffer) -> MhchemResult<Vec<Value>> {
     Ok(res)
 }
 
-fn pu2_output(ctx: &ParserCtx, buffer: &mut Buffer) -> MhchemResult<Vec<Value>> {
+fn pu2_output(ctx: &RuntimeCtx, buffer: &mut Buffer) -> MhchemResult<Vec<Value>> {
     let res = if let Some(rm) = buffer.rm.take() {
         if let Some(mrm) = match_pattern(ctx.data, "{(...)}", &rm).ok().flatten() {
             if mrm.remainder.is_empty() {
@@ -621,7 +621,7 @@ fn pu99_out(buffer: &mut Buffer, reverse_triplets: bool) -> MhchemResult<Vec<Val
 }
 
 fn global_action(
-    ctx: &ParserCtx,
+    ctx: &RuntimeCtx,
     machine: &str,
     buffer: &mut Buffer,
     m: &MatchToken,
