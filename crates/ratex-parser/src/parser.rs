@@ -1229,6 +1229,7 @@ fn input_exceeds_max_depth(input: &str) -> bool {
                         index += 1;
                     }
                     let command = &input[command_start..index];
+                    index = skip_flat_function_arguments(input, bytes, index, command);
                     match command {
                         "def" | "gdef" | "edef" | "xdef" => {
                             index = skip_macro_definition_body(input, bytes, index);
@@ -1434,6 +1435,44 @@ fn skip_latex_macro_definition_body(input: &str, bytes: &[u8], mut index: usize)
     }
 
     skip_macro_argument(input, bytes, index)
+}
+
+fn is_flat_source_argument(arg_type: Option<ArgType>) -> bool {
+    matches!(arg_type, Some(ArgType::Raw | ArgType::Url))
+}
+
+fn skip_flat_function_arguments(
+    input: &str,
+    bytes: &[u8],
+    mut index: usize,
+    command: &str,
+) -> usize {
+    let command_name = format!("\\{command}");
+    let Some(func) = FUNCTIONS.get(command_name.as_str()) else {
+        return index;
+    };
+    let Some(arg_types) = func.arg_types.as_ref() else {
+        return index;
+    };
+
+    let total_args = func.num_optional_args + func.num_args;
+    for i in 0..total_args {
+        if !is_flat_source_argument(arg_types.get(i).copied()) {
+            break;
+        }
+
+        let optional = i < func.num_optional_args;
+        if optional {
+            index = skip_ascii_whitespace(bytes, index);
+            if index < bytes.len() && bytes[index] == b'[' {
+                index = skip_balanced_group(input, bytes, index, b'[', b']');
+            }
+        } else {
+            index = skip_macro_argument(input, bytes, index);
+        }
+    }
+
+    index
 }
 
 fn is_latin_base_char(ch: char) -> bool {

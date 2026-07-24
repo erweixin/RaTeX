@@ -1274,4 +1274,13 @@ mod recursion_limit {
         .is_ok());
         assert!(parse(&format!(r"\providecommand{{\foo}}{{{deep_body}}}x")).is_ok());
     }
+
+    #[test]
+    fn source_preflight_ignores_flat_string_arguments() {
+        let deep_body = braced_body(40);
+
+        assert!(parse(&format!(r"\url{{{deep_body}}}")).is_ok());
+        assert!(parse(&format!(r"\href{{{deep_body}}}{{x}}")).is_ok());
+        assert!(parse(&format!(r"\htmlStyle{{{deep_body}}}{{x}}")).is_ok());
+    }
 }
