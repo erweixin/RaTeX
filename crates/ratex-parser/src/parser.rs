@@ -1082,7 +1082,7 @@ impl<'a> Parser<'a> {
         }
 
         let accent_count = chars.len() - split_idx - 1;
-        if accent_count > MAX_RECURSION_DEPTH {
+        if self.recursion_depth + accent_count > MAX_RECURSION_DEPTH {
             return Err(ParseError::new("Recursion limit exceeded", Some(nucleus)));
         }
 
@@ -1219,13 +1219,16 @@ fn input_exceeds_max_depth(input: &str) -> bool {
                     break;
                 }
 
-                if bytes[index].is_ascii_alphabetic() {
+                if is_control_word_byte(bytes[index]) {
                     let command_start = index;
-                    while index < bytes.len() && bytes[index].is_ascii_alphabetic() {
+                    while index < bytes.len() && is_control_word_byte(bytes[index]) {
                         index += 1;
                     }
                     let command = &input[command_start..index];
                     match command {
+                        "def" | "gdef" | "edef" | "xdef" => {
+                            index = skip_macro_definition_body(input, bytes, index);
+                        }
                         "left" | "begingroup" => {
                             depth += 1;
                             if depth > MAX_RECURSION_DEPTH {
@@ -1262,6 +1265,103 @@ fn input_exceeds_max_depth(input: &str) -> bool {
     }
 
     false
+}
+
+fn is_control_word_byte(byte: u8) -> bool {
+    byte.is_ascii_alphabetic() || byte == b'@'
+}
+
+fn skip_ascii_whitespace(bytes: &[u8], mut index: usize) -> usize {
+    while index < bytes.len() && matches!(bytes[index], b' ' | b'\t' | b'\r' | b'\n') {
+        index += 1;
+    }
+    index
+}
+
+fn skip_control_sequence(input: &str, bytes: &[u8], mut index: usize) -> usize {
+    if index >= bytes.len() || bytes[index] != b'\\' {
+        return index;
+    }
+    index += 1;
+    if index >= bytes.len() {
+        return index;
+    }
+    if is_control_word_byte(bytes[index]) {
+        while index < bytes.len() && is_control_word_byte(bytes[index]) {
+            index += 1;
+        }
+    } else {
+        let ch = input[index..].chars().next().unwrap();
+        index += ch.len_utf8();
+    }
+    skip_ascii_whitespace(bytes, index)
+}
+
+fn skip_macro_definition_body(input: &str, bytes: &[u8], mut index: usize) -> usize {
+    index = skip_ascii_whitespace(bytes, index);
+    index = if index < bytes.len() && bytes[index] == b'\\' {
+        skip_control_sequence(input, bytes, index)
+    } else if index < bytes.len() {
+        let ch = input[index..].chars().next().unwrap();
+        index + ch.len_utf8()
+    } else {
+        index
+    };
+
+    while index < bytes.len() {
+        match bytes[index] {
+            b'%' => {
+                index += 1;
+                while index < bytes.len() && bytes[index] != b'\n' {
+                    index += 1;
+                }
+            }
+            b'\\' => {
+                index = skip_control_sequence(input, bytes, index);
+            }
+            b'{' => break,
+            _ => {
+                let ch = input[index..].chars().next().unwrap();
+                index += ch.len_utf8();
+            }
+        }
+    }
+
+    if index >= bytes.len() || bytes[index] != b'{' {
+        return index;
+    }
+
+    let mut depth = 0usize;
+    while index < bytes.len() {
+        match bytes[index] {
+            b'%' => {
+                index += 1;
+                while index < bytes.len() && bytes[index] != b'\n' {
+                    index += 1;
+                }
+            }
+            b'\\' => {
+                index = skip_control_sequence(input, bytes, index);
+            }
+            b'{' => {
+                depth += 1;
+                index += 1;
+            }
+            b'}' => {
+                depth = depth.saturating_sub(1);
+                index += 1;
+                if depth == 0 {
+                    break;
+                }
+            }
+            _ => {
+                let ch = input[index..].chars().next().unwrap();
+                index += ch.len_utf8();
+            }
+        }
+    }
+
+    index
 }
 
 fn is_latin_base_char(ch: char) -> bool {

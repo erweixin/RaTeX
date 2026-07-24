@@ -92,10 +92,10 @@ mod tests {
     fn nested_submachines_have_a_depth_budget() {
         let nested_ce = |depth: usize| format!("{}H{}", r"\ce{".repeat(depth), "}".repeat(depth));
 
-        // chem_parse_str starts the root machine, so 31 nested \ce calls make
-        // a total structural depth of 32.
-        assert!(chem_parse_str(&nested_ce(31), "ce").is_ok());
-        let error = chem_parse_str(&nested_ce(32), "ce").unwrap_err();
+        // mhchem also enters helper machines while processing terminal atoms,
+        // so visible \ce nesting consumes slightly less than the full engine budget.
+        assert!(chem_parse_str(&nested_ce(30), "ce").is_ok());
+        let error = chem_parse_str(&nested_ce(31), "ce").unwrap_err();
         assert!(
             error.to_string().contains("Recursion limit exceeded"),
             "unexpected error: {error}"
@@ -105,11 +105,20 @@ mod tests {
     #[test]
     fn nested_submachine_engine_depth_is_bounded_before_texify() {
         let nested_ce = |depth: usize| format!("{}H{}", r"\ce{".repeat(depth), "}".repeat(depth));
+        let nested_empty_ce =
+            |depth: usize| format!("{}{}", r"\ce{".repeat(depth), "}".repeat(depth));
         let d = data();
         let ctx = ParserCtx { data: d };
 
-        assert!(ctx.go(&nested_ce(31), "ce").is_ok());
-        let error = ctx.go(&nested_ce(32), "ce").unwrap_err();
+        assert!(ctx.go(&nested_ce(30), "ce").is_ok());
+        let error = ctx.go(&nested_ce(31), "ce").unwrap_err();
+        assert!(
+            error.to_string().contains("Recursion limit exceeded"),
+            "unexpected error: {error}"
+        );
+
+        assert!(ctx.go(&nested_empty_ce(31), "ce").is_ok());
+        let error = ctx.go(&nested_empty_ce(32), "ce").unwrap_err();
         assert!(
             error.to_string().contains("Recursion limit exceeded"),
             "unexpected error: {error}"

@@ -10,6 +10,10 @@ The maximum supported input-controlled recursive or structural depth is **32**.
 Depth 32 is accepted; depth 33 returns a `ParseError` whose message contains
 `Recursion limit exceeded`.
 
+The budget is cumulative across enclosing structures. For example, an accent
+chain inside a braced group consumes both the group depth and the accent depth;
+each category does not receive a separate depth-32 allowance.
+
 The budget covers:
 
 - recursively nested parser expressions, including groups, radicals,

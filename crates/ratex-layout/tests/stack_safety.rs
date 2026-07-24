@@ -78,6 +78,7 @@ fn run_small_stack_cases() {
     let accents_4200 = "\u{301}".repeat(4_200);
     assert_recursion_limit(&format!("x{accents_4200}"));
     assert_recursion_limit(&format!(r"\text{{x{accents_4200}}}"));
+    assert_recursion_limit(&format!(r"\text{{x{}}}", "\u{301}".repeat(32)));
     assert_recursion_limit(&unary_prooftree(32));
 
     // Unbraced primitive/function arguments must also terminate with a regular
@@ -100,8 +101,9 @@ fn run_boundary_cases() {
     }
 
     let accents_32 = "\u{301}".repeat(32);
+    let accents_31 = "\u{301}".repeat(31);
     assert_pipeline_ok(&format!("x{accents_32}"));
-    assert_pipeline_ok(&format!(r"\text{{x{accents_32}}}"));
+    assert_pipeline_ok(&format!(r"\text{{x{accents_31}}}"));
 
     assert_pipeline_ok(&unary_prooftree(31));
 }

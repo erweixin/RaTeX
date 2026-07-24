@@ -38,7 +38,7 @@ pub(crate) fn go_machine(
     // mhchem inputs fan out through helper machines before texify. Guard the
     // active engine-call depth directly so engine callers fail before building
     // an over-budget AST, while preserving the public parser boundary.
-    if previous_depth > MAX_RECURSION_DEPTH {
+    if previous_depth >= MAX_RECURSION_DEPTH {
         return Err(MhchemError::msg("Recursion limit exceeded"));
     }
     MHCHEM_RECURSION_DEPTH.with(|depth| depth.set(previous_depth + 1));
