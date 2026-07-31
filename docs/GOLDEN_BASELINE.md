@@ -12,7 +12,27 @@ reviewed baseline change.
 
 `tools/golden_compare/package-lock.json` pins KaTeX and Puppeteer exactly.
 `.github/workflows/golden.yml` additionally fixes Node, Python, Rust, and the
-Ubuntu runner family. The full CI artifact report records:
+Ubuntu runner family.
+
+### System fonts are part of the pinned reference environment
+
+The KaTeX reference is rendered in a headless Chromium and RaTeX renders `\text`
+fallback (CJK, emoji, …) from system fonts, so the **installed system font set
+must be pinned too** — it is a scoring input, not incidental.
+
+- `golden.yml` installs `fonts-noto-cjk` and `fonts-noto-color-emoji` before
+  rendering. RaTeX discovers CJK at the exact path `fonts-noto-cjk` installs
+  (`/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc`) and emoji via the
+  `Noto Color Emoji` family; without them CI renders CJK/emoji text as tofu and
+  every such case shows up as a spurious golden regression.
+- The committed `baseline.json` is authoritative only for the environment that
+  produced it. A baseline generated on a machine with a different font set or a
+  different OS will not reproduce in CI (scores drift in both directions).
+  **Regenerate the baseline in CI** (download the `golden-report` artifact's
+  `baseline.json`) or in an environment identical to the runner — do not commit
+  a baseline produced on a machine whose fonts differ from the runner's.
+
+The full CI artifact report records:
 
 - commit SHA and whether the local worktree was dirty;
 - raw test-case SHA-256 and canonical suite hash;
