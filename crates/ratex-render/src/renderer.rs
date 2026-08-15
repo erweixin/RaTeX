@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::{Arc, LazyLock, RwLock};
 
 use ab_glyph::{Font, FontRef};
 use ratex_font::FontId;
@@ -482,6 +483,32 @@ struct RasterGlyphParams {
     opacity: f32,
 }
 
+/// Cache key for decoded color-emoji raster strikes.
+///
+/// The font bytes are held in an `Arc` inside `ratex-unicode-font`, so the
+/// pointer/length pair is stable for the process lifetime and avoids cloning
+/// or hashing the font data on every lookup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct EmojiRasterCacheKey {
+    font_ptr: usize,
+    font_len: usize,
+    face_index: u32,
+    ch: char,
+    strike: u16,
+}
+
+struct CachedEmojiRaster {
+    pixmap: Arc<Pixmap>,
+    x: f32,
+    y: f32,
+    width: f32,
+    height: f32,
+    pixels_per_em: f32,
+}
+
+static EMOJI_RASTER_CACHE: LazyLock<RwLock<HashMap<EmojiRasterCacheKey, Arc<CachedEmojiRaster>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
 fn render_glyph_with_font(
     pixmap: &mut Pixmap,
     px: f32,
@@ -645,6 +672,21 @@ fn try_blit_raster_glyph(
         None => return false,
     };
     let strike = params.em.round().clamp(8.0, 256.0) as u16;
+
+    let key = EmojiRasterCacheKey {
+        font_ptr: font_bytes.as_ptr() as usize,
+        font_len: font_bytes.len(),
+        face_index,
+        ch: params.ch,
+        strike,
+    };
+    {
+        let cache = EMOJI_RASTER_CACHE.read().unwrap();
+        if let Some(entry) = cache.get(&key) {
+            return blit_cached_emoji_raster(pixmap, &params, entry);
+        }
+    }
+
     let img = face
         .glyph_raster_image(gid, strike)
         .or_else(|| face.glyph_raster_image(gid, u16::MAX));
@@ -655,24 +697,48 @@ fn try_blit_raster_glyph(
         Some(p) => p,
         None => return false,
     };
-    let ppm = f32::from(img.pixels_per_em.max(1));
+    let entry = Arc::new(CachedEmojiRaster {
+        pixmap: Arc::new(glyph_pm),
+        x: f32::from(img.x),
+        y: f32::from(img.y),
+        width: f32::from(img.width),
+        height: f32::from(img.height),
+        pixels_per_em: f32::from(img.pixels_per_em.max(1)),
+    });
+    let result = blit_cached_emoji_raster(pixmap, &params, &entry);
+
+    // Insert without replacing an existing entry: another thread may have
+    // decoded the same strike while we were working.
+    let mut cache = EMOJI_RASTER_CACHE.write().unwrap();
+    cache.entry(key).or_insert(entry);
+    result
+}
+
+/// Draw a decoded emoji raster strike, using the same geometry as the
+/// uncached path in [`try_blit_raster_glyph`].
+fn blit_cached_emoji_raster(
+    pixmap: &mut Pixmap,
+    params: &RasterGlyphParams,
+    entry: &CachedEmojiRaster,
+) -> bool {
+    let ppm = entry.pixels_per_em.max(1.0);
     let mut scale = params.em / ppm;
     // Scale emoji to fit 1.0em layout width if it's wider (prevents overflow).
-    let actual_width_em = f32::from(img.width) / ppm;
+    let actual_width_em = entry.width / ppm;
     let assumed_width = 1.0;
     if actual_width_em > 0.01 && actual_width_em > assumed_width * 1.01 {
         scale *= assumed_width / actual_width_em;
     }
-    let top_x = params.px + f32::from(img.x) * scale;
+    let top_x = params.px + entry.x * scale;
     // `ttf-parser` / OpenType: `RasterGlyphImage::{x,y}` are in strike pixels; `y` is the
     // **bottom** edge of the bitmap in y-up coordinates (sbix yOffset to bottom; CBDT normalized
     // the same way). Top edge = y + height — using `y` alone shifts the glyph down by ~full height.
-    let mut top_y = params.py - (f32::from(img.y) + f32::from(img.height)) * scale;
+    let mut top_y = params.py - (entry.y + entry.height) * scale;
     // sbix places the bitmap bottom on the math baseline, but tall (~1em) color strikes put the
     // ink centroid near 0.5em above baseline. Binary/relation glyphs (+, =) are centered on the
     // math axis (~0.25em). Nudge the bitmap so its vertical center matches the axis — matches
     // mixed `\text{emoji} … formula` rows without changing layout baselines.
-    let center_strike = (f32::from(img.y) + f32::from(img.height) / 2.0) / ppm;
+    let center_strike = (entry.y + entry.height / 2.0) / ppm;
     let axis = ratex_font::get_global_metrics(0).axis_height as f32;
     top_y += (center_strike - axis) * params.em;
     let paint = PixmapPaint {
@@ -681,7 +747,7 @@ fn try_blit_raster_glyph(
         ..Default::default()
     };
     let transform = Transform::from_row(scale, 0.0, 0.0, scale, top_x, top_y);
-    pixmap.draw_pixmap(0, 0, glyph_pm.as_ref(), &paint, transform, None);
+    pixmap.draw_pixmap(0, 0, (*entry.pixmap).as_ref(), &paint, transform, None);
     true
 }
 

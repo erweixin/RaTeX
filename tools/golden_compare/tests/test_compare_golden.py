@@ -26,6 +26,10 @@ def write_png(path: Path, offset: int = 0) -> None:
     image.save(path)
 
 
+def write_blank_png(path: Path) -> None:
+    Image.new("RGB", (32, 24), "white").save(path)
+
+
 def make_args(root: Path, **overrides) -> argparse.Namespace:
     values = {
         "test_cases": str(root / "cases.txt"),
@@ -72,6 +76,22 @@ class GoldenComparatorTests(unittest.TestCase):
             self.assertEqual(len(metrics["ref_crop"]), 2)
             self.assertEqual(len(metrics["test_crop"]), 2)
             self.assertGreater(metrics["score"], 0)
+
+    def test_blank_images_score_one(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            ref = root / "ref.png"
+            test = root / "test.png"
+            write_blank_png(ref)
+            write_blank_png(test)
+            metrics = golden.compute_ink_metrics(
+                golden.load_image(ref), golden.load_image(test)
+            )
+            self.assertEqual(metrics["score"], 1.0)
+            self.assertEqual(metrics["iou"], 1.0)
+            self.assertEqual(metrics["recall"], 1.0)
+            self.assertEqual(metrics["precision"], 1.0)
+            self.assertEqual(metrics["f1"], 1.0)
 
     def test_missing_cases_never_disappear_from_report(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::sync::{Arc, LazyLock, RwLock};
+
 use ratex_types::PathCommand;
 
 /// Returns (commands, width, height, fill) for a KaTeX SVG accent, or `None` if unhandled.
@@ -14,7 +17,7 @@ pub fn katex_accent_path(
             // KaTeX `svgGeometry.path.vec` (glyph U+20D7) + `svgData.vec` fixed size — not stretched to base width.
             const W_EM: f64 = 0.471;
             const H_EM: f64 = 0.714;
-            let raw = parse_svg_path(KATEX_VEC_PATH);
+            let raw = parsed_static_path(KATEX_VEC_PATH);
             let cmds = scale_svg_path_thousandths(&raw);
             Some((cmds, W_EM, H_EM, true))
         }
@@ -332,13 +335,13 @@ fn select_tilde(group_len: usize) -> (&'static str, f64, f64, f64) {
 
 /// Parse SVG path and scale with independent X/Y factors (preserveAspectRatio="none").
 fn parse_and_fit_nonuniform(
-    svg_path: &str,
+    svg_path: &'static str,
     vb_width: f64,
     vb_height: f64,
     target_width_em: f64,
     target_height_em: f64,
 ) -> Vec<PathCommand> {
-    let raw = parse_svg_path(svg_path);
+    let raw = parsed_static_path(svg_path);
     let sx = target_width_em / vb_width;
     let sy = target_height_em / vb_height;
     raw.iter().map(|c| scale_cmd_xy(c, sx, sy)).collect()
@@ -588,9 +591,38 @@ fn scale_cmd_xy(cmd: &PathCommand, sx: f64, sy: f64) -> PathCommand {
 // Minimal SVG path data parser
 // ---------------------------------------------------------------------------
 
+/// Cache for SVG path strings that are static for the lifetime of the process.
+/// Parsing these on every accent/stretchy-arrow layout is wasteful because the
+/// same KaTeX path constants are used repeatedly across formulas.
+type StaticPathCache = RwLock<HashMap<&'static str, Arc<[PathCommand]>>>;
+
+static STATIC_PATH_CACHE: LazyLock<StaticPathCache> = LazyLock::new(|| RwLock::new(HashMap::new()));
+
 /// Parse a KaTeX-style SVG path `d` string into [`PathCommand`]s (for delimiters, accents).
 pub(crate) fn parse_svg_path_data(d: &str) -> Vec<PathCommand> {
     parse_svg_path(d)
+}
+
+/// Return the parsed form of a static SVG path string, caching the result.
+///
+/// The returned slice is shared; callers must not mutate it. This keeps the
+/// existing `parse_svg_path_data` API unchanged while avoiding repeated
+/// tokenize/parse work for KaTeX's built-in path constants.
+fn parsed_static_path(d: &'static str) -> Arc<[PathCommand]> {
+    {
+        let cache = STATIC_PATH_CACHE.read().unwrap();
+        if let Some(parsed) = cache.get(d) {
+            return Arc::clone(parsed);
+        }
+    }
+
+    let parsed: Arc<[PathCommand]> = parse_svg_path(d).into();
+    let mut cache = STATIC_PATH_CACHE.write().unwrap();
+    // Another thread may have inserted the same path while we were parsing.
+    cache
+        .entry(d)
+        .or_insert_with(|| Arc::clone(&parsed))
+        .clone()
 }
 
 fn parse_svg_path(d: &str) -> Vec<PathCommand> {
@@ -1338,7 +1370,7 @@ pub fn katex_stretchy_path(label: &str, width_em: f64) -> Option<(Vec<PathComman
 
     let make_cmds = |path_name: &str, x_shift: f64| -> Option<Vec<PathCommand>> {
         let svg_str = path_for_name(path_name)?;
-        let raw = parse_svg_path(svg_str);
+        let raw = parsed_static_path(svg_str);
         Some(
             raw.iter()
                 .map(|c| scale_cmd_twohead_uniform(c, s, vb_cy, x_shift))
