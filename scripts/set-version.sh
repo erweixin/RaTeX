@@ -9,7 +9,8 @@
 #   demo/android/README.md（Maven 示例坐标）,
 #   platforms/jvm/README.md, platforms/jvm/README.zh-CN.md,
 #   demo/flutter/pubspec.yaml,
-#   platforms/web/package.json, platforms/react-native/package.json
+#   platforms/web/package.json, platforms/react-native/package.json,
+#   CHANGELOG.md（把首个 "## [Unreleased]" 段改名为 "## [新版本] - 当天日期"，并在其上方新建空的 "## [Unreleased]" 段）
 # platforms/android / platforms/jvm（Maven Central）在未传 -PlibraryVersion 时从本文件读取版本，见各平台 build.gradle.kts。
 # 用法: ./scripts/set-version.sh [版本号]
 # 若省略版本号，则使用 VERSION 文件内容。
@@ -81,4 +82,57 @@ for (const p of ['platforms/web/package.json', 'platforms/react-native/package.j
 }
 "
 
-echo "Done. Updated: Cargo.toml (workspace + ratex-* 依赖版本), platforms/flutter/pubspec.yaml, platforms/flutter/ios/ratex_flutter.podspec, platforms/flutter/macos/ratex_flutter.podspec, platforms/flutter/android/build.gradle, platforms/flutter/README.md, platforms/flutter/README.zh-CN.md, platforms/android/README.md, platforms/android/README.zh-CN.md, demo/android/README.md, platforms/jvm/README.md, platforms/jvm/README.zh-CN.md, demo/flutter/pubspec.yaml, platforms/web/package.json, platforms/react-native/package.json; Android/JVM Maven 使用根目录 VERSION。各 Rust 子 crate 使用 version.workspace = true，无需单独改文件。"
+# CHANGELOG.md：把 "## [Unreleased]" 段改名为 "## [新版本] - 日期"，并在其上方新建空的 "## [Unreleased]" 段。
+# 幂等：若该版本段已存在则只保证存在新的 Unreleased 段；文件不存在或缺少 Unreleased 段时不报错。
+TODAY=$(date +%Y-%m-%d)
+python3 - "$VER" "$TODAY" <<'PY'
+import re
+import sys
+
+ver, today = sys.argv[1], sys.argv[2]
+path = 'CHANGELOG.md'
+try:
+    text = open(path, encoding='utf-8').read()
+except FileNotFoundError:
+    print('Note: CHANGELOG.md not found; skipping changelog update.')
+    sys.exit(0)
+
+lines = text.splitlines(keepends=True)
+unreleased_re = re.compile(r'^## \[Unreleased\]\s*$')
+heading_re = re.compile(r'^## \[')
+version_re = re.compile(r'^## \[' + re.escape(ver) + r'\](?:\s|$)')
+
+# 1) 版本段不存在时，把第一个 "## [Unreleased]" 改名为 "## [ver] - date"
+renamed = False
+if not any(version_re.match(l.strip()) for l in lines):
+    for i, l in enumerate(lines):
+        if unreleased_re.match(l.strip()):
+            lines[i] = f'## [{ver}] - {today}\n'
+            renamed = True
+            break
+    else:
+        print('Note: no "## [Unreleased]" section in CHANGELOG.md; skipping rename.')
+
+# 2) 确保文件顶部（第一个版本段之前）存在一个空的 "## [Unreleased]" 段
+inserted = False
+if not any(unreleased_re.match(l.strip()) for l in lines):
+    first = next((i for i, l in enumerate(lines) if heading_re.match(l.strip())), None)
+    if first is not None:
+        lines.insert(first, '## [Unreleased]\n\n')
+    else:
+        if lines and not lines[-1].endswith('\n'):
+            lines.append('\n')
+        lines.append('## [Unreleased]\n\n')
+    inserted = True
+
+if renamed or inserted:
+    open(path, 'w', encoding='utf-8').write(''.join(lines))
+    if renamed:
+        print(f'CHANGELOG.md: released [Unreleased] as [{ver}] - {today}')
+    else:
+        print('CHANGELOG.md: added an empty [Unreleased] section.')
+else:
+    print(f'CHANGELOG.md: unchanged (version section [{ver}] already present).')
+PY
+
+echo "Done. Updated: Cargo.toml (workspace + ratex-* 依赖版本), platforms/flutter/pubspec.yaml, platforms/flutter/ios/ratex_flutter.podspec, platforms/flutter/macos/ratex_flutter.podspec, platforms/flutter/android/build.gradle, platforms/flutter/README.md, platforms/flutter/README.zh-CN.md, platforms/android/README.md, platforms/android/README.zh-CN.md, demo/android/README.md, platforms/jvm/README.md, platforms/jvm/README.zh-CN.md, demo/flutter/pubspec.yaml, platforms/web/package.json, platforms/react-native/package.json, CHANGELOG.md（Unreleased → 新版本）; Android/JVM Maven 使用根目录 VERSION。各 Rust 子 crate 使用 version.workspace = true，无需单独改文件。"

@@ -512,6 +512,116 @@ struct CachedEmojiRaster {
 static EMOJI_RASTER_CACHE: LazyLock<RwLock<HashMap<EmojiRasterCacheKey, Arc<CachedEmojiRaster>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
+/// Cache key for rasterized outline-glyph masks.
+///
+/// Rasterizing a glyph outline (curve flattening + anti-aliased scanline fill)
+/// is the dominant PNG render cost and scales with the outline's curve count,
+/// not its pixel area. Repeated renders of the same formula (live preview,
+/// batch re-renders, benchmarks) rasterize the same (font, glyph, size,
+/// position-phase, color) combinations, so the rasterized result is cached and
+/// later draws become plain pixel blits.
+///
+/// Glyph size and the sub-pixel phase of the glyph position are part of the
+/// key **exactly** (as float bit patterns), so every cache hit reproduces the
+/// first caller's rasterization pixel-for-pixel: the same (font, glyph, size,
+/// phase) combination yields the same anti-aliased coverage regardless of the
+/// integer part of the position. Glyphs at integer-aligned positions
+/// additionally share masks within a single formula.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct GlyphMaskKey {
+    source: OutlineSourceId,
+    font_id: FontId,
+    glyph_id: ab_glyph::GlyphId,
+    /// Exact `em` size as `f32` bits.
+    size_bits: u32,
+    /// Exact fractional x phase of `px` as `f32` bits.
+    frac_x: u32,
+    /// Exact fractional y phase of `py` as `f32` bits.
+    frac_y: u32,
+    color: u32,
+}
+
+static GLYPH_MASK_CACHE: LazyLock<RwLock<HashMap<GlyphMaskKey, Arc<Pixmap>>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+/// Upper bound on cached glyph masks. Masks are small (a 40 px glyph is
+/// ~4 KiB); the cap keeps long-running processes bounded. On overflow the
+/// cache is cleared wholesale — simple, and misses only re-rasterize.
+const GLYPH_MASK_CACHE_CAP: usize = 8192;
+
+fn pack_color_u32(color: &Color) -> u32 {
+    let r = (color.r.clamp(0.0, 1.0) * 255.0).round() as u32;
+    let g = (color.g.clamp(0.0, 1.0) * 255.0).round() as u32;
+    let b = (color.b.clamp(0.0, 1.0) * 255.0).round() as u32;
+    let a = (color.a.clamp(0.0, 1.0) * 255.0).round() as u32;
+    (r << 24) | (g << 16) | (b << 8) | a
+}
+
+/// Draw a cached glyph mask at the given integer anchor (exact pixel copy).
+fn blit_glyph_mask(pixmap: &mut Pixmap, mask: &Pixmap, dst_x: i32, dst_y: i32) {
+    let paint = PixmapPaint {
+        opacity: 1.0,
+        blend_mode: tiny_skia::BlendMode::SourceOver,
+        quality: FilterQuality::Nearest,
+    };
+    pixmap.draw_pixmap(
+        dst_x,
+        dst_y,
+        mask.as_ref(),
+        &paint,
+        Transform::identity(),
+        None,
+    );
+}
+
+/// Bounding box of all outline points transformed to device space.
+///
+/// Matches tiny-skia `Path::bounds()` (control-point hull) for the path this
+/// function's caller builds from the same curves, so mask anchors are
+/// consistent between cache hits (bbox only) and misses (built path).
+fn outline_bbox(
+    curves: &[ab_glyph::OutlineCurve],
+    px: f32,
+    py: f32,
+    scale: f32,
+) -> (f32, f32, f32, f32) {
+    use ab_glyph::OutlineCurve;
+    let (mut min_x, mut min_y, mut max_x, mut max_y) = (
+        f32::INFINITY,
+        f32::INFINITY,
+        f32::NEG_INFINITY,
+        f32::NEG_INFINITY,
+    );
+    let mut acc = |p: ab_glyph::Point| {
+        let x = px + p.x * scale;
+        let y = py - p.y * scale;
+        min_x = min_x.min(x);
+        min_y = min_y.min(y);
+        max_x = max_x.max(x);
+        max_y = max_y.max(y);
+    };
+    for curve in curves {
+        match curve {
+            OutlineCurve::Line(p0, p1) => {
+                acc(*p0);
+                acc(*p1);
+            }
+            OutlineCurve::Quad(p0, p1, p2) => {
+                acc(*p0);
+                acc(*p1);
+                acc(*p2);
+            }
+            OutlineCurve::Cubic(p0, p1, p2, p3) => {
+                acc(*p0);
+                acc(*p1);
+                acc(*p2);
+                acc(*p3);
+            }
+        }
+    }
+    (min_x, min_y, max_x, max_y)
+}
+
 fn render_glyph_with_font(
     pixmap: &mut Pixmap,
     px: f32,
@@ -544,6 +654,39 @@ fn render_glyph_with_font(
         let assumed_width = 1.0;
         if actual_advance_em > 0.01 && actual_advance_em > assumed_width * 1.01 {
             scale *= assumed_width / actual_advance_em;
+        }
+    }
+
+    // Key includes the exact size and sub-pixel phase so a cache hit is
+    // guaranteed to reproduce pixel-identical anti-aliased coverage.
+    let cache_key = GlyphMaskKey {
+        source: g.source_id,
+        font_id: g.font_id,
+        glyph_id: g.glyph_id,
+        size_bits: em.to_bits(),
+        frac_x: px.fract().to_bits(),
+        frac_y: py.fract().to_bits(),
+        color: pack_color_u32(color),
+    };
+
+    // Mask geometry: bounds of all outline points (same point set as the path
+    // built below) plus a 1 px anti-aliasing margin, anchored at an integer
+    // device position.
+    let (min_x, min_y, max_x, max_y) = outline_bbox(&curves, px, py, scale);
+    let left = min_x.floor() - 1.0;
+    let top = min_y.floor() - 1.0;
+    let mask_w = ((max_x.ceil() + 1.0) - left).max(1.0) as u32;
+    let mask_h = ((max_y.ceil() + 1.0) - top).max(1.0) as u32;
+    let dst_x = left as i32;
+    let dst_y = top as i32;
+
+    {
+        let cache = GLYPH_MASK_CACHE.read().unwrap();
+        if let Some(mask) = cache.get(&cache_key) {
+            let mask = Arc::clone(mask);
+            drop(cache);
+            blit_glyph_mask(pixmap, &mask, dst_x, dst_y);
+            return true;
         }
     }
 
@@ -620,20 +763,40 @@ fn render_glyph_with_font(
         builder.close();
     }
 
-    if let Some(path) = builder.finish() {
-        let mut paint = paint_for_color(color);
-        paint.anti_alias = true;
-        pixmap.fill_path(
-            &path,
-            &paint,
-            tiny_skia::FillRule::Winding,
-            Transform::identity(),
-            None,
-        );
-        true
-    } else {
-        false
+    let Some(path) = builder.finish() else {
+        return false;
+    };
+
+    // Rasterize into a mask pixmap sized to the glyph's bounds plus a 1 px
+    // anti-aliasing margin. The path is translated by the mask's integer
+    // anchor so the stored pixels are position-independent; the blit at
+    // (dst_x, dst_y) restores the device position.
+    let Some(mut mask) = Pixmap::new(mask_w, mask_h) else {
+        return false;
+    };
+    mask.fill(tiny_skia::Color::TRANSPARENT);
+
+    let mut paint = paint_for_color(color);
+    paint.anti_alias = true;
+    mask.fill_path(
+        &path,
+        &paint,
+        tiny_skia::FillRule::Winding,
+        Transform::from_translate(-left, -top),
+        None,
+    );
+
+    blit_glyph_mask(pixmap, &mask, dst_x, dst_y);
+
+    // Insert without replacing an existing entry: another thread may have
+    // rasterized the same glyph while we were working.
+    let entry = Arc::new(mask);
+    let mut cache = GLYPH_MASK_CACHE.write().unwrap();
+    if cache.len() >= GLYPH_MASK_CACHE_CAP {
+        cache.clear();
     }
+    cache.entry(cache_key).or_insert(entry);
+    true
 }
 
 /// Color emoji (sbix / CBDT / etc.) often have no `glyf` outlines; `ttf-parser` embedded strikes + PNG.
@@ -980,7 +1143,95 @@ fn render_path_segment(
 }
 
 fn encode_png(pixmap: &Pixmap) -> Result<Vec<u8>, String> {
-    pixmap
-        .encode_png()
-        .map_err(|e| format!("PNG encode error: {}", e))
+    // Fast compression path: `Pixmap::encode_png` uses the png crate's default
+    // (stronger) zlib settings; math formulas are mostly flat white regions,
+    // where `Compression::Fast` + `Sub` filtering decodes to identical pixels
+    // in a fraction of the time (larger files by a small margin).
+    let mut out = Vec::with_capacity(pixmap.width() as usize * pixmap.height() as usize);
+    {
+        let mut encoder = png::Encoder::new(&mut out, pixmap.width(), pixmap.height());
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+        encoder.set_compression(png::Compression::Fast);
+        encoder.set_adaptive_filter(png::AdaptiveFilterType::NonAdaptive);
+        encoder.set_filter(png::FilterType::Sub);
+        let mut writer = encoder
+            .write_header()
+            .map_err(|e| format!("PNG encode error: {e}"))?;
+        writer
+            .write_image_data(pixmap.data())
+            .map_err(|e| format!("PNG encode error: {e}"))?;
+    }
+    Ok(out)
+}
+
+#[cfg(test)]
+mod glyph_mask_cache_tests {
+    use super::*;
+
+    fn font_dir() -> String {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fonts")
+            .to_string_lossy()
+            .to_string()
+    }
+
+    fn render(expr: &str) -> Pixmap {
+        let mut opts = RenderOptions::default();
+        opts.font_dir = font_dir();
+        let ast = ratex_parser::parser::parse(expr).expect("parse");
+        let layout = ratex_layout::layout(&ast, &ratex_layout::LayoutOptions::default());
+        let dl = ratex_layout::to_display_list(&layout);
+        render_to_png(&dl, &opts).expect("render");
+        Pixmap::decode_png(&render_to_png(&dl, &opts).expect("render")).expect("decode")
+    }
+
+    fn ink_bbox(pixmap: &Pixmap) -> (u32, u32, u32, u32) {
+        let mut min_x = u32::MAX;
+        let mut min_y = u32::MAX;
+        let mut max_x = 0;
+        let mut max_y = 0;
+        for (i, px) in pixmap.data().chunks_exact(4).enumerate() {
+            if px[0] < 200 {
+                let x = (i as u32) % pixmap.width();
+                let y = (i as u32) / pixmap.width();
+                min_x = min_x.min(x);
+                min_y = min_y.min(y);
+                max_x = max_x.max(x);
+                max_y = max_y.max(y);
+            }
+        }
+        (min_x, min_y, max_x, max_y)
+    }
+
+    #[test]
+    fn repeated_render_is_pixel_identical() {
+        let a = render("x^2 + y^2 = z^2");
+        let b = render("x^2 + y^2 = z^2");
+        assert_eq!(a.data(), b.data());
+    }
+
+    #[test]
+    fn cached_glyph_at_second_position_is_not_misplaced() {
+        // Two identical glyphs at different positions: the second must come
+        // from the mask cache and still be drawn at its own position.
+        let pixmap = render("a+a");
+        let (min_x, _, max_x, _) = ink_bbox(&pixmap);
+        // ~20 px per glyph at font_size 40 plus spacing: both `a`s must be
+        // present, so the ink span covers both positions.
+        assert!(
+            (max_x - min_x) > 40,
+            "expected both 'a's to be drawn, ink bbox x {min_x}..{max_x}"
+        );
+    }
+
+    #[test]
+    fn interleaved_formulas_share_cache_without_misplacement() {
+        // The first formula populates the cache ('+' and '=' glyphs); the
+        // second must draw them at its own positions.
+        let a = render("a+b=c");
+        let _b = render("x^2 + y^2 = z^2");
+        let c = render("a+b=c");
+        assert_eq!(a.data(), c.data());
+    }
 }

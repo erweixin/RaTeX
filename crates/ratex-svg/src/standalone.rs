@@ -259,9 +259,33 @@ fn outline_to_d(
     font: &FontVec,
     glyph_id: ab_glyph::GlyphId,
 ) -> Option<String> {
-    let curves = ratex_font_loader::outline_cache::get_or_compute_outline_fontvec(
+    let mut d = String::with_capacity(256);
+    if outline_to_d_into(&mut d, px, py, em, font_id, source_id, font, glyph_id) {
+        Some(d)
+    } else {
+        None
+    }
+}
+
+/// Append the glyph outline as SVG path data to `out`, returning whether any
+/// command was written. Equivalent to the legacy `outline_to_d` (which trimmed
+/// the result and returned `None` for empty output).
+#[allow(clippy::too_many_arguments)]
+fn outline_to_d_into(
+    out: &mut String,
+    px: f32,
+    py: f32,
+    em: f32,
+    font_id: FontId,
+    source_id: OutlineSourceId,
+    font: &FontVec,
+    glyph_id: ab_glyph::GlyphId,
+) -> bool {
+    let Some(curves) = ratex_font_loader::outline_cache::get_or_compute_outline_fontvec(
         font_id, font, source_id, glyph_id,
-    )?;
+    ) else {
+        return false;
+    };
     let units_per_em = font.units_per_em().unwrap_or(1000.0);
     let mut scale = em / units_per_em;
 
@@ -276,7 +300,7 @@ fn outline_to_d(
         }
     }
 
-    let mut d = String::new();
+    let start_len = out.len();
     let mut last_end: Option<(f32, f32)> = None;
 
     for curve in curves.iter() {
@@ -311,55 +335,49 @@ fn outline_to_d(
 
         if need_move {
             if last_end.is_some() {
-                d.push('Z');
-                d.push(' ');
+                out.push('Z');
+                out.push(' ');
             }
-            use std::fmt::Write;
-            let _ = write!(
-                &mut d,
-                "M{} {}",
-                super::fmt_num(start.0 as f64),
-                super::fmt_num(start.1 as f64)
-            );
-            d.push(' ');
+            out.push('M');
+            crate::fmt_num_to(out, start.0 as f64);
+            out.push(' ');
+            crate::fmt_num_to(out, start.1 as f64);
+            out.push(' ');
         }
 
         match curve {
             OutlineCurve::Line(_, p1) => {
-                use std::fmt::Write;
-                let _ = write!(
-                    &mut d,
-                    "L{} {}",
-                    super::fmt_num((px + p1.x * scale) as f64),
-                    super::fmt_num((py - p1.y * scale) as f64)
-                );
-                d.push(' ');
+                out.push('L');
+                crate::fmt_num_to(out, (px + p1.x * scale) as f64);
+                out.push(' ');
+                crate::fmt_num_to(out, (py - p1.y * scale) as f64);
+                out.push(' ');
             }
             OutlineCurve::Quad(_, p1, p2) => {
-                use std::fmt::Write;
-                let _ = write!(
-                    &mut d,
-                    "Q{} {} {} {}",
-                    super::fmt_num((px + p1.x * scale) as f64),
-                    super::fmt_num((py - p1.y * scale) as f64),
-                    super::fmt_num((px + p2.x * scale) as f64),
-                    super::fmt_num((py - p2.y * scale) as f64)
-                );
-                d.push(' ');
+                out.push('Q');
+                crate::fmt_num_to(out, (px + p1.x * scale) as f64);
+                out.push(' ');
+                crate::fmt_num_to(out, (py - p1.y * scale) as f64);
+                out.push(' ');
+                crate::fmt_num_to(out, (px + p2.x * scale) as f64);
+                out.push(' ');
+                crate::fmt_num_to(out, (py - p2.y * scale) as f64);
+                out.push(' ');
             }
             OutlineCurve::Cubic(_, p1, p2, p3) => {
-                use std::fmt::Write;
-                let _ = write!(
-                    &mut d,
-                    "C{} {} {} {} {} {}",
-                    super::fmt_num((px + p1.x * scale) as f64),
-                    super::fmt_num((py - p1.y * scale) as f64),
-                    super::fmt_num((px + p2.x * scale) as f64),
-                    super::fmt_num((py - p2.y * scale) as f64),
-                    super::fmt_num((px + p3.x * scale) as f64),
-                    super::fmt_num((py - p3.y * scale) as f64)
-                );
-                d.push(' ');
+                out.push('C');
+                crate::fmt_num_to(out, (px + p1.x * scale) as f64);
+                out.push(' ');
+                crate::fmt_num_to(out, (py - p1.y * scale) as f64);
+                out.push(' ');
+                crate::fmt_num_to(out, (px + p2.x * scale) as f64);
+                out.push(' ');
+                crate::fmt_num_to(out, (py - p2.y * scale) as f64);
+                out.push(' ');
+                crate::fmt_num_to(out, (px + p3.x * scale) as f64);
+                out.push(' ');
+                crate::fmt_num_to(out, (py - p3.y * scale) as f64);
+                out.push(' ');
             }
         }
 
@@ -367,13 +385,15 @@ fn outline_to_d(
     }
 
     if last_end.is_some() {
-        d.push('Z');
+        out.push('Z');
     }
 
-    let d = d.trim().to_string();
-    if d.is_empty() {
-        None
-    } else {
-        Some(d)
+    // `d.trim()`: no leading whitespace is ever written, so this is trim-end.
+    let bytes = out.as_bytes();
+    let mut end = out.len();
+    while end > start_len && bytes[end - 1].is_ascii_whitespace() {
+        end -= 1;
     }
+    out.truncate(end);
+    end > start_len
 }

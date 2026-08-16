@@ -16,6 +16,8 @@ Android / iOS / JVM 的 Maven 或 Xcode 产物版本在各自 **release workflow
 
 发布 **Flutter** 至 pub.dev 前，建议在 [`platforms/flutter/CHANGELOG.md`](platforms/flutter/CHANGELOG.md) 写入本版本变更摘要（pub.dev 展示用）。
 
+根目录 [`CHANGELOG.md`](CHANGELOG.md) 记录仓库级变更：日常改动落在 `[Unreleased]`，发布时由 [`scripts/set-version.sh`](scripts/set-version.sh) 自动把 `[Unreleased]` 段改名为新版本号 + 日期并新建空的 `[Unreleased]`。执行脚本前请先人工检查、补全该段内容。
+
 ## 发布前：统一版本
 
 1. **改版本（二选一）**
@@ -27,9 +29,10 @@ Android / iOS / JVM 的 Maven 或 Xcode 产物版本在各自 **release workflow
      ```bash
      ./scripts/set-version.sh 0.0.10
      ```
-2. **提交**（路径与 [`scripts/set-version.sh`](scripts/set-version.sh) 实际修改的文件一致；若只改部分平台可酌情 `git add` 子集）
+2. **检查 `CHANGELOG.md`**：`set-version.sh` 已把 `[Unreleased]` 改名为 `[0.0.10] - 2026-xx-xx` 并新建空的 `[Unreleased]` 段；确认该版本段落内容完整、无误。
+3. **提交**（路径与 [`scripts/set-version.sh`](scripts/set-version.sh) 实际修改的文件一致；若只改部分平台可酌情 `git add` 子集）
    ```bash
-   git add VERSION Cargo.toml \
+   git add VERSION Cargo.toml CHANGELOG.md \
      platforms/flutter/pubspec.yaml \
      platforms/flutter/ios/ratex_flutter.podspec \
      platforms/flutter/android/build.gradle \
@@ -42,7 +45,7 @@ Android / iOS / JVM 的 Maven 或 Xcode 产物版本在各自 **release workflow
      platforms/flutter/CHANGELOG.md
    git commit -m "chore: release v0.0.10"
    ```
-3. **打 tag 并推送**
+4. **打 tag 并推送**
    ```bash
    git tag v0.0.10
    git push origin main --tags

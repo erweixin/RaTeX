@@ -198,11 +198,19 @@ pub fn render_to_svg_with_color_syntax(
 }
 
 fn wrap_svg(vb_w: f64, vb_h: f64, body: &str) -> String {
-    let w = fmt_num(vb_w);
-    let h = fmt_num(vb_h);
-    format!(
-        r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {w} {h}" width="{w}pt" height="{h}pt">{body}</svg>"#
-    )
+    let mut out = String::with_capacity(body.len() + 96);
+    out.push_str(r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 "#);
+    fmt_num_to(&mut out, vb_w);
+    out.push(' ');
+    fmt_num_to(&mut out, vb_h);
+    out.push_str(r#"" width=""#);
+    fmt_num_to(&mut out, vb_w);
+    out.push_str(r#"pt" height=""#);
+    fmt_num_to(&mut out, vb_h);
+    out.push_str("pt\">");
+    out.push_str(body);
+    out.push_str("</svg>");
+    out
 }
 
 fn tx(x_em: f64, opts: &SvgOptions) -> f64 {
@@ -213,30 +221,59 @@ fn ty(y_em: f64, opts: &SvgOptions) -> f64 {
     y_em * opts.em_px() + opts.padding
 }
 
-fn color_to_svg(c: &Color, syntax: SvgColorSyntax) -> String {
+/// Append `n` formatted with the legacy `fmt_num` semantics directly to `out`
+/// (6 fractional digits, trailing zeros and dot trimmed, `-0` normalised to `0`),
+/// without any intermediate allocation.
+fn fmt_num_to(out: &mut String, n: f64) {
+    use std::fmt::Write;
+    let start = out.len();
+    let _ = write!(out, "{n:.6}");
+    // Reproduce `s.trim_end_matches('0').trim_end_matches('.')` on the tail.
+    let bytes = out.as_bytes();
+    let mut end = out.len();
+    while end > start + 1 && bytes[end - 1] == b'0' {
+        end -= 1;
+    }
+    if end > start && bytes[end - 1] == b'.' {
+        end -= 1;
+    }
+    out.truncate(end);
+    // Legacy safety net: empty or bare `-` becomes `0`.
+    if end == start || &out[start..end] == "-" {
+        out.truncate(start);
+        out.push('0');
+    }
+}
+
+fn color_to_svg_into(out: &mut String, c: &Color, syntax: SvgColorSyntax) {
+    use std::fmt::Write;
     let r = (c.r.clamp(0.0, 1.0) * 255.0).round() as u8;
     let g = (c.g.clamp(0.0, 1.0) * 255.0).round() as u8;
     let b = (c.b.clamp(0.0, 1.0) * 255.0).round() as u8;
     match syntax {
         SvgColorSyntax::Rgba => {
             let a = normalized_alpha(c.a);
-            format!("rgba({r},{g},{b},{a})")
+            let _ = write!(out, "rgba({r},{g},{b},{a})");
         }
-        SvgColorSyntax::Rgb => format!("rgb({r},{g},{b})"),
+        SvgColorSyntax::Rgb => {
+            let _ = write!(out, "rgb({r},{g},{b})");
+        }
     }
 }
 
-fn color_opacity_attr(c: &Color, attr: &str, syntax: SvgColorSyntax) -> String {
+/// Append ` attr="opacity"` (Rgb syntax, alpha < 1) or nothing.
+fn color_opacity_attr_into(out: &mut String, c: &Color, attr: &str, syntax: SvgColorSyntax) {
     if syntax != SvgColorSyntax::Rgb {
-        return String::new();
+        return;
     }
 
     let alpha = normalized_alpha(c.a);
-    if alpha >= 1.0 {
-        String::new()
-    } else {
-        let opacity = fmt_num(alpha as f64);
-        format!(r#" {attr}="{opacity}""#)
+    if alpha < 1.0 {
+        out.push(' ');
+        out.push_str(attr);
+        out.push_str("=\"");
+        fmt_num_to(out, alpha as f64);
+        out.push('"');
     }
 }
 
@@ -248,29 +285,15 @@ fn normalized_alpha(alpha: f32) -> f32 {
     }
 }
 
-pub(crate) fn fmt_num(n: f64) -> String {
-    let s = format!("{n:.6}");
-    let s = s.trim_end_matches('0');
-    let s = s.trim_end_matches('.');
-    if s.is_empty() || s == "-" {
-        "0".to_string()
-    } else {
-        s.to_string()
+/// Append `ch` with XML text escaping directly to `out`.
+fn push_escaped_char(out: &mut String, ch: char) {
+    match ch {
+        '&' => out.push_str("&amp;"),
+        '<' => out.push_str("&lt;"),
+        '>' => out.push_str("&gt;"),
+        '"' => out.push_str("&quot;"),
+        _ => out.push(ch),
     }
-}
-
-fn xml_escape_text(s: &str) -> String {
-    let mut out = String::with_capacity(s.len());
-    for ch in s.chars() {
-        match ch {
-            '&' => out.push_str("&amp;"),
-            '<' => out.push_str("&lt;"),
-            '>' => out.push_str("&gt;"),
-            '"' => out.push_str("&quot;"),
-            _ => out.push(ch),
-        }
-    }
-    out
 }
 
 /// Map internal font id string (e.g. `Main-Regular`) to KaTeX CSS `font-family` and face attributes.
@@ -335,34 +358,32 @@ fn emit_glyph_standalone(
         if let Some(glyph) = prerendered {
             match glyph {
                 standalone::StandaloneGlyph::Path(d) => {
-                    let fill = color_to_svg(g.color, color_syntax);
-                    let opacity = color_opacity_attr(g.color, "fill-opacity", color_syntax);
                     use std::fmt::Write;
-                    let _ = write!(
-                        out,
-                        r#"<path d="{d}" fill="{fill}"{opacity} fill-rule="nonzero" stroke="none"/>"#
-                    );
+                    let _ = write!(out, r#"<path d="{d}" fill=""#);
+                    color_to_svg_into(out, g.color, color_syntax);
+                    out.push('"');
+                    color_opacity_attr_into(out, g.color, "fill-opacity", color_syntax);
+                    let _ = write!(out, r#" fill-rule="nonzero" stroke="none"/>"#);
                     return;
                 }
                 standalone::StandaloneGlyph::Image { href, x, y, w, h } => {
                     use std::fmt::Write;
-                    let x_s = fmt_num(*x as f64);
-                    let y_s = fmt_num(*y as f64);
-                    let w_s = fmt_num(*w as f64);
-                    let h_s = fmt_num(*h as f64);
+                    out.push_str(r#"<image href=""#);
+                    out.push_str(href);
+                    out.push_str(r#"" x=""#);
+                    fmt_num_to(out, *x as f64);
+                    out.push_str(r#"" y=""#);
+                    fmt_num_to(out, *y as f64);
+                    out.push_str(r#"" width=""#);
+                    fmt_num_to(out, *w as f64);
+                    out.push_str(r#"" height=""#);
+                    fmt_num_to(out, *h as f64);
                     let opacity = normalized_alpha(g.color.a);
                     if opacity < 1.0 {
-                        let opacity_s = fmt_num(opacity as f64);
-                        let _ = write!(
-                            out,
-                            r#"<image href="{href}" x="{x_s}" y="{y_s}" width="{w_s}" height="{h_s}" opacity="{opacity_s}" preserveAspectRatio="none"/>"#
-                        );
-                    } else {
-                        let _ = write!(
-                            out,
-                            r#"<image href="{href}" x="{x_s}" y="{y_s}" width="{w_s}" height="{h_s}" preserveAspectRatio="none"/>"#
-                        );
+                        out.push_str(r#"" opacity=""#);
+                        fmt_num_to(out, opacity as f64);
                     }
+                    let _ = write!(out, r#"" preserveAspectRatio="none"/>"#);
                     return;
                 }
             }
@@ -375,19 +396,25 @@ fn emit_glyph_text(out: &mut String, g: GlyphEmit<'_>, context: SvgRenderContext
     let opts = context.opts;
     let color_syntax = context.color_syntax;
     let ch = char::from_u32(g.char_code).unwrap_or('\u{fffd}');
-    let text = xml_escape_text(&ch.to_string());
     let (family, weight, style) = katex_face(g.font);
     let fs = g.scale * opts.em_px();
-    let fill = color_to_svg(g.color, color_syntax);
-    let opacity = color_opacity_attr(g.color, "fill-opacity", color_syntax);
-    let x_s = fmt_num(tx(g.x, opts));
-    let y_s = fmt_num(ty(g.y, opts));
-    let fs_s = fmt_num(fs);
     use std::fmt::Write;
+    let _ = write!(out, r#"<text x=""#);
+    fmt_num_to(out, tx(g.x, opts));
+    let _ = write!(out, r#"" y=""#);
+    fmt_num_to(out, ty(g.y, opts));
+    let _ = write!(out, r#"" font-family="{family}" font-size=""#);
+    fmt_num_to(out, fs);
     let _ = write!(
         out,
-        r#"<text x="{x_s}" y="{y_s}" font-family="{family}" font-size="{fs_s}" font-weight="{weight}" font-style="{style}" fill="{fill}"{opacity} dominant-baseline="alphabetic">{text}</text>"#
+        r#"" font-weight="{weight}" font-style="{style}" fill=""#
     );
+    color_to_svg_into(out, g.color, color_syntax);
+    out.push('"');
+    color_opacity_attr_into(out, g.color, "fill-opacity", color_syntax);
+    let _ = write!(out, r#" dominant-baseline="alphabetic">"#);
+    push_escaped_char(out, ch);
+    let _ = write!(out, "</text>");
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -408,30 +435,42 @@ fn emit_line(
     let yc = ty(y, opts);
     let t = (thickness * em).max(1e-6);
     let w = width * em;
-    let stroke = color_to_svg(color, color_syntax);
     use std::fmt::Write;
     if dashed {
-        let opacity = color_opacity_attr(color, "stroke-opacity", color_syntax);
-        let x0s = fmt_num(x0);
-        let ycs = fmt_num(yc);
-        let x1s = fmt_num(x0 + w);
-        let ts = fmt_num(t);
-        let dash = fmt_num(t * 3.0);
-        let _ = write!(
-            out,
-            r#"<line x1="{x0s}" y1="{ycs}" x2="{x1s}" y2="{ycs}" stroke="{stroke}"{opacity} stroke-width="{ts}" stroke-dasharray="{dash} {dash}"/>"#
-        );
+        let _ = write!(out, r#"<line x1=""#);
+        fmt_num_to(out, x0);
+        let _ = write!(out, r#"" y1=""#);
+        fmt_num_to(out, yc);
+        let _ = write!(out, r#"" x2=""#);
+        fmt_num_to(out, x0 + w);
+        let _ = write!(out, r#"" y2=""#);
+        fmt_num_to(out, yc);
+        let _ = write!(out, r#"" stroke=""#);
+        color_to_svg_into(out, color, color_syntax);
+        out.push('"');
+        color_opacity_attr_into(out, color, "stroke-opacity", color_syntax);
+        let _ = write!(out, r#" stroke-width=""#);
+        fmt_num_to(out, t);
+        let _ = write!(out, r#"" stroke-dasharray=""#);
+        fmt_num_to(out, t * 3.0);
+        let _ = write!(out, r#" "#);
+        fmt_num_to(out, t * 3.0);
+        let _ = write!(out, r#""/>"#);
     } else {
-        let opacity = color_opacity_attr(color, "fill-opacity", color_syntax);
         let y0 = yc - t / 2.0;
-        let x0s = fmt_num(x0);
-        let y0s = fmt_num(y0);
-        let ws = fmt_num(w);
-        let hs = fmt_num(t);
-        let _ = write!(
-            out,
-            r#"<rect x="{x0s}" y="{y0s}" width="{ws}" height="{hs}" fill="{stroke}"{opacity}/>"#
-        );
+        let _ = write!(out, r#"<rect x=""#);
+        fmt_num_to(out, x0);
+        let _ = write!(out, r#"" y=""#);
+        fmt_num_to(out, y0);
+        let _ = write!(out, r#"" width=""#);
+        fmt_num_to(out, w);
+        let _ = write!(out, r#"" height=""#);
+        fmt_num_to(out, t);
+        let _ = write!(out, r#"" fill=""#);
+        color_to_svg_into(out, color, color_syntax);
+        out.push('"');
+        color_opacity_attr_into(out, color, "fill-opacity", color_syntax);
+        let _ = write!(out, "/>");
     }
 }
 
@@ -451,34 +490,44 @@ fn emit_rect(
     let y0 = ty(y, opts);
     let w = width * em;
     let h = height * em;
-    let fill = color_to_svg(color, color_syntax);
-    let opacity = color_opacity_attr(color, "fill-opacity", color_syntax);
-    let x0s = fmt_num(x0);
-    let y0s = fmt_num(y0);
-    let ws = fmt_num(w);
-    let hs = fmt_num(h);
     use std::fmt::Write;
-    let _ = write!(
-        out,
-        r#"<rect x="{x0s}" y="{y0s}" width="{ws}" height="{hs}" fill="{fill}"{opacity}/>"#
-    );
+    let _ = write!(out, r#"<rect x=""#);
+    fmt_num_to(out, x0);
+    let _ = write!(out, r#"" y=""#);
+    fmt_num_to(out, y0);
+    let _ = write!(out, r#"" width=""#);
+    fmt_num_to(out, w);
+    let _ = write!(out, r#"" height=""#);
+    fmt_num_to(out, h);
+    let _ = write!(out, r#"" fill=""#);
+    color_to_svg_into(out, color, color_syntax);
+    out.push('"');
+    color_opacity_attr_into(out, color, "fill-opacity", color_syntax);
+    let _ = write!(out, "/>");
 }
 
-fn path_commands_to_d(origin_x: f64, origin_y: f64, em: f64, commands: &[PathCommand]) -> String {
-    let mut d = String::new();
+/// Append the SVG path data for `commands` to `out`, trimming the trailing
+/// separator exactly like the legacy `path_commands_to_d` did.
+fn path_commands_to_d_into(
+    out: &mut String,
+    origin_x: f64,
+    origin_y: f64,
+    em: f64,
+    commands: &[PathCommand],
+) {
     for cmd in commands {
         match cmd {
             PathCommand::MoveTo { x, y } => {
-                d.push('M');
-                d.push_str(&fmt_num(origin_x + x * em));
-                d.push(' ');
-                d.push_str(&fmt_num(origin_y + y * em));
+                out.push('M');
+                fmt_num_to(out, origin_x + x * em);
+                out.push(' ');
+                fmt_num_to(out, origin_y + y * em);
             }
             PathCommand::LineTo { x, y } => {
-                d.push('L');
-                d.push_str(&fmt_num(origin_x + x * em));
-                d.push(' ');
-                d.push_str(&fmt_num(origin_y + y * em));
+                out.push('L');
+                fmt_num_to(out, origin_x + x * em);
+                out.push(' ');
+                fmt_num_to(out, origin_y + y * em);
             }
             PathCommand::CubicTo {
                 x1,
@@ -488,34 +537,40 @@ fn path_commands_to_d(origin_x: f64, origin_y: f64, em: f64, commands: &[PathCom
                 x,
                 y,
             } => {
-                d.push('C');
-                d.push_str(&fmt_num(origin_x + x1 * em));
-                d.push(' ');
-                d.push_str(&fmt_num(origin_y + y1 * em));
-                d.push(' ');
-                d.push_str(&fmt_num(origin_x + x2 * em));
-                d.push(' ');
-                d.push_str(&fmt_num(origin_y + y2 * em));
-                d.push(' ');
-                d.push_str(&fmt_num(origin_x + x * em));
-                d.push(' ');
-                d.push_str(&fmt_num(origin_y + y * em));
+                out.push('C');
+                fmt_num_to(out, origin_x + x1 * em);
+                out.push(' ');
+                fmt_num_to(out, origin_y + y1 * em);
+                out.push(' ');
+                fmt_num_to(out, origin_x + x2 * em);
+                out.push(' ');
+                fmt_num_to(out, origin_y + y2 * em);
+                out.push(' ');
+                fmt_num_to(out, origin_x + x * em);
+                out.push(' ');
+                fmt_num_to(out, origin_y + y * em);
             }
             PathCommand::QuadTo { x1, y1, x, y } => {
-                d.push('Q');
-                d.push_str(&fmt_num(origin_x + x1 * em));
-                d.push(' ');
-                d.push_str(&fmt_num(origin_y + y1 * em));
-                d.push(' ');
-                d.push_str(&fmt_num(origin_x + x * em));
-                d.push(' ');
-                d.push_str(&fmt_num(origin_y + y * em));
+                out.push('Q');
+                fmt_num_to(out, origin_x + x1 * em);
+                out.push(' ');
+                fmt_num_to(out, origin_y + y1 * em);
+                out.push(' ');
+                fmt_num_to(out, origin_x + x * em);
+                out.push(' ');
+                fmt_num_to(out, origin_y + y * em);
             }
-            PathCommand::Close => d.push('Z'),
+            PathCommand::Close => out.push('Z'),
         }
-        d.push(' ');
+        out.push(' ');
     }
-    d.trim_end().to_string()
+    // `d.trim_end()` on the segment just written.
+    let bytes = out.as_bytes();
+    let mut end = out.len();
+    while end > 0 && bytes[end - 1].is_ascii_whitespace() {
+        end -= 1;
+    }
+    out.truncate(end);
 }
 
 fn emit_path_item(
@@ -532,10 +587,8 @@ fn emit_path_item(
     let em = opts.em_px();
     let ox = tx(x, opts);
     let oy = ty(y, opts);
-    let paint = color_to_svg(color, color_syntax);
 
     if fill {
-        let opacity = color_opacity_attr(color, "fill-opacity", color_syntax);
         let mut start = 0usize;
         for i in 1..commands.len() {
             if matches!(commands[i], PathCommand::MoveTo { .. }) {
@@ -544,40 +597,41 @@ fn emit_path_item(
                 if seg.is_empty() {
                     continue;
                 }
-                let d = path_commands_to_d(ox, oy, em, seg);
-                if d.is_empty() {
-                    continue;
-                }
                 use std::fmt::Write;
-                let _ = write!(
-                    out,
-                    r#"<path d="{d}" fill="{paint}"{opacity} fill-rule="nonzero" stroke="none"/>"#
-                );
+                let _ = write!(out, r#"<path d=""#);
+                path_commands_to_d_into(out, ox, oy, em, seg);
+                let _ = write!(out, r#"" fill=""#);
+                color_to_svg_into(out, color, color_syntax);
+                out.push('"');
+                color_opacity_attr_into(out, color, "fill-opacity", color_syntax);
+                let _ = write!(out, r#" fill-rule="nonzero" stroke="none"/>"#);
             }
         }
         let seg = &commands[start..];
         if !seg.is_empty() {
-            let d = path_commands_to_d(ox, oy, em, seg);
-            if !d.is_empty() {
-                use std::fmt::Write;
-                let _ = write!(
-                    out,
-                    r#"<path d="{d}" fill="{paint}"{opacity} fill-rule="nonzero" stroke="none"/>"#
-                );
-            }
+            use std::fmt::Write;
+            let _ = write!(out, r#"<path d=""#);
+            path_commands_to_d_into(out, ox, oy, em, seg);
+            let _ = write!(out, r#"" fill=""#);
+            color_to_svg_into(out, color, color_syntax);
+            out.push('"');
+            color_opacity_attr_into(out, color, "fill-opacity", color_syntax);
+            let _ = write!(out, r#" fill-rule="nonzero" stroke="none"/>"#);
         }
     } else {
-        let d = path_commands_to_d(ox, oy, em, commands);
-        if d.is_empty() {
+        if commands.is_empty() {
             return;
         }
-        let sw = fmt_num(opts.stroke_width);
-        let opacity = color_opacity_attr(color, "stroke-opacity", color_syntax);
         use std::fmt::Write;
-        let _ = write!(
-            out,
-            r#"<path d="{d}" fill="none" stroke="{paint}"{opacity} stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round"/>"#
-        );
+        let _ = write!(out, r#"<path d=""#);
+        path_commands_to_d_into(out, ox, oy, em, commands);
+        let _ = write!(out, r#"" fill="none" stroke=""#);
+        color_to_svg_into(out, color, color_syntax);
+        out.push('"');
+        color_opacity_attr_into(out, color, "stroke-opacity", color_syntax);
+        let _ = write!(out, r#" stroke-width=""#);
+        fmt_num_to(out, opts.stroke_width);
+        let _ = write!(out, r#"" stroke-linecap="round" stroke-linejoin="round"/>"#);
     }
 }
 
