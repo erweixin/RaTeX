@@ -11,6 +11,7 @@
 #   demo/flutter/pubspec.yaml,
 #   platforms/web/package.json, platforms/react-native/package.json,
 #   CHANGELOG.md（把首个 "## [Unreleased]" 段改名为 "## [新版本] - 当天日期"，并在其上方新建空的 "## [Unreleased]" 段）
+# CHANGELOG 维护依赖 python3。
 # platforms/android / platforms/jvm（Maven Central）在未传 -PlibraryVersion 时从本文件读取版本，见各平台 build.gradle.kts。
 # 用法: ./scripts/set-version.sh [版本号]
 # 若省略版本号，则使用 VERSION 文件内容。
@@ -85,7 +86,7 @@ for (const p of ['platforms/web/package.json', 'platforms/react-native/package.j
 # CHANGELOG.md：把 "## [Unreleased]" 段改名为 "## [新版本] - 日期"，并在其上方新建空的 "## [Unreleased]" 段。
 # 幂等：若该版本段已存在则只保证存在新的 Unreleased 段；文件不存在或缺少 Unreleased 段时不报错。
 TODAY=$(date +%Y-%m-%d)
-python3 - "$VER" "$TODAY" <<'PY'
+CHANGELOG_STATUS=$(python3 - "$VER" "$TODAY" <<'PY'
 import re
 import sys
 
@@ -134,5 +135,8 @@ if renamed or inserted:
 else:
     print(f'CHANGELOG.md: unchanged (version section [{ver}] already present).')
 PY
+)
+printf '%s\n' "$CHANGELOG_STATUS"
+CHANGELOG_SUMMARY=$(printf '%s\n' "$CHANGELOG_STATUS" | tail -n 1 | sed 's/^CHANGELOG\.md: //')
 
-echo "Done. Updated: Cargo.toml (workspace + ratex-* 依赖版本), platforms/flutter/pubspec.yaml, platforms/flutter/ios/ratex_flutter.podspec, platforms/flutter/macos/ratex_flutter.podspec, platforms/flutter/android/build.gradle, platforms/flutter/README.md, platforms/flutter/README.zh-CN.md, platforms/android/README.md, platforms/android/README.zh-CN.md, demo/android/README.md, platforms/jvm/README.md, platforms/jvm/README.zh-CN.md, demo/flutter/pubspec.yaml, platforms/web/package.json, platforms/react-native/package.json, CHANGELOG.md（Unreleased → 新版本）; Android/JVM Maven 使用根目录 VERSION。各 Rust 子 crate 使用 version.workspace = true，无需单独改文件。"
+echo "Done. Updated: Cargo.toml (workspace + ratex-* 依赖版本), platforms/flutter/pubspec.yaml, platforms/flutter/ios/ratex_flutter.podspec, platforms/flutter/macos/ratex_flutter.podspec, platforms/flutter/android/build.gradle, platforms/flutter/README.md, platforms/flutter/README.zh-CN.md, platforms/android/README.md, platforms/android/README.zh-CN.md, demo/android/README.md, platforms/jvm/README.md, platforms/jvm/README.zh-CN.md, demo/flutter/pubspec.yaml, platforms/web/package.json, platforms/react-native/package.json; CHANGELOG.md: ${CHANGELOG_SUMMARY:-未修改}。Android/JVM Maven 使用根目录 VERSION。各 Rust 子 crate 使用 version.workspace = true，无需单独改文件。"

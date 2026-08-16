@@ -16,7 +16,7 @@ Android / iOS / JVM 的 Maven 或 Xcode 产物版本在各自 **release workflow
 
 发布 **Flutter** 至 pub.dev 前，建议在 [`platforms/flutter/CHANGELOG.md`](platforms/flutter/CHANGELOG.md) 写入本版本变更摘要（pub.dev 展示用）。
 
-根目录 [`CHANGELOG.md`](CHANGELOG.md) 记录仓库级变更：日常改动落在 `[Unreleased]`，发布时由 [`scripts/set-version.sh`](scripts/set-version.sh) 自动把 `[Unreleased]` 段改名为新版本号 + 日期并新建空的 `[Unreleased]`。执行脚本前请先人工检查、补全该段内容。
+根目录 [`CHANGELOG.md`](CHANGELOG.md) 记录仓库级变更：日常改动落在 `[Unreleased]`，发布时由 [`scripts/set-version.sh`](scripts/set-version.sh)（需要 `python3`）自动把 `[Unreleased]` 段改名为新版本号 + 日期并新建空的 `[Unreleased]`。执行脚本前请先人工检查、补全该段内容。
 
 ## 发布前：统一版本
 

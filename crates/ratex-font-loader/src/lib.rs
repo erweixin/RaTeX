@@ -65,6 +65,11 @@ static NEXT_OUTLINE_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
 static OUTLINE_SOURCE_IDS: LazyLock<RwLock<HashMap<FontSourceKey, u64>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
+/// Bound the source-intern table. Clearing it only drops the path-to-id
+/// mapping; IDs are allocated monotonically, so previously cached outlines
+/// keep their original (still valid) source IDs and simply become cold.
+const OUTLINE_SOURCE_CACHE_CAP: usize = 4096;
+
 fn intern_outline_source(source: FontSourceKey) -> OutlineSourceId {
     {
         let sources = OUTLINE_SOURCE_IDS
@@ -80,6 +85,9 @@ fn intern_outline_source(source: FontSourceKey) -> OutlineSourceId {
         .expect("outline source cache poisoned");
     if let Some(&id) = sources.get(&source) {
         return OutlineSourceId(id);
+    }
+    if sources.len() >= OUTLINE_SOURCE_CACHE_CAP {
+        sources.clear();
     }
     let id = NEXT_OUTLINE_SOURCE_ID.fetch_add(1, Ordering::Relaxed);
     sources.insert(source, id);
@@ -140,6 +148,10 @@ impl From<HashMap<FontId, Vec<u8>>> for FontSet {
 /// this set holds an additional `Arc` clone for the current render. Each entry
 /// also carries its interned [`OutlineSourceId`] so outline lookups do not need
 /// to rebuild the font source key.
+///
+/// The accessors intentionally return `ab_glyph::FontVec`, so the public API
+/// surface of this crate follows the `ab_glyph` version used by RaTeX. Treat
+/// an `ab_glyph` major-version bump as a breaking change for this type.
 #[derive(Debug)]
 pub struct ParsedFontSet {
     fonts: HashMap<FontId, ParsedFont>,
@@ -244,6 +256,32 @@ fn may_need_runtime_unicode_fallback(font_id: FontId, char_code: u32) -> bool {
 
 static FONT_CACHE: OnceLock<RwLock<HashMap<CacheKey, CachedFont>>> = OnceLock::new();
 
+/// Bound the global raw/parsed font caches when many distinct `font_dir`
+/// values are used. Entries are value objects (`Arc` clones), so clearing is
+/// safe for already-returned `FontSet`/`ParsedFontSet` handles; subsequent
+/// renders simply reload and reparse.
+const FONT_CACHE_CAP: usize = 4096;
+const PARSED_FONT_CACHE_CAP: usize = 4096;
+
+fn trim_cache_at_capacity<K, V>(
+    cache: &RwLock<HashMap<K, V>>,
+    cap: usize,
+    name: &str,
+) -> Result<(), String> {
+    {
+        let cached = cache.read().map_err(|_| format!("{name} poisoned"))?;
+        if cached.len() < cap {
+            return Ok(());
+        }
+    }
+
+    let mut cached = cache.write().map_err(|_| format!("{name} poisoned"))?;
+    if cached.len() >= cap {
+        cached.clear();
+    }
+    Ok(())
+}
+
 fn cache() -> &'static RwLock<HashMap<CacheKey, CachedFont>> {
     FONT_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
 }
@@ -277,6 +315,7 @@ pub fn load_fonts_for_plan_parsed(
     let wanted = plan.all();
     let mut out = HashMap::new();
     let cache = parsed_cache();
+    trim_cache_at_capacity(cache, PARSED_FONT_CACHE_CAP, "parsed font cache")?;
 
     {
         let cached = cache
@@ -393,6 +432,7 @@ pub fn load_fonts_for_plan(font_dir: &str, plan: &FontLoadPlan) -> Result<FontSe
     let wanted = plan.all();
     let mut out = HashMap::new();
     let cache = cache();
+    trim_cache_at_capacity(cache, FONT_CACHE_CAP, "font cache")?;
 
     {
         let cached = cache

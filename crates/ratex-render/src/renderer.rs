@@ -572,21 +572,92 @@ fn pack_color_u32(color: &Color) -> u32 {
     ((r as u32) << 24) | ((g as u32) << 16) | ((b as u32) << 8) | a as u32
 }
 
-/// Draw a cached glyph mask at the given integer anchor (exact pixel copy).
-fn blit_glyph_mask(pixmap: &mut Pixmap, mask: &Pixmap, dst_x: i32, dst_y: i32) {
-    let paint = PixmapPaint {
-        opacity: 1.0,
-        blend_mode: tiny_skia::BlendMode::SourceOver,
-        quality: FilterQuality::Nearest,
+/// tiny-skia's low-precision pipeline computes `div255(v)` as `(v + 255) >> 8`.
+///
+/// The pre-cache renderer used `Pixmap::fill_path` directly, whose solid-color
+/// anti-aliasing pipeline uses this exact arithmetic. The glyph-mask cache
+/// stores the rasterized source and then composites it manually, so the blit
+/// path must reproduce this rounding exactly to remain pixel-identical with
+/// `fill_path`.
+#[inline]
+fn div255(v: u32) -> u8 {
+    ((v + 255) >> 8) as u8
+}
+
+/// Composite one premultiplied mask pixel over a destination pixel using the
+/// same arithmetic as tiny-skia's solid-color `fill_path` pipeline.
+///
+/// `paint_rgba` is the straight, quantized RGBA8 paint color that produced
+/// `mask`. For an opaque paint, tiny-skia strength-reduces `SourceOver` to
+/// `Source` and antialiased pixels are `lerp(dst, src, coverage)`; in that
+/// case `mask.alpha` is exactly the coverage value. For a non-opaque paint,
+/// the path pipeline pre-scales the source by coverage, and the stored mask
+/// pixel already equals that pre-scaled source, so the remaining operation is
+/// lowp `SourceOver`: `src + div255(dst * inv(src.a))`.
+fn blend_mask_over(
+    src: tiny_skia::PremultipliedColorU8,
+    dst: tiny_skia::PremultipliedColorU8,
+    paint_rgba: [u8; 4],
+) -> tiny_skia::PremultipliedColorU8 {
+    let out = if paint_rgba[3] == 255 {
+        let coverage = src.alpha() as u32;
+        let inv = 255 - coverage;
+        [
+            div255(dst.red() as u32 * inv + paint_rgba[0] as u32 * coverage),
+            div255(dst.green() as u32 * inv + paint_rgba[1] as u32 * coverage),
+            div255(dst.blue() as u32 * inv + paint_rgba[2] as u32 * coverage),
+            div255(dst.alpha() as u32 * inv + 255 * coverage),
+        ]
+    } else {
+        let inv = 255 - src.alpha() as u32;
+        [
+            (src.red() as u32 + ((dst.red() as u32 * inv + 255) >> 8)) as u8,
+            (src.green() as u32 + ((dst.green() as u32 * inv + 255) >> 8)) as u8,
+            (src.blue() as u32 + ((dst.blue() as u32 * inv + 255) >> 8)) as u8,
+            (src.alpha() as u32 + ((dst.alpha() as u32 * inv + 255) >> 8)) as u8,
+        ]
     };
-    pixmap.draw_pixmap(
-        dst_x,
-        dst_y,
-        mask.as_ref(),
-        &paint,
-        Transform::identity(),
-        None,
-    );
+    tiny_skia::PremultipliedColorU8::from_rgba(out[0], out[1], out[2], out[3])
+        .expect("glyph mask source-over blend must stay premultiplied")
+}
+
+/// Draw a cached glyph mask at the given integer anchor, reproducing the
+/// pre-cache `fill_path` compositing arithmetic pixel-for-pixel.
+fn blit_glyph_mask(
+    pixmap: &mut Pixmap,
+    mask: &Pixmap,
+    dst_x: i32,
+    dst_y: i32,
+    paint_rgba: [u8; 4],
+) {
+    let dst_right = (dst_x as i64 + mask.width() as i64)
+        .min(pixmap.width() as i64)
+        .max(0) as u32;
+    let dst_bottom = (dst_y as i64 + mask.height() as i64)
+        .min(pixmap.height() as i64)
+        .max(0) as u32;
+    let dst_left = (dst_x as i64).max(0) as u32;
+    let dst_top = (dst_y as i64).max(0) as u32;
+    if dst_left >= dst_right || dst_top >= dst_bottom {
+        return;
+    }
+
+    let dst_width = pixmap.width() as usize;
+    let dst_pixels = pixmap.pixels_mut();
+    let src_pixels = mask.pixels();
+    for y in dst_top..dst_bottom {
+        let src_y = y as i64 - dst_y as i64;
+        for x in dst_left..dst_right {
+            let src_x = x as i64 - dst_x as i64;
+            let src_idx = src_y as usize * mask.width() as usize + src_x as usize;
+            let src = src_pixels[src_idx];
+            if src.alpha() == 0 {
+                continue;
+            }
+            let dst_idx = y as usize * dst_width + x as usize;
+            dst_pixels[dst_idx] = blend_mask_over(src, dst_pixels[dst_idx], paint_rgba);
+        }
+    }
 }
 
 /// Bounding box of all outline points transformed to device space.
@@ -672,6 +743,8 @@ fn render_glyph_with_font(
         }
     }
 
+    let paint_rgba = color_to_rgba8(color);
+
     // Key includes the exact size and sub-pixel phase so a cache hit is
     // guaranteed to reproduce pixel-identical anti-aliased coverage.
     let cache_key = GlyphMaskKey {
@@ -700,7 +773,7 @@ fn render_glyph_with_font(
         if let Some(mask) = cache.get(&cache_key) {
             let mask = Arc::clone(mask);
             drop(cache);
-            blit_glyph_mask(pixmap, &mask, dst_x, dst_y);
+            blit_glyph_mask(pixmap, &mask, dst_x, dst_y, paint_rgba);
             return true;
         }
     }
@@ -801,7 +874,7 @@ fn render_glyph_with_font(
         None,
     );
 
-    blit_glyph_mask(pixmap, &mask, dst_x, dst_y);
+    blit_glyph_mask(pixmap, &mask, dst_x, dst_y, paint_rgba);
 
     // Insert without replacing an existing entry: another thread may have
     // rasterized the same glyph while we were working.
@@ -1183,10 +1256,11 @@ fn demultiply_rgba(data: &[u8]) -> Vec<u8> {
 }
 
 fn encode_png(pixmap: &Pixmap) -> Result<Vec<u8>, String> {
-    // Fast compression path: `Pixmap::encode_png` uses the png crate's default
-    // (stronger) zlib settings; math formulas are mostly flat white regions,
-    // where `Compression::Fast` + `Sub` filtering decodes to identical pixels
-    // in a fraction of the time (larger files by a small margin).
+    // `Pixmap::encode_png` clones the whole pixmap before demultiplying it.
+    // We still need one demultiplying copy, but can write the PNG rows directly
+    // from that buffer. png 0.17 already defaults to `Compression::Fast`,
+    // `FilterType::Sub`, and non-adaptive filtering; the explicit settings
+    // below keep that contract even if the defaults change.
     let data = demultiply_rgba(pixmap.data());
     let mut out = Vec::with_capacity(pixmap.width() as usize * pixmap.height() as usize);
     {
@@ -1203,12 +1277,101 @@ fn encode_png(pixmap: &Pixmap) -> Result<Vec<u8>, String> {
             .write_image_data(&data)
             .map_err(|e| format!("PNG encode error: {e}"))?;
     }
+    // The encoder capacity estimate is deliberately generous to avoid
+    // reallocations while writing; do not return the spare capacity to
+    // callers, since compressed PNGs are often much smaller than `w * h`.
+    out.shrink_to_fit();
     Ok(out)
 }
 
 #[cfg(test)]
 mod glyph_mask_cache_tests {
     use super::*;
+
+    #[test]
+    fn mask_blit_matches_direct_fill_path_for_opaque_and_alpha_paint() {
+        let w = 32;
+        let h = 32;
+        let backgrounds: [[u8; 4]; 5] = [
+            [255, 255, 255, 255],
+            [238, 238, 238, 255],
+            [17, 17, 17, 255],
+            [0, 0, 0, 0],
+            [51, 102, 153, 128],
+        ];
+        let colors: [[u8; 4]; 4] = [
+            [0, 0, 0, 255],
+            [51, 102, 153, 255],
+            [51, 102, 153, 128],
+            [255, 0, 0, 128],
+        ];
+
+        let mut pb = PathBuilder::new();
+        pb.move_to(2.3, 3.7);
+        pb.line_to(20.7, 2.9);
+        pb.line_to(16.2, 22.6);
+        pb.line_to(5.1, 17.2);
+        pb.close();
+        let path = pb.finish().expect("path");
+
+        for bg in backgrounds {
+            let mut base = Pixmap::new(w, h).unwrap();
+            base.fill(tiny_skia::Color::from_rgba8(bg[0], bg[1], bg[2], bg[3]));
+            for rgba in colors {
+                let mut direct = base.clone();
+                let mut paint = Paint::default();
+                paint.set_color_rgba8(rgba[0], rgba[1], rgba[2], rgba[3]);
+                paint.anti_alias = true;
+                direct.fill_path(
+                    &path,
+                    &paint,
+                    FillRule::Winding,
+                    Transform::identity(),
+                    None,
+                );
+
+                let bounds = path.bounds();
+                let left = bounds.left().floor() - 1.0;
+                let top = bounds.top().floor() - 1.0;
+                let mask_w = ((bounds.right().ceil() + 1.0) - left).max(1.0) as u32;
+                let mask_h = ((bounds.bottom().ceil() + 1.0) - top).max(1.0) as u32;
+                let mut mask = Pixmap::new(mask_w, mask_h).unwrap();
+                mask.fill(tiny_skia::Color::TRANSPARENT);
+                mask.fill_path(
+                    &path,
+                    &paint,
+                    FillRule::Winding,
+                    Transform::from_translate(-left, -top),
+                    None,
+                );
+
+                let mut cached = base.clone();
+                blit_glyph_mask(&mut cached, &mask, left as i32, top as i32, rgba);
+                assert_eq!(
+                    direct.data(),
+                    cached.data(),
+                    "mask blit differs from direct fill_path for background {bg:?} and color {rgba:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn encoded_png_does_not_keep_preallocation_capacity() {
+        let mut opts = RenderOptions::default();
+        opts.font_dir = font_dir();
+        opts.font_size = 300.0;
+        let ast = ratex_parser::parser::parse("x").expect("parse");
+        let layout = ratex_layout::layout(&ast, &ratex_layout::LayoutOptions::default());
+        let dl = ratex_layout::to_display_list(&layout);
+        let png = render_to_png(&dl, &opts).expect("render");
+        assert!(
+            png.capacity() <= png.len() * 2,
+            "returned PNG buffer should not retain its large preallocation (len {}, capacity {})",
+            png.len(),
+            png.capacity()
+        );
+    }
 
     #[test]
     fn glyph_mask_color_key_uses_paint_quantization() {

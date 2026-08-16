@@ -19,9 +19,15 @@ section.
   of the same formula (live preview, batch re-renders) become plain pixel
   blits instead of curve flattening + anti-aliased fills. Glyph-mask cache
   capped at 8192 entries; decoded emoji-strike cache capped at 4096 entries.
-- **PNG**: faster encoding via the `png` crate with `Compression::Fast` and
-  `Sub` filtering (identical decoded pixels after demultiplying tiny-skia's
-  premultiplied pixmap, smaller CPU cost).
+- **Fonts**: bound the raw-font, parsed-font, and font-source caches at 4096
+  entries each so long-running renderers with many distinct font directories
+  do not grow without limit. Clearing only drops cache entries; returned
+  `Arc`-backed font handles remain valid.
+- **PNG**: encode from a directly demultiplied RGBA buffer with a pre-sized
+  encoder output buffer (and shrink it before returning). The `png` crate
+  0.17 already defaults to `Compression::Fast`, `Sub` filtering, and
+  non-adaptive filtering; the settings are kept explicit so output stays
+  stable if defaults change.
 - **SVG**: allocation-free serialization. Numbers (`fmt_num`), paint colors,
   opacity attributes, character escaping, and glyph path data are written
   directly into the output buffer instead of building per-value `String`s;

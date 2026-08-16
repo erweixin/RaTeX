@@ -515,6 +515,7 @@ fn path_commands_to_d_into(
     em: f64,
     commands: &[PathCommand],
 ) {
+    let start_len = out.len();
     for cmd in commands {
         match cmd {
             PathCommand::MoveTo { x, y } => {
@@ -564,10 +565,11 @@ fn path_commands_to_d_into(
         }
         out.push(' ');
     }
-    // `d.trim_end()` on the segment just written.
+    // `d.trim_end()` on the segment just written; never touch content that
+    // was already in `out` before this call.
     let bytes = out.as_bytes();
     let mut end = out.len();
-    while end > 0 && bytes[end - 1].is_ascii_whitespace() {
+    while end > start_len && bytes[end - 1].is_ascii_whitespace() {
         end -= 1;
     }
     out.truncate(end);
