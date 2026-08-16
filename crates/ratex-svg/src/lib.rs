@@ -222,7 +222,7 @@ fn ty(y_em: f64, opts: &SvgOptions) -> f64 {
 }
 
 /// Append `n` formatted with the legacy `fmt_num` semantics directly to `out`
-/// (6 fractional digits, trailing zeros and dot trimmed, `-0` normalised to `0`),
+/// (6 fractional digits, trailing zeros and dot trimmed; `-0` is preserved),
 /// without any intermediate allocation.
 fn fmt_num_to(out: &mut String, n: f64) {
     use std::fmt::Write;

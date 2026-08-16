@@ -214,9 +214,9 @@ fn render_to_png_preserves_glyph_alpha() {
         eprintln!("SKIP transparent_background: KaTeX font_dir missing");
         return;
     };
-    let alpha = max_alpha(&png);
-    assert!(alpha > 0);
-    assert!(alpha <= 128);
+    // Check RGB as well as alpha: the PNG encoder must demultiply tiny-skia's
+    // premultiplied pixmap before writing, otherwise red comes out as 128.
+    assert_eq!(max_alpha_pixel(&png), [255, 0, 0, 128]);
 }
 
 #[test]

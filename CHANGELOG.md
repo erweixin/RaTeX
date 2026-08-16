@@ -13,13 +13,15 @@ section.
 
 ### Performance
 
-- **PNG**: cache rasterized glyph masks. Keys are the exact font, glyph, size,
-  and sub-pixel position phase, so cache hits are pixel-identical; repeated
-  renders of the same formula (live preview, batch re-renders) become plain
-  pixel blits instead of curve flattening + anti-aliased fills. Cache capped
-  at 8192 entries.
+- **PNG**: cache rasterized glyph masks and decoded color-emoji strikes. Glyph
+  mask keys are the exact font, glyph, size, sub-pixel position phase, and
+  quantized paint color, so cache hits are pixel-identical; repeated renders
+  of the same formula (live preview, batch re-renders) become plain pixel
+  blits instead of curve flattening + anti-aliased fills. Glyph-mask cache
+  capped at 8192 entries; decoded emoji-strike cache capped at 4096 entries.
 - **PNG**: faster encoding via the `png` crate with `Compression::Fast` and
-  `Sub` filtering (identical decoded pixels, smaller CPU cost).
+  `Sub` filtering (identical decoded pixels after demultiplying tiny-skia's
+  premultiplied pixmap, smaller CPU cost).
 - **SVG**: allocation-free serialization. Numbers (`fmt_num`), paint colors,
   opacity attributes, character escaping, and glyph path data are written
   directly into the output buffer instead of building per-value `String`s;

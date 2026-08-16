@@ -360,7 +360,7 @@ def compute_ink_metrics(
             "test_crop": [test_crop.shape[1], test_crop.shape[0]],
             "ref_ink_px": 0,
             "test_ink_px": 0,
-            "tolerant_f1": None,
+            "tolerant_f1": 1.0 if prooftree_tolerant else None,
         }
 
     (

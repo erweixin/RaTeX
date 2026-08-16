@@ -92,6 +92,15 @@ class GoldenComparatorTests(unittest.TestCase):
             self.assertEqual(metrics["recall"], 1.0)
             self.assertEqual(metrics["precision"], 1.0)
             self.assertEqual(metrics["f1"], 1.0)
+            self.assertIsNone(metrics["tolerant_f1"])
+
+            tolerant = golden.compute_ink_metrics(
+                golden.load_image(ref),
+                golden.load_image(test),
+                prooftree_tolerant=True,
+            )
+            self.assertEqual(tolerant["score"], 1.0)
+            self.assertEqual(tolerant["tolerant_f1"], 1.0)
 
     def test_missing_cases_never_disappear_from_report(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

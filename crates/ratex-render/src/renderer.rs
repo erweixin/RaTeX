@@ -89,14 +89,25 @@ fn to_tiny_skia_color(color: Color) -> tiny_skia::Color {
     .unwrap_or(tiny_skia::Color::TRANSPARENT)
 }
 
-fn paint_for_color(color: &Color) -> Paint<'static> {
-    let mut paint = Paint::default();
-    paint.set_color_rgba8(
+/// Quantize a [`Color`] to the exact RGBA8 bytes used for painting.
+///
+/// RGB uses saturating truncation and alpha uses round-to-nearest, matching
+/// the pre-cache renderer behavior. Glyph-mask cache keys must use this same
+/// quantization, otherwise two different colors can collide on one key and a
+/// cache hit would paint the wrong color.
+fn color_to_rgba8(color: &Color) -> [u8; 4] {
+    [
         (color.r * 255.0) as u8,
         (color.g * 255.0) as u8,
         (color.b * 255.0) as u8,
         (color.a.clamp(0.0, 1.0) * 255.0).round() as u8,
-    );
+    ]
+}
+
+fn paint_for_color(color: &Color) -> Paint<'static> {
+    let [r, g, b, a] = color_to_rgba8(color);
+    let mut paint = Paint::default();
+    paint.set_color_rgba8(r, g, b, a);
     paint
 }
 
@@ -490,7 +501,9 @@ struct RasterGlyphParams {
 ///
 /// The font bytes are held in an `Arc` inside `ratex-unicode-font`, so the
 /// pointer/length pair is stable for the process lifetime and avoids cloning
-/// or hashing the font data on every lookup.
+/// or hashing the font data on every lookup. This cache must only be fed from
+/// that process-lifetime `OnceLock<Arc<Vec<u8>>>`; transient buffers could be
+/// freed and their address reused by a different font.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct EmojiRasterCacheKey {
     font_ptr: usize,
@@ -511,6 +524,11 @@ struct CachedEmojiRaster {
 
 static EMOJI_RASTER_CACHE: LazyLock<RwLock<HashMap<EmojiRasterCacheKey, Arc<CachedEmojiRaster>>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
+
+/// Upper bound on cached decoded emoji strikes. Each strike is usually a few
+/// KiB to tens of KiB; clearing wholesale on overflow keeps long-running
+/// renderers bounded while preserving the common repeated-formula fast path.
+const EMOJI_RASTER_CACHE_CAP: usize = 4096;
 
 /// Cache key for rasterized outline-glyph masks.
 ///
@@ -550,11 +568,8 @@ static GLYPH_MASK_CACHE: LazyLock<RwLock<HashMap<GlyphMaskKey, Arc<Pixmap>>>> =
 const GLYPH_MASK_CACHE_CAP: usize = 8192;
 
 fn pack_color_u32(color: &Color) -> u32 {
-    let r = (color.r.clamp(0.0, 1.0) * 255.0).round() as u32;
-    let g = (color.g.clamp(0.0, 1.0) * 255.0).round() as u32;
-    let b = (color.b.clamp(0.0, 1.0) * 255.0).round() as u32;
-    let a = (color.a.clamp(0.0, 1.0) * 255.0).round() as u32;
-    (r << 24) | (g << 16) | (b << 8) | a
+    let [r, g, b, a] = color_to_rgba8(color);
+    ((r as u32) << 24) | ((g as u32) << 16) | ((b as u32) << 8) | a as u32
 }
 
 /// Draw a cached glyph mask at the given integer anchor (exact pixel copy).
@@ -879,6 +894,9 @@ fn try_blit_raster_glyph(
     // Insert without replacing an existing entry: another thread may have
     // decoded the same strike while we were working.
     let mut cache = EMOJI_RASTER_CACHE.write().unwrap();
+    if cache.len() >= EMOJI_RASTER_CACHE_CAP {
+        cache.clear();
+    }
     cache.entry(key).or_insert(entry);
     result
 }
@@ -1142,11 +1160,34 @@ fn render_path_segment(
     }
 }
 
+/// Convert tiny-skia's premultiplied RGBA pixels to straight RGBA for PNG.
+///
+/// This mirrors `tiny_skia::Pixmap::encode_png`, which demultiplies with the
+/// same `value / alpha + 0.5` rounding before encoding.
+fn demultiply_rgba(data: &[u8]) -> Vec<u8> {
+    let mut out = data.to_vec();
+    for px in out.chunks_exact_mut(4) {
+        let alpha = px[3];
+        if alpha == 0 {
+            px[0] = 0;
+            px[1] = 0;
+            px[2] = 0;
+        } else if alpha != 255 {
+            let a = alpha as f64 / 255.0;
+            px[0] = ((px[0] as f64 / a) + 0.5) as u8;
+            px[1] = ((px[1] as f64 / a) + 0.5) as u8;
+            px[2] = ((px[2] as f64 / a) + 0.5) as u8;
+        }
+    }
+    out
+}
+
 fn encode_png(pixmap: &Pixmap) -> Result<Vec<u8>, String> {
     // Fast compression path: `Pixmap::encode_png` uses the png crate's default
     // (stronger) zlib settings; math formulas are mostly flat white regions,
     // where `Compression::Fast` + `Sub` filtering decodes to identical pixels
     // in a fraction of the time (larger files by a small margin).
+    let data = demultiply_rgba(pixmap.data());
     let mut out = Vec::with_capacity(pixmap.width() as usize * pixmap.height() as usize);
     {
         let mut encoder = png::Encoder::new(&mut out, pixmap.width(), pixmap.height());
@@ -1159,7 +1200,7 @@ fn encode_png(pixmap: &Pixmap) -> Result<Vec<u8>, String> {
             .write_header()
             .map_err(|e| format!("PNG encode error: {e}"))?;
         writer
-            .write_image_data(pixmap.data())
+            .write_image_data(&data)
             .map_err(|e| format!("PNG encode error: {e}"))?;
     }
     Ok(out)
@@ -1168,6 +1209,22 @@ fn encode_png(pixmap: &Pixmap) -> Result<Vec<u8>, String> {
 #[cfg(test)]
 mod glyph_mask_cache_tests {
     use super::*;
+
+    #[test]
+    fn glyph_mask_color_key_uses_paint_quantization() {
+        // These two values both round to byte 1, but the paint path truncates
+        // them to 0 and 1 respectively. The cache key must use the paint
+        // quantization, otherwise the second glyph could reuse the first
+        // glyph's mask and render the wrong red channel.
+        let truncates_to_zero = Color::new(0.0020000001, 0.0, 0.0, 1.0);
+        let truncates_to_one = Color::new(0.0058431374, 0.0, 0.0, 1.0);
+        assert_ne!(
+            pack_color_u32(&truncates_to_zero),
+            pack_color_u32(&truncates_to_one)
+        );
+        assert_eq!(color_to_rgba8(&truncates_to_zero)[0], 0);
+        assert_eq!(color_to_rgba8(&truncates_to_one)[0], 1);
+    }
 
     fn font_dir() -> String {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
