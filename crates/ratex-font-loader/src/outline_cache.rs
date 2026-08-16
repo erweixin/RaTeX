@@ -1,19 +1,46 @@
-//! Global outline cache shared by PNG, SVG-standalone, and PDF renderers.
+//! Global outline cache shared by PNG, SVG-standalone, PDF, and Cairo renderers.
 //!
 //! `ab_glyph::Font::outline()` parses the TrueType `glyf` table on every call.
 //! The same glyphs appear repeatedly within a formula (e.g. three `2`s in
 //! `x^2 + y^2 = z^2`) and across consecutive renders — caching eliminates
 //! redundant glyf parsing.
+//!
+//! Cache keys include an interned font-source id, the TTC face index, and the
+//! glyph id, so two different fonts installed under the same `FontId` do not
+//! share outlines.
 
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, RwLock};
 
-use ab_glyph::{Font, FontRef, GlyphId, OutlineCurve, VariableFont};
+use ab_glyph::{Font, FontRef, FontVec, GlyphId, OutlineCurve, VariableFont};
 use ratex_font::FontId;
+
+use crate::{font_face_index, legacy_outline_source_id, outline_source_id, OutlineSourceId};
 
 type OutlineData = Arc<[OutlineCurve]>;
 
-static OUTLINE_CACHE: LazyLock<RwLock<HashMap<(FontId, GlyphId), OutlineData>>> =
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct OutlineCacheKey {
+    source: OutlineSourceId,
+    font_id: FontId,
+    face_index: u32,
+    glyph_id: GlyphId,
+}
+
+fn outline_cache_key(
+    source: OutlineSourceId,
+    font_id: FontId,
+    glyph_id: GlyphId,
+) -> OutlineCacheKey {
+    OutlineCacheKey {
+        source,
+        font_id,
+        face_index: font_face_index(font_id),
+        glyph_id,
+    }
+}
+
+static OUTLINE_CACHE: LazyLock<RwLock<HashMap<OutlineCacheKey, OutlineData>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
 /// Retrieve cached outline curves, or compute + cache them via `font.outline()`.
@@ -22,13 +49,54 @@ static OUTLINE_CACHE: LazyLock<RwLock<HashMap<(FontId, GlyphId), OutlineData>>> 
 /// with their own `px`, `py`, and `em` values before rasterising or serializing.
 ///
 /// For variable fonts, sets `wght=400` (Regular) if the axis exists and supports it.
+///
+/// Prefer [`get_or_compute_outline_with_source_id`] in renderers: this helper
+/// interns `font_dir` on every call and is intended for API compatibility and
+/// one-off callers.
+pub fn get_or_compute_outline_with_source(
+    font_id: FontId,
+    font: &FontRef<'_>,
+    font_dir: &str,
+    glyph_id: GlyphId,
+) -> Option<Arc<[OutlineCurve]>> {
+    get_or_compute_outline_with_source_id(
+        font_id,
+        font,
+        outline_source_id(font_dir, font_id),
+        glyph_id,
+    )
+}
+
+/// Source-aware raw-font outline lookup using an already-interned source id.
+pub fn get_or_compute_outline_with_source_id(
+    font_id: FontId,
+    font: &FontRef<'_>,
+    source: OutlineSourceId,
+    glyph_id: GlyphId,
+) -> Option<Arc<[OutlineCurve]>> {
+    get_or_compute_outline_with_key(outline_cache_key(source, font_id, glyph_id), font)
+}
+
+/// Deprecated compatibility entry point.
+///
+/// Prefer [`get_or_compute_outline_with_source`] or
+/// [`get_or_compute_outline_with_source_id`]: this wrapper has no font source
+/// information, so all calls through it share a legacy cache bucket.
+#[deprecated(
+    note = "use `get_or_compute_outline_with_source` so outline cache keys include the font source"
+)]
 pub fn get_or_compute_outline(
     font_id: FontId,
     font: &FontRef<'_>,
     glyph_id: GlyphId,
 ) -> Option<Arc<[OutlineCurve]>> {
-    let key = (font_id, glyph_id);
+    get_or_compute_outline_with_source_id(font_id, font, legacy_outline_source_id(), glyph_id)
+}
 
+fn get_or_compute_outline_with_key(
+    key: OutlineCacheKey,
+    font: &FontRef<'_>,
+) -> Option<Arc<[OutlineCurve]>> {
     // Fast path: read-lock
     {
         let cache = OUTLINE_CACHE.read().unwrap();
@@ -55,9 +123,9 @@ pub fn get_or_compute_outline(
                 break;
             }
         }
-        instance.outline(glyph_id)?
+        instance.outline(key.glyph_id)?
     } else {
-        font.outline(glyph_id)?
+        font.outline(key.glyph_id)?
     };
     let curves: Arc<[OutlineCurve]> = outline.curves.into();
 
@@ -69,4 +137,67 @@ pub fn get_or_compute_outline(
     let result = Arc::clone(&curves);
     cache.insert(key, curves);
     Some(result)
+}
+
+/// `FontVec` counterpart to [`get_or_compute_outline_with_source_id`].
+///
+/// `FontVec` owns the parsed font data and cannot be cloned for the variable
+/// font path, so variable fonts are re-parsed as `FontRef` only when the font
+/// actually exposes a `wght` axis. Non-variable fonts use the owned `FontVec`
+/// directly and avoid per-render font parsing entirely.
+pub fn get_or_compute_outline_fontvec(
+    font_id: FontId,
+    font: &FontVec,
+    source: OutlineSourceId,
+    glyph_id: GlyphId,
+) -> Option<Arc<[OutlineCurve]>> {
+    let face_index = font_face_index(font_id);
+    let key = outline_cache_key(source, font_id, glyph_id);
+
+    {
+        let cache = OUTLINE_CACHE.read().unwrap();
+        if let Some(cached) = cache.get(&key) {
+            return Some(Arc::clone(cached));
+        }
+    }
+
+    let needs_variation = font.variations().iter().any(|axis| &axis.tag == b"wght");
+    if needs_variation {
+        // Preserve the existing `FontRef` behavior for variable fonts.
+        let font_ref = FontRef::try_from_slice_and_index(font.as_slice(), face_index).ok()?;
+        return get_or_compute_outline_with_source_id(font_id, &font_ref, source, glyph_id);
+    }
+
+    let outline = font.outline(glyph_id)?;
+    let curves: Arc<[OutlineCurve]> = outline.curves.into();
+
+    let mut cache = OUTLINE_CACHE.write().unwrap();
+    if let Some(existing) = cache.get(&key) {
+        return Some(Arc::clone(existing));
+    }
+    let result = Arc::clone(&curves);
+    cache.insert(key, curves);
+    Some(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn outline_cache_key_includes_source_face_and_glyph() {
+        let source_a = outline_source_id("/tmp/fonts-a", FontId::MainRegular);
+        let source_b = outline_source_id("/tmp/fonts-b", FontId::MainRegular);
+        let base = outline_cache_key(source_a, FontId::MainRegular, GlyphId(10));
+        let same = outline_cache_key(source_a, FontId::MainRegular, GlyphId(10));
+        let other_source = outline_cache_key(source_b, FontId::MainRegular, GlyphId(10));
+        let other_glyph = outline_cache_key(source_a, FontId::MainRegular, GlyphId(11));
+
+        assert_eq!(base, same);
+        #[cfg(not(feature = "embed-fonts"))]
+        assert_ne!(base, other_source);
+        #[cfg(feature = "embed-fonts")]
+        assert_eq!(base, other_source);
+        assert_ne!(base, other_glyph);
+    }
 }

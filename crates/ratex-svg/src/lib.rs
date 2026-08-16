@@ -89,42 +89,39 @@ pub fn render_to_svg_with_color_syntax(
     #[cfg(feature = "embed-fonts")]
     let load_fonts = opts.embed_glyphs;
 
-    // Pre-render standalone glyphs while holding the font lock, then drop it.
-    // This avoids self-referential struct issues with FontRef borrowing from the lock guard.
+    // Pre-render standalone glyphs while the `ParsedFontSet` and its borrowed
+    // `FontVec` references are alive, then drop them. The emitted paths/images
+    // are self-contained, so the body loop below does not need the font cache.
     #[cfg(feature = "standalone")]
     let prerendered_glyphs: Option<Vec<Option<standalone::StandaloneGlyph>>> = {
         if load_fonts {
-            if let Ok(fonts) = ratex_font_loader::load_fonts_for_items(&opts.font_dir, &list.items)
+            if let Ok(fonts) =
+                ratex_font_loader::load_fonts_for_items_parsed(&opts.font_dir, &list.items)
             {
-                if let Ok(font_refs) = standalone::build_font_refs(&fonts) {
-                    let em = opts.em_px();
-                    let pad = opts.padding;
-                    let mut out = Vec::with_capacity(list.items.len());
-                    for item in &list.items {
-                        let glyph = if let DisplayItem::GlyphPath {
-                            x,
-                            y,
-                            scale,
-                            font,
-                            char_code,
-                            ..
-                        } = item
-                        {
-                            let px = (*x * em + pad) as f32;
-                            let py = (*y * em + pad) as f32;
-                            let glyph_em = (*scale * em) as f32;
-                            standalone::standalone_glyph(
-                                px, py, glyph_em, font, *char_code, &font_refs,
-                            )
-                        } else {
-                            None
-                        };
-                        out.push(glyph);
-                    }
-                    Some(out)
-                } else {
-                    None
+                let font_refs = standalone::build_font_refs(&fonts);
+                let em = opts.em_px();
+                let pad = opts.padding;
+                let mut out = Vec::with_capacity(list.items.len());
+                for item in &list.items {
+                    let glyph = if let DisplayItem::GlyphPath {
+                        x,
+                        y,
+                        scale,
+                        font,
+                        char_code,
+                        ..
+                    } = item
+                    {
+                        let px = (*x * em + pad) as f32;
+                        let py = (*y * em + pad) as f32;
+                        let glyph_em = (*scale * em) as f32;
+                        standalone::standalone_glyph(px, py, glyph_em, font, *char_code, &font_refs)
+                    } else {
+                        None
+                    };
+                    out.push(glyph);
                 }
+                Some(out)
             } else {
                 None
             }

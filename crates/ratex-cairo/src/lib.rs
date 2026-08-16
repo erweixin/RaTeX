@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use ab_glyph::{Font, FontRef, OutlineCurve};
 use ratex_font::FontId;
-use ratex_font_loader::FontSet;
+use ratex_font_loader::{outline_source_id, FontSet, OutlineSourceId};
 use ratex_types::{Color, DisplayItem, DisplayList, PathCommand};
 use thiserror::Error;
 
@@ -65,7 +65,7 @@ pub fn render_to_cairo(
         .unwrap_or("");
     let fonts = ratex_font_loader::load_fonts_for_items(font_dir, &display_list.items)
         .map_err(CairoError::Font)?;
-    let font_refs = build_font_refs(&fonts).map_err(CairoError::Font)?;
+    let font_refs = build_font_refs(font_dir, &fonts).map_err(CairoError::Font)?;
 
     let em = options.font_size as f32;
     let pad = options.padding as f32;
@@ -148,12 +148,27 @@ pub fn render_to_cairo(
     Ok(())
 }
 
-fn build_font_refs(data: &FontSet) -> Result<HashMap<FontId, FontRef<'_>>, String> {
+#[derive(Clone)]
+struct CairoFontRef<'a> {
+    font: FontRef<'a>,
+    source_id: OutlineSourceId,
+}
+
+fn build_font_refs<'a>(
+    font_dir: &'a str,
+    data: &'a FontSet,
+) -> Result<HashMap<FontId, CairoFontRef<'a>>, String> {
     let mut font_refs = HashMap::new();
     for (id, bytes) in data.iter() {
         let font = FontRef::try_from_slice_and_index(bytes, sfnt_collection_index(*id))
             .map_err(|e| format!("Failed to parse font {:?}: {}", id, e))?;
-        font_refs.insert(*id, font);
+        font_refs.insert(
+            *id,
+            CairoFontRef {
+                font,
+                source_id: outline_source_id(font_dir, *id),
+            },
+        );
     }
 
     if !font_refs.contains_key(&FontId::MainRegular) {
@@ -172,21 +187,23 @@ fn sfnt_collection_index(id: FontId) -> u32 {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_glyph(
     cr: &cairo::Context,
     point: Point,
     font_id: FontId,
     char_code: u32,
     color: Color,
-    font_cache: &HashMap<FontId, FontRef<'_>>,
+    font_cache: &HashMap<FontId, CairoFontRef<'_>>,
     em: f32,
 ) -> Result<(), CairoError> {
-    let font = match font_cache.get(&font_id) {
-        Some(font) => font,
+    let font_entry = match font_cache.get(&font_id) {
+        Some(entry) => entry,
         None => font_cache
             .get(&FontId::MainRegular)
             .ok_or_else(|| CairoError::Font("Main-Regular font not found".to_string()))?,
     };
+    let font = &font_entry.font;
 
     let ch = ratex_font::katex_ttf_glyph_char(font_id, char_code);
     let glyph_id = font.glyph_id(ch);
@@ -216,6 +233,7 @@ fn render_glyph(
             FontGlyph {
                 font_id,
                 font,
+                source_id: font_entry.source_id,
                 glyph_id,
             },
             color,
@@ -232,6 +250,7 @@ fn render_glyph(
             FontGlyph {
                 font_id,
                 font,
+                source_id: font_entry.source_id,
                 glyph_id,
             },
             color,
@@ -243,14 +262,15 @@ fn render_glyph(
             return Ok(());
         }
         if let Some(fallback_font) = font_cache.get(&FontId::CjkFallback) {
-            let fallback_id = fallback_font.glyph_id(ch);
+            let fallback_id = fallback_font.font.glyph_id(ch);
             if fallback_id.0 != 0 {
                 let _ = render_glyph_with_font(
                     cr,
                     point,
                     FontGlyph {
                         font_id: FontId::CjkFallback,
-                        font: fallback_font,
+                        font: &fallback_font.font,
+                        source_id: fallback_font.source_id,
                         glyph_id: fallback_id,
                     },
                     color,
@@ -268,6 +288,7 @@ fn render_glyph(
             FontGlyph {
                 font_id,
                 font,
+                source_id: font_entry.source_id,
                 glyph_id,
             },
             color,
@@ -285,6 +306,7 @@ fn render_glyph(
         FontGlyph {
             font_id,
             font,
+            source_id: font_entry.source_id,
             glyph_id,
         },
         color,
@@ -319,25 +341,27 @@ struct FallbackOptions {
     skip_main_regular: bool,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn try_system_unicode_fallback(
     cr: &cairo::Context,
     point: Point,
     ch: char,
     color: Color,
     em: f32,
-    font_cache: &HashMap<FontId, FontRef<'_>>,
+    font_cache: &HashMap<FontId, CairoFontRef<'_>>,
     options: FallbackOptions,
 ) -> Result<bool, CairoError> {
     if !options.skip_main_regular {
         if let Some(font) = font_cache.get(&FontId::MainRegular) {
-            let glyph_id = font.glyph_id(ch);
+            let glyph_id = font.font.glyph_id(ch);
             if glyph_id.0 != 0
                 && render_glyph_with_font(
                     cr,
                     point,
                     FontGlyph {
                         font_id: FontId::MainRegular,
-                        font,
+                        font: &font.font,
+                        source_id: font.source_id,
                         glyph_id,
                     },
                     color,
@@ -350,14 +374,15 @@ fn try_system_unicode_fallback(
     }
 
     if let Some(font) = font_cache.get(&FontId::CjkRegular) {
-        let glyph_id = font.glyph_id(ch);
+        let glyph_id = font.font.glyph_id(ch);
         if glyph_id.0 != 0
             && render_glyph_with_font(
                 cr,
                 point,
                 FontGlyph {
                     font_id: FontId::CjkRegular,
-                    font,
+                    font: &font.font,
+                    source_id: font.source_id,
                     glyph_id,
                 },
                 color,
@@ -373,14 +398,15 @@ fn try_system_unicode_fallback(
     }
 
     if let Some(font) = font_cache.get(&FontId::CjkFallback) {
-        let glyph_id = font.glyph_id(ch);
+        let glyph_id = font.font.glyph_id(ch);
         if glyph_id.0 != 0
             && render_glyph_with_font(
                 cr,
                 point,
                 FontGlyph {
                     font_id: FontId::CjkFallback,
-                    font,
+                    font: &font.font,
+                    source_id: font.source_id,
                     glyph_id,
                 },
                 color,
@@ -400,21 +426,22 @@ fn try_draw_emoji_or_outline(
     ch: char,
     color: Color,
     em: f32,
-    font_cache: &HashMap<FontId, FontRef<'_>>,
+    font_cache: &HashMap<FontId, CairoFontRef<'_>>,
 ) -> Result<bool, CairoError> {
     if try_draw_emoji_png(cr, point, em, ch)? {
         return Ok(true);
     }
 
     if let Some(font) = font_cache.get(&FontId::EmojiFallback) {
-        let glyph_id = font.glyph_id(ch);
+        let glyph_id = font.font.glyph_id(ch);
         if glyph_id.0 != 0 {
             return render_glyph_with_font(
                 cr,
                 point,
                 FontGlyph {
                     font_id: FontId::EmojiFallback,
-                    font,
+                    font: &font.font,
+                    source_id: font.source_id,
                     glyph_id,
                 },
                 color,
@@ -429,6 +456,7 @@ fn try_draw_emoji_or_outline(
 struct FontGlyph<'a> {
     font_id: FontId,
     font: &'a FontRef<'a>,
+    source_id: OutlineSourceId,
     glyph_id: ab_glyph::GlyphId,
 }
 
@@ -439,9 +467,10 @@ fn render_glyph_with_font(
     color: Color,
     em: f32,
 ) -> Result<bool, CairoError> {
-    let curves = match ratex_font_loader::outline_cache::get_or_compute_outline(
+    let curves = match ratex_font_loader::outline_cache::get_or_compute_outline_with_source_id(
         glyph.font_id,
         glyph.font,
+        glyph.source_id,
         glyph.glyph_id,
     ) {
         Some(curves) => curves,

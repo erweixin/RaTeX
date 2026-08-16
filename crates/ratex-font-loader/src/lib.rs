@@ -1,7 +1,9 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
-use std::sync::{Arc, OnceLock, RwLock};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, LazyLock, OnceLock, RwLock};
 
+use ab_glyph::FontVec;
 use ratex_font::FontId;
 use ratex_types::display_item::DisplayItem;
 
@@ -34,18 +36,70 @@ const FONT_MAP: &[(FontId, &str)] = &[
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum FontSourceKey {
+pub(crate) enum FontSourceKey {
     Embedded,
     Directory(PathBuf),
     SystemUnicode,
     SystemFallback,
     SystemEmoji,
+    /// Compatibility bucket for the deprecated legacy outline-cache entry point,
+    /// which has no source information to key on.
+    Legacy,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct CacheKey {
     source: FontSourceKey,
     font_id: FontId,
+}
+
+/// Cheap per-glyph cache key component identifying a concrete font source.
+///
+/// Directory/system-font keys are interned once; outline lookups then only
+/// hash/copy a `u64` instead of building and hashing a `PathBuf` for every
+/// glyph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct OutlineSourceId(u64);
+
+static NEXT_OUTLINE_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
+static OUTLINE_SOURCE_IDS: LazyLock<RwLock<HashMap<FontSourceKey, u64>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+fn intern_outline_source(source: FontSourceKey) -> OutlineSourceId {
+    {
+        let sources = OUTLINE_SOURCE_IDS
+            .read()
+            .expect("outline source cache poisoned");
+        if let Some(&id) = sources.get(&source) {
+            return OutlineSourceId(id);
+        }
+    }
+
+    let mut sources = OUTLINE_SOURCE_IDS
+        .write()
+        .expect("outline source cache poisoned");
+    if let Some(&id) = sources.get(&source) {
+        return OutlineSourceId(id);
+    }
+    let id = NEXT_OUTLINE_SOURCE_ID.fetch_add(1, Ordering::Relaxed);
+    sources.insert(source, id);
+    OutlineSourceId(id)
+}
+
+pub(crate) fn legacy_outline_source_id() -> OutlineSourceId {
+    intern_outline_source(FontSourceKey::Legacy)
+}
+
+#[derive(Debug, Clone)]
+struct ParsedFont {
+    font: Arc<FontVec>,
+    source_id: OutlineSourceId,
+}
+
+#[derive(Debug, Clone)]
+enum ParsedFontCacheEntry {
+    Parsed(ParsedFont),
+    Missing,
 }
 
 #[derive(Debug, Clone)]
@@ -75,6 +129,55 @@ impl From<HashMap<FontId, Vec<u8>>> for FontSet {
                 .map(|(id, bytes)| (id, Arc::new(bytes)))
                 .collect(),
         }
+    }
+}
+
+/// Parsed-font cache handle shared by PNG and SVG-standalone renderers.
+///
+/// Each `FontVec` owns its own copy of the TTF/OTF bytes plus pre-parsed cmap
+/// and kern subtables, so glyph lookup and outline extraction do not re-parse
+/// the font on every render. The global parsed-font cache owns one `Arc`, and
+/// this set holds an additional `Arc` clone for the current render. Each entry
+/// also carries its interned [`OutlineSourceId`] so outline lookups do not need
+/// to rebuild the font source key.
+#[derive(Debug)]
+pub struct ParsedFontSet {
+    fonts: HashMap<FontId, ParsedFont>,
+}
+
+impl ParsedFontSet {
+    pub fn get(&self, id: &FontId) -> Option<&FontVec> {
+        self.fonts.get(id).map(|parsed| parsed.font.as_ref())
+    }
+
+    pub fn contains_key(&self, id: &FontId) -> bool {
+        self.fonts.contains_key(id)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&FontId, &FontVec)> {
+        self.fonts
+            .iter()
+            .map(|(id, parsed)| (id, parsed.font.as_ref()))
+    }
+
+    pub fn iter_with_source(&self) -> impl Iterator<Item = (&FontId, &FontVec, OutlineSourceId)> {
+        self.fonts
+            .iter()
+            .map(|(id, parsed)| (id, parsed.font.as_ref(), parsed.source_id))
+    }
+}
+
+/// Collection face index for fonts that use `ab_glyph::FontVec`.
+///
+/// This mirrors the private `sfnt_collection_index` helpers in the renderers;
+/// keeping it in `ratex-font-loader` lets parsed-font consumers ask the cache
+/// layer instead of reaching into `ratex-unicode-font` themselves.
+pub fn font_face_index(font_id: FontId) -> u32 {
+    match font_id {
+        FontId::EmojiFallback => ratex_unicode_font::emoji_font_face_index().unwrap_or(0),
+        FontId::CjkRegular => ratex_unicode_font::unicode_font_face_index().unwrap_or(0),
+        FontId::CjkFallback => ratex_unicode_font::fallback_font_face_index().unwrap_or(0),
+        _ => 0,
     }
 }
 
@@ -143,6 +246,142 @@ static FONT_CACHE: OnceLock<RwLock<HashMap<CacheKey, CachedFont>>> = OnceLock::n
 
 fn cache() -> &'static RwLock<HashMap<CacheKey, CachedFont>> {
     FONT_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
+}
+
+static PARSED_FONT_CACHE: LazyLock<RwLock<HashMap<CacheKey, ParsedFontCacheEntry>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+fn parsed_cache() -> &'static RwLock<HashMap<CacheKey, ParsedFontCacheEntry>> {
+    &PARSED_FONT_CACHE
+}
+
+/// Load fonts referenced by `items`, parsing each TTF once into an owned
+/// `ab_glyph::FontVec` and caching the parsed result globally.
+///
+/// This is the parsed-font counterpart to [`load_fonts_for_items`]; renderers
+/// that need glyph outlines or advances can use the returned [`ParsedFontSet`]
+/// without paying the `FontRef::try_from_slice` cost on every render.
+pub fn load_fonts_for_items_parsed(
+    font_dir: &str,
+    items: &[DisplayItem],
+) -> Result<ParsedFontSet, String> {
+    let plan = FontLoadPlan::for_display_items(items);
+    load_fonts_for_plan_parsed(font_dir, &plan)
+}
+
+/// Parsed-font counterpart to [`load_fonts_for_plan`].
+pub fn load_fonts_for_plan_parsed(
+    font_dir: &str,
+    plan: &FontLoadPlan,
+) -> Result<ParsedFontSet, String> {
+    let wanted = plan.all();
+    let mut out = HashMap::new();
+    let cache = parsed_cache();
+
+    {
+        let cached = cache
+            .read()
+            .map_err(|_| "parsed font cache poisoned".to_string())?;
+        if collect_cached_parsed(font_dir, &wanted, &cached, &mut out) {
+            validate_required_parsed(plan, &out)?;
+            return Ok(ParsedFontSet { fonts: out });
+        }
+    }
+
+    // Ensure raw bytes are available first; then collect the font entries that
+    // are still missing from the parsed cache.
+    let raw = load_fonts_for_plan(font_dir, plan)?;
+
+    let mut to_parse = Vec::new();
+    let mut unavailable = Vec::new();
+    {
+        let cached = cache
+            .read()
+            .map_err(|_| "parsed font cache poisoned".to_string())?;
+        for &font_id in &wanted {
+            let key = cache_key(font_dir, font_id);
+            if cached.contains_key(&key) {
+                continue;
+            }
+            match raw.get(&font_id) {
+                Some(bytes) => to_parse.push((font_id, bytes.to_vec())),
+                None => unavailable.push(font_id),
+            }
+        }
+    }
+
+    // Parse outside the global write lock; `FontVec` owns a copy of the bytes,
+    // so the parse work does not need to serialize with other renderers.
+    let mut parsed = Vec::new();
+    for (font_id, bytes) in to_parse {
+        let font = parse_font_vec(font_id, &bytes)?;
+        let source_id = intern_outline_source(outline_source_key(font_dir, font_id));
+        parsed.push((font_id, ParsedFont { font, source_id }));
+    }
+
+    {
+        let mut cached = cache
+            .write()
+            .map_err(|_| "parsed font cache poisoned".to_string())?;
+        // Another thread may have inserted entries while we were parsing, so
+        // only fill keys that are still absent.
+        for font_id in unavailable {
+            cached
+                .entry(cache_key(font_dir, font_id))
+                .or_insert(ParsedFontCacheEntry::Missing);
+        }
+        for (font_id, parsed_font) in parsed {
+            cached
+                .entry(cache_key(font_dir, font_id))
+                .or_insert(ParsedFontCacheEntry::Parsed(parsed_font));
+        }
+        // Re-collect; `out` may already contain entries from the read fast path.
+        collect_cached_parsed(font_dir, &wanted, &cached, &mut out);
+    }
+
+    validate_required_parsed(plan, &out)?;
+    Ok(ParsedFontSet { fonts: out })
+}
+
+fn parse_font_vec(font_id: FontId, bytes: &[u8]) -> Result<Arc<FontVec>, String> {
+    let face_index = font_face_index(font_id);
+    FontVec::try_from_vec_and_index(bytes.to_vec(), face_index)
+        .map(Arc::new)
+        .map_err(|e| format!("Failed to parse font {}: {e:?}", font_id.as_str()))
+}
+
+fn collect_cached_parsed(
+    font_dir: &str,
+    wanted: &HashSet<FontId>,
+    cached: &HashMap<CacheKey, ParsedFontCacheEntry>,
+    out: &mut HashMap<FontId, ParsedFont>,
+) -> bool {
+    let mut all_known = true;
+    for &font_id in wanted {
+        let key = cache_key(font_dir, font_id);
+        match cached.get(&key) {
+            Some(ParsedFontCacheEntry::Parsed(parsed)) => {
+                out.insert(font_id, parsed.clone());
+            }
+            Some(ParsedFontCacheEntry::Missing) => {}
+            None => {
+                all_known = false;
+            }
+        }
+    }
+    all_known
+}
+
+fn validate_required_parsed(
+    plan: &FontLoadPlan,
+    loaded: &HashMap<FontId, ParsedFont>,
+) -> Result<(), String> {
+    for &font_id in plan.required() {
+        if !loaded.contains_key(&font_id) {
+            return Err(format!("Missing required font {}", font_id.as_str()));
+        }
+    }
+    Ok(())
 }
 
 pub fn load_fonts_for_items(font_dir: &str, items: &[DisplayItem]) -> Result<FontSet, String> {
@@ -228,13 +467,46 @@ fn cache_key(font_dir: &str, font_id: FontId) -> CacheKey {
     }
 }
 
-fn source_key(font_dir: &str, font_id: FontId) -> FontSourceKey {
+pub(crate) fn source_key(font_dir: &str, font_id: FontId) -> FontSourceKey {
     match font_id {
         FontId::CjkRegular => FontSourceKey::SystemUnicode,
         FontId::CjkFallback => FontSourceKey::SystemFallback,
         FontId::EmojiFallback => FontSourceKey::SystemEmoji,
         _ => katex_source_key(font_dir),
     }
+}
+
+/// Cheaper source discriminator for the per-glyph outline cache.
+///
+/// `source_key` canonicalizes `font_dir` because it also keys the persistent
+/// raw/parsed font caches; doing that on every glyph lookup would add a
+/// filesystem syscall per glyph. Outline cache keys only need to avoid mixing
+/// distinct directories, so a plain path value is sufficient.
+pub(crate) fn outline_source_key(font_dir: &str, font_id: FontId) -> FontSourceKey {
+    match font_id {
+        FontId::CjkRegular => FontSourceKey::SystemUnicode,
+        FontId::CjkFallback => FontSourceKey::SystemFallback,
+        FontId::EmojiFallback => FontSourceKey::SystemEmoji,
+        _ => outline_katex_source_key(font_dir),
+    }
+}
+
+/// Intern a font source for outline-cache lookups.
+///
+/// This is intended to be called once per loaded font (not once per glyph) and
+/// returns a cheap copyable ID for [`outline_cache::get_or_compute_outline_with_source_id`].
+pub fn outline_source_id(font_dir: &str, font_id: FontId) -> OutlineSourceId {
+    intern_outline_source(outline_source_key(font_dir, font_id))
+}
+
+#[cfg(feature = "embed-fonts")]
+fn outline_katex_source_key(_font_dir: &str) -> FontSourceKey {
+    FontSourceKey::Embedded
+}
+
+#[cfg(not(feature = "embed-fonts"))]
+fn outline_katex_source_key(font_dir: &str) -> FontSourceKey {
+    FontSourceKey::Directory(PathBuf::from(font_dir))
 }
 
 #[cfg(feature = "embed-fonts")]
@@ -350,5 +622,67 @@ mod tests {
         let mut out = HashMap::new();
         assert!(collect_cached(font_dir, &wanted, &cached, &mut out));
         assert!(!out.contains_key(&FontId::EmojiFallback));
+    }
+
+    #[test]
+    fn cached_missing_optional_parsed_font_counts_as_known() {
+        let font_dir = "/tmp/ratex-font-loader-test-missing-optional";
+        let mut wanted = HashSet::new();
+        wanted.insert(FontId::EmojiFallback);
+
+        let mut cached = HashMap::new();
+        cached.insert(
+            cache_key(font_dir, FontId::EmojiFallback),
+            ParsedFontCacheEntry::Missing,
+        );
+
+        let mut out: HashMap<FontId, ParsedFont> = HashMap::new();
+        assert!(collect_cached_parsed(font_dir, &wanted, &cached, &mut out));
+        assert!(!out.contains_key(&FontId::EmojiFallback));
+    }
+
+    #[cfg(not(feature = "embed-fonts"))]
+    #[test]
+    fn parsed_loader_caches_unavailable_optional_font() {
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let source_font = manifest_dir.join("../../fonts/KaTeX_Main-Regular.ttf");
+        if !source_font.exists() {
+            eprintln!("SKIP parsed_loader_caches_unavailable_optional_font: fonts not present");
+            return;
+        }
+
+        let font_dir = std::env::temp_dir().join(format!(
+            "ratex-parsed-loader-test-{}-{}",
+            std::process::id(),
+            line!()
+        ));
+        let _ = std::fs::remove_dir_all(&font_dir);
+        std::fs::create_dir_all(&font_dir).expect("create temp font dir");
+        std::fs::copy(&source_font, font_dir.join("KaTeX_Main-Regular.ttf"))
+            .expect("copy Main-Regular");
+
+        let plan = FontLoadPlan {
+            required: HashSet::from([FontId::MainRegular]),
+            optional: HashSet::from([FontId::Size1Regular]),
+        };
+        let font_dir = font_dir.to_string_lossy().to_string();
+
+        let fonts = load_fonts_for_plan_parsed(&font_dir, &plan).expect("first parsed load");
+        assert!(fonts.contains_key(&FontId::MainRegular));
+        assert!(!fonts.contains_key(&FontId::Size1Regular));
+
+        let cached = parsed_cache().read().unwrap();
+        assert!(matches!(
+            cached.get(&cache_key(&font_dir, FontId::Size1Regular)),
+            Some(ParsedFontCacheEntry::Missing)
+        ));
+
+        // A second load must observe the same cached result (the missing
+        // optional font is a known `None`, so the fast path can be used).
+        let fonts = load_fonts_for_plan_parsed(&font_dir, &plan).expect("second parsed load");
+        assert!(fonts.contains_key(&FontId::MainRegular));
+        assert!(!fonts.contains_key(&FontId::Size1Regular));
+
+        let _ = std::fs::remove_dir_all(font_dir);
     }
 }
