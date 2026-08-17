@@ -97,6 +97,14 @@ text remains in `test_cases.txt`; it is not duplicated. Full JSON diagnostics
 are uploaded by CI as an artifact, while CSV, generated manifests, PNG output,
 and SVG output are not versioned.
 
+The committed compact baseline is also consumed by the website, but CI does
+not use its scores as the regression gate because browser/font rasterization
+is OS-dependent. CI checks out the target commit into a temporary worktree and
+regenerates its RaTeX output, KaTeX fixtures, and compact baseline on the same
+Ubuntu runner as the proposed change. The per-case comparison therefore
+measures the code change rather than differences between developer and runner
+rendering environments.
+
 Useful gates:
 
 ```text

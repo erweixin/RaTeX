@@ -36,19 +36,32 @@ jobs:
         run: |
           ./scripts/update_golden_output.sh --png-only
           node tools/golden_compare/generate_reference.mjs
-      - name: Read the trusted baseline from the target commit
+      - name: Regenerate the trusted baseline from the target commit
         env:
           BASELINE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |
-          git fetch --no-tags --depth=1 origin "$BASELINE_SHA"
-          if git show "${BASELINE_SHA}:tests/golden/baseline.json" \
-            > "$RUNNER_TEMP/golden-baseline.json"; then
-            git show "${BASELINE_SHA}:tests/golden/test_cases.txt" \
-              > "$RUNNER_TEMP/golden-baseline-cases.txt"
-            echo "Using baseline from $BASELINE_SHA"
+          if [[ "$BASELINE_SHA" != "0000000000000000000000000000000000000000" ]] && \
+            git fetch --no-tags --depth=1 origin "$BASELINE_SHA" && \
+            git cat-file -e "${BASELINE_SHA}^{commit}"; then
+            base_dir="$RUNNER_TEMP/golden-base"
+            git worktree add --detach "$base_dir" "$BASELINE_SHA"
+            npm ci --prefix "$base_dir/tools/golden_compare"
+            "$base_dir/scripts/update_golden_output.sh" --png-only
+            node "$base_dir/tools/golden_compare/generate_reference.mjs"
+            python3 tools/golden_compare/compare_golden.py \
+              --test-cases "$base_dir/tests/golden/test_cases.txt" \
+              --fixtures "$base_dir/tests/golden/fixtures" \
+              --output "$base_dir/tests/golden/output" \
+              --policy "$base_dir/tests/golden/policy.json" \
+              --baseline-out "$RUNNER_TEMP/golden-baseline.json" \
+              --require-manifests \
+              --fail-on-missing \
+              --min-coverage 1.0
+            cp "$base_dir/tests/golden/test_cases.txt" \
+              "$RUNNER_TEMP/golden-baseline-cases.txt"
+            echo "Generated same-runner baseline from $BASELINE_SHA"
           else
-            rm -f "$RUNNER_TEMP/golden-baseline.json"
-            echo "::notice::The target commit has no compact golden baseline; running absolute gates only."
+            echo "::notice::The target commit is unavailable; running absolute gates only."
           fi
       - name: Score with the authoritative Python comparator
         run: |
