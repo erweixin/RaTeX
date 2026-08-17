@@ -257,29 +257,30 @@ fn may_need_runtime_unicode_fallback(font_id: FontId, char_code: u32) -> bool {
 static FONT_CACHE: OnceLock<RwLock<HashMap<CacheKey, CachedFont>>> = OnceLock::new();
 
 /// Bound the global raw/parsed font caches when many distinct `font_dir`
-/// values are used. Entries are value objects (`Arc` clones), so clearing is
+/// values are used. Entries are value objects (`Arc` clones), so eviction is
 /// safe for already-returned `FontSet`/`ParsedFontSet` handles; subsequent
 /// renders simply reload and reparse.
 const FONT_CACHE_CAP: usize = 4096;
 const PARSED_FONT_CACHE_CAP: usize = 4096;
 
-fn trim_cache_at_capacity<K, V>(
-    cache: &RwLock<HashMap<K, V>>,
+/// Evict unrelated entries only when an insertion would exceed `cap`.
+///
+/// Keeping this decision on the write path is important: a cache that is at
+/// capacity can still serve hits indefinitely without becoming cold.
+fn make_cache_room_for_insert<K, V>(
+    cache: &mut HashMap<K, V>,
+    pending: usize,
     cap: usize,
-    name: &str,
-) -> Result<(), String> {
-    {
-        let cached = cache.read().map_err(|_| format!("{name} poisoned"))?;
-        if cached.len() < cap {
-            return Ok(());
-        }
+    mut keep: impl FnMut(&K) -> bool,
+) {
+    if pending == 0 || cache.len().saturating_add(pending) <= cap {
+        return;
     }
 
-    let mut cached = cache.write().map_err(|_| format!("{name} poisoned"))?;
-    if cached.len() >= cap {
-        cached.clear();
+    cache.retain(|key, _| keep(key));
+    if cache.len().saturating_add(pending) > cap {
+        cache.clear();
     }
-    Ok(())
 }
 
 fn cache() -> &'static RwLock<HashMap<CacheKey, CachedFont>> {
@@ -315,7 +316,6 @@ pub fn load_fonts_for_plan_parsed(
     let wanted = plan.all();
     let mut out = HashMap::new();
     let cache = parsed_cache();
-    trim_cache_at_capacity(cache, PARSED_FONT_CACHE_CAP, "parsed font cache")?;
 
     {
         let cached = cache
@@ -349,11 +349,12 @@ pub fn load_fonts_for_plan_parsed(
         }
     }
 
-    // Parse outside the global write lock; `FontVec` owns a copy of the bytes,
-    // so the parse work does not need to serialize with other renderers.
+    // Parse outside the global write lock. Each `FontVec` takes ownership of
+    // the prepared byte buffer, so parsing neither serializes with other
+    // renderers nor clones that buffer again.
     let mut parsed = Vec::new();
     for (font_id, bytes) in to_parse {
-        let font = parse_font_vec(font_id, &bytes)?;
+        let font = parse_font_vec(font_id, bytes)?;
         let source_id = intern_outline_source(outline_source_key(font_dir, font_id));
         parsed.push((font_id, ParsedFont { font, source_id }));
     }
@@ -363,7 +364,22 @@ pub fn load_fonts_for_plan_parsed(
             .write()
             .map_err(|_| "parsed font cache poisoned".to_string())?;
         // Another thread may have inserted entries while we were parsing, so
-        // only fill keys that are still absent.
+        // only make room for and fill keys that are still absent.
+        let pending = unavailable
+            .iter()
+            .filter(|&&font_id| !cached.contains_key(&cache_key(font_dir, font_id)))
+            .count()
+            + parsed
+                .iter()
+                .filter(|(font_id, _)| !cached.contains_key(&cache_key(font_dir, *font_id)))
+                .count();
+        let wanted_keys: HashSet<_> = wanted
+            .iter()
+            .map(|&font_id| cache_key(font_dir, font_id))
+            .collect();
+        make_cache_room_for_insert(&mut cached, pending, PARSED_FONT_CACHE_CAP, |key| {
+            wanted_keys.contains(key)
+        });
         for font_id in unavailable {
             cached
                 .entry(cache_key(font_dir, font_id))
@@ -382,9 +398,9 @@ pub fn load_fonts_for_plan_parsed(
     Ok(ParsedFontSet { fonts: out })
 }
 
-fn parse_font_vec(font_id: FontId, bytes: &[u8]) -> Result<Arc<FontVec>, String> {
+fn parse_font_vec(font_id: FontId, bytes: Vec<u8>) -> Result<Arc<FontVec>, String> {
     let face_index = font_face_index(font_id);
-    FontVec::try_from_vec_and_index(bytes.to_vec(), face_index)
+    FontVec::try_from_vec_and_index(bytes, face_index)
         .map(Arc::new)
         .map_err(|e| format!("Failed to parse font {}: {e:?}", font_id.as_str()))
 }
@@ -432,7 +448,6 @@ pub fn load_fonts_for_plan(font_dir: &str, plan: &FontLoadPlan) -> Result<FontSe
     let wanted = plan.all();
     let mut out = HashMap::new();
     let cache = cache();
-    trim_cache_at_capacity(cache, FONT_CACHE_CAP, "font cache")?;
 
     {
         let cached = cache
@@ -448,13 +463,21 @@ pub fn load_fonts_for_plan(font_dir: &str, plan: &FontLoadPlan) -> Result<FontSe
         let mut cached = cache
             .write()
             .map_err(|_| "font cache poisoned".to_string())?;
-        for &font_id in &wanted {
-            let key = cache_key(font_dir, font_id);
-            if cached.contains_key(&key) {
-                continue;
-            }
+        let missing: Vec<_> = wanted
+            .iter()
+            .copied()
+            .filter(|&font_id| !cached.contains_key(&cache_key(font_dir, font_id)))
+            .collect();
+        let wanted_keys: HashSet<_> = wanted
+            .iter()
+            .map(|&font_id| cache_key(font_dir, font_id))
+            .collect();
+        make_cache_room_for_insert(&mut cached, missing.len(), FONT_CACHE_CAP, |key| {
+            wanted_keys.contains(key)
+        });
+        for font_id in missing {
             let loaded = load_font_bytes(font_dir, font_id)?;
-            cached.insert(key, loaded);
+            cached.insert(cache_key(font_dir, font_id), loaded);
         }
         // Re-collect without clearing `out`: fonts already inserted during the
         // read-lock fast path stay in place (overwritten with identical Arc
@@ -664,6 +687,26 @@ mod tests {
         let mut out: HashMap<FontId, ParsedFont> = HashMap::new();
         assert!(collect_cached_parsed(font_dir, &wanted, &cached, &mut out));
         assert!(!out.contains_key(&FontId::EmojiFallback));
+    }
+
+    #[test]
+    fn full_cache_hit_does_not_trigger_eviction() {
+        let mut cached = HashMap::from([(1_u8, "one"), (2, "two")]);
+
+        make_cache_room_for_insert(&mut cached, 0, 2, |_| false);
+
+        assert_eq!(cached.len(), 2);
+        assert_eq!(cached.get(&1), Some(&"one"));
+        assert_eq!(cached.get(&2), Some(&"two"));
+    }
+
+    #[test]
+    fn cache_miss_evicts_only_unrelated_entries() {
+        let mut cached = HashMap::from([(1_u8, "keep"), (2, "evict")]);
+
+        make_cache_room_for_insert(&mut cached, 1, 2, |key| *key == 1);
+
+        assert_eq!(cached, HashMap::from([(1, "keep")]));
     }
 
     #[cfg(all(not(feature = "embed-fonts"), unix))]

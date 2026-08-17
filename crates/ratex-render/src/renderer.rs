@@ -522,13 +522,54 @@ struct CachedEmojiRaster {
     pixels_per_em: f32,
 }
 
-static EMOJI_RASTER_CACHE: LazyLock<RwLock<HashMap<EmojiRasterCacheKey, Arc<CachedEmojiRaster>>>> =
-    LazyLock::new(|| RwLock::new(HashMap::new()));
+#[derive(Default)]
+struct EmojiRasterCache {
+    entries: HashMap<EmojiRasterCacheKey, Arc<CachedEmojiRaster>>,
+    /// Decoded RGBA pixel bytes retained by `entries`.
+    bytes: usize,
+}
 
-/// Upper bound on cached decoded emoji strikes. Each strike is usually a few
-/// KiB to tens of KiB; clearing wholesale on overflow keeps long-running
-/// renderers bounded while preserving the common repeated-formula fast path.
+impl EmojiRasterCache {
+    fn clear(&mut self) {
+        self.entries.clear();
+        self.bytes = 0;
+    }
+
+    fn insert_with_limits(
+        &mut self,
+        key: EmojiRasterCacheKey,
+        entry: Arc<CachedEmojiRaster>,
+        entry_cap: usize,
+        byte_cap: usize,
+    ) {
+        // Another thread may have decoded the same strike while this caller
+        // was working. A duplicate must not evict the existing hot entry.
+        if self.entries.contains_key(&key) {
+            return;
+        }
+
+        let entry_bytes = entry.pixmap.data().len();
+        // Do not flush useful entries for a single raster that cannot fit in
+        // the cache by itself.
+        if entry_bytes > byte_cap {
+            return;
+        }
+        if self.entries.len() >= entry_cap || self.bytes.saturating_add(entry_bytes) > byte_cap {
+            self.clear();
+        }
+        self.bytes += entry_bytes;
+        self.entries.insert(key, entry);
+    }
+}
+
+static EMOJI_RASTER_CACHE: LazyLock<RwLock<EmojiRasterCache>> =
+    LazyLock::new(|| RwLock::new(EmojiRasterCache::default()));
+
+/// Upper bounds on cached decoded emoji strikes. The entry cap limits key
+/// diversity while the byte cap bounds the decoded RGBA pixel memory retained
+/// by large color-font strikes.
 const EMOJI_RASTER_CACHE_CAP: usize = 4096;
+const EMOJI_RASTER_CACHE_BYTE_CAP: usize = 64 * 1024 * 1024;
 
 /// Cache key for rasterized outline-glyph masks.
 ///
@@ -961,11 +1002,12 @@ fn try_blit_raster_glyph(
         glyph_id: gid.0,
         pixels_per_em: img.pixels_per_em,
     };
-    {
+    let cached_entry = {
         let cache = EMOJI_RASTER_CACHE.read().unwrap();
-        if let Some(entry) = cache.get(&key) {
-            return blit_cached_emoji_raster(pixmap, &params, entry);
-        }
+        cache.entries.get(&key).cloned()
+    };
+    if let Some(entry) = cached_entry {
+        return blit_cached_emoji_raster(pixmap, &params, &entry);
     }
 
     let glyph_pm = match raster_glyph_image_to_pixmap(&img) {
@@ -985,10 +1027,12 @@ fn try_blit_raster_glyph(
     // Insert without replacing an existing entry: another thread may have
     // decoded the same strike while we were working.
     let mut cache = EMOJI_RASTER_CACHE.write().unwrap();
-    if cache.len() >= EMOJI_RASTER_CACHE_CAP {
-        cache.clear();
-    }
-    cache.entry(key).or_insert(entry);
+    cache.insert_with_limits(
+        key,
+        entry,
+        EMOJI_RASTER_CACHE_CAP,
+        EMOJI_RASTER_CACHE_BYTE_CAP,
+    );
     result
 }
 
@@ -1458,6 +1502,7 @@ mod glyph_mask_cache_tests {
 
         let cache = EMOJI_RASTER_CACHE.read().unwrap();
         let matching_entries = cache
+            .entries
             .keys()
             .filter(|key| {
                 key.font_ptr == font_bytes.as_ptr() as usize
@@ -1470,6 +1515,55 @@ mod glyph_mask_cache_tests {
             matching_entries, 1,
             "requests {first_request} and {second_request} resolved to one strike"
         );
+    }
+
+    #[test]
+    fn emoji_raster_cache_enforces_decoded_byte_budget() {
+        fn key(glyph_id: u16) -> EmojiRasterCacheKey {
+            EmojiRasterCacheKey {
+                font_ptr: 1,
+                font_len: 1,
+                face_index: 0,
+                glyph_id,
+                pixels_per_em: 16,
+            }
+        }
+
+        fn entry(width: u32, height: u32) -> Arc<CachedEmojiRaster> {
+            Arc::new(CachedEmojiRaster {
+                pixmap: Arc::new(Pixmap::new(width, height).unwrap()),
+                x: 0.0,
+                y: 0.0,
+                width: width as f32,
+                height: height as f32,
+                pixels_per_em: 16.0,
+            })
+        }
+
+        let mut cache = EmojiRasterCache::default();
+        let first = entry(2, 2);
+        let entry_bytes = first.pixmap.data().len();
+        cache.insert_with_limits(key(1), first, 4, entry_bytes + 1);
+        assert_eq!(cache.bytes, entry_bytes);
+
+        // The second raster would exceed the byte budget, so the old entry is
+        // evicted and the cache remains within budget.
+        let second = entry(2, 2);
+        cache.insert_with_limits(key(2), Arc::clone(&second), 4, entry_bytes + 1);
+        assert_eq!(cache.entries.len(), 1);
+        assert!(cache.entries.contains_key(&key(2)));
+        assert_eq!(cache.bytes, entry_bytes);
+
+        // A duplicate insertion at the entry cap must preserve the hot value.
+        cache.insert_with_limits(key(2), entry(2, 2), 1, entry_bytes + 1);
+        assert!(Arc::ptr_eq(cache.entries.get(&key(2)).unwrap(), &second));
+
+        // A single oversized raster is not cached and does not flush entries
+        // that already fit within the budget.
+        cache.insert_with_limits(key(3), entry(3, 3), 4, entry_bytes + 1);
+        assert_eq!(cache.entries.len(), 1);
+        assert!(cache.entries.contains_key(&key(2)));
+        assert_eq!(cache.bytes, entry_bytes);
     }
 
     fn font_dir() -> String {
