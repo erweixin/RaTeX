@@ -559,13 +559,22 @@ struct GlyphMaskKey {
     color: u32,
 }
 
-static GLYPH_MASK_CACHE: LazyLock<RwLock<HashMap<GlyphMaskKey, Arc<Pixmap>>>> =
-    LazyLock::new(|| RwLock::new(HashMap::new()));
-
-/// Upper bound on cached glyph masks. Masks are small (a 40 px glyph is
-/// ~4 KiB); the cap keeps long-running processes bounded. On overflow the
-/// cache is cleared wholesale — simple, and misses only re-rasterize.
+/// Upper bound on cached glyph masks. The entry cap limits key diversity while
+/// the byte cap bounds the actual pixel memory retained by the cache.
 const GLYPH_MASK_CACHE_CAP: usize = 8192;
+const GLYPH_MASK_CACHE_BYTE_CAP: usize = 64 * 1024 * 1024;
+
+struct GlyphMaskCache {
+    entries: HashMap<GlyphMaskKey, Arc<Pixmap>>,
+    bytes: usize,
+}
+
+static GLYPH_MASK_CACHE: LazyLock<RwLock<GlyphMaskCache>> = LazyLock::new(|| {
+    RwLock::new(GlyphMaskCache {
+        entries: HashMap::new(),
+        bytes: 0,
+    })
+});
 
 fn pack_color_u32(color: &Color) -> u32 {
     let [r, g, b, a] = color_to_rgba8(color);
@@ -770,7 +779,7 @@ fn render_glyph_with_font(
 
     {
         let cache = GLYPH_MASK_CACHE.read().unwrap();
-        if let Some(mask) = cache.get(&cache_key) {
+        if let Some(mask) = cache.entries.get(&cache_key) {
             let mask = Arc::clone(mask);
             drop(cache);
             blit_glyph_mask(pixmap, &mask, dst_x, dst_y, paint_rgba);
@@ -879,11 +888,18 @@ fn render_glyph_with_font(
     // Insert without replacing an existing entry: another thread may have
     // rasterized the same glyph while we were working.
     let entry = Arc::new(mask);
+    let entry_bytes = entry.data().len();
     let mut cache = GLYPH_MASK_CACHE.write().unwrap();
-    if cache.len() >= GLYPH_MASK_CACHE_CAP {
-        cache.clear();
+    if !cache.entries.contains_key(&cache_key) && entry_bytes <= GLYPH_MASK_CACHE_BYTE_CAP {
+        if cache.entries.len() >= GLYPH_MASK_CACHE_CAP
+            || cache.bytes.saturating_add(entry_bytes) > GLYPH_MASK_CACHE_BYTE_CAP
+        {
+            cache.entries.clear();
+            cache.bytes = 0;
+        }
+        cache.bytes += entry_bytes;
+        cache.entries.insert(cache_key, entry);
     }
-    cache.entry(cache_key).or_insert(entry);
     true
 }
 

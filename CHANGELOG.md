@@ -18,7 +18,8 @@ section.
   quantized paint color, so cache hits are pixel-identical; repeated renders
   of the same formula (live preview, batch re-renders) become plain pixel
   blits instead of curve flattening + anti-aliased fills. Glyph-mask cache
-  capped at 8192 entries; decoded emoji-strike cache capped at 4096 entries.
+  capped at 8192 entries and 64 MiB of pixel data; decoded emoji-strike cache
+  capped at 4096 entries.
 - **Fonts**: bound the raw-font, parsed-font, and font-source caches at 4096
   entries each so long-running renderers with many distinct font directories
   do not grow without limit. Clearing only drops cache entries; returned

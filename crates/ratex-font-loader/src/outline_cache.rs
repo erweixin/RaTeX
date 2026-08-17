@@ -43,6 +43,11 @@ fn outline_cache_key(
 static OUTLINE_CACHE: LazyLock<RwLock<HashMap<OutlineCacheKey, OutlineData>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
+/// Upper bound on cached glyph outlines. The source-aware cache key includes
+/// an interned font source ID, so bounding entries prevents old source IDs
+/// from retaining outline data indefinitely in long-running processes.
+const OUTLINE_CACHE_CAP: usize = 16_384;
+
 /// Retrieve cached outline curves, or compute + cache them via `font.outline()`.
 ///
 /// Position and scale are **not** applied — callers must transform the curves
@@ -134,6 +139,9 @@ fn get_or_compute_outline_with_key(
     if let Some(existing) = cache.get(&key) {
         return Some(Arc::clone(existing));
     }
+    if cache.len() >= OUTLINE_CACHE_CAP {
+        cache.clear();
+    }
     let result = Arc::clone(&curves);
     cache.insert(key, curves);
     Some(result)
@@ -174,6 +182,9 @@ pub fn get_or_compute_outline_fontvec(
     let mut cache = OUTLINE_CACHE.write().unwrap();
     if let Some(existing) = cache.get(&key) {
         return Some(Arc::clone(existing));
+    }
+    if cache.len() >= OUTLINE_CACHE_CAP {
+        cache.clear();
     }
     let result = Arc::clone(&curves);
     cache.insert(key, curves);
