@@ -509,8 +509,8 @@ struct EmojiRasterCacheKey {
     font_ptr: usize,
     font_len: usize,
     face_index: u32,
-    ch: char,
-    strike: u16,
+    glyph_id: u16,
+    pixels_per_em: u16,
 }
 
 struct CachedEmojiRaster {
@@ -944,14 +944,22 @@ fn try_blit_raster_glyph(
         Some(g) => g,
         None => return false,
     };
-    let strike = params.em.round().clamp(8.0, 256.0) as u16;
-
+    let requested_strike = params.em.round().clamp(8.0, 256.0) as u16;
+    let img = face
+        .glyph_raster_image(gid, requested_strike)
+        .or_else(|| face.glyph_raster_image(gid, u16::MAX));
+    let Some(img) = img else {
+        return false;
+    };
+    // Multiple requested sizes can resolve to the same bitmap strike. Cache by
+    // the strike that was actually returned so those requests share one decoded
+    // pixmap; the requested `params.em` is still applied when drawing below.
     let key = EmojiRasterCacheKey {
         font_ptr: font_bytes.as_ptr() as usize,
         font_len: font_bytes.len(),
         face_index,
-        ch: params.ch,
-        strike,
+        glyph_id: gid.0,
+        pixels_per_em: img.pixels_per_em,
     };
     {
         let cache = EMOJI_RASTER_CACHE.read().unwrap();
@@ -960,12 +968,6 @@ fn try_blit_raster_glyph(
         }
     }
 
-    let img = face
-        .glyph_raster_image(gid, strike)
-        .or_else(|| face.glyph_raster_image(gid, u16::MAX));
-    let Some(img) = img else {
-        return false;
-    };
     let glyph_pm = match raster_glyph_image_to_pixmap(&img) {
         Some(p) => p,
         None => return false,
@@ -1403,6 +1405,71 @@ mod glyph_mask_cache_tests {
         );
         assert_eq!(color_to_rgba8(&truncates_to_zero)[0], 0);
         assert_eq!(color_to_rgba8(&truncates_to_one)[0], 1);
+    }
+
+    #[test]
+    fn emoji_requests_resolving_to_one_strike_share_one_cache_entry() {
+        let Some(font_bytes) = ratex_unicode_font::load_emoji_font_arc() else {
+            return;
+        };
+        let face_index = ratex_unicode_font::emoji_font_face_index().unwrap_or(0);
+        let Ok(face) = ttf_parser::Face::parse(font_bytes.as_slice(), face_index) else {
+            return;
+        };
+        let ch = '😊';
+        let Some(gid) = face.glyph_index(ch) else {
+            return;
+        };
+
+        let mut first_request_by_ppem = HashMap::new();
+        let mut duplicate_requests = None;
+        for requested in 8_u16..=256 {
+            let image = face
+                .glyph_raster_image(gid, requested)
+                .or_else(|| face.glyph_raster_image(gid, u16::MAX));
+            let Some(image) = image else {
+                continue;
+            };
+            if let Some(previous) = first_request_by_ppem.insert(image.pixels_per_em, requested) {
+                duplicate_requests = Some((previous, requested));
+                break;
+            }
+        }
+        let Some((first_request, second_request)) = duplicate_requests else {
+            return;
+        };
+
+        EMOJI_RASTER_CACHE.write().unwrap().clear();
+        let mut pixmap = Pixmap::new(512, 512).unwrap();
+        for requested in [first_request, second_request] {
+            assert!(try_blit_raster_glyph(
+                &mut pixmap,
+                RasterGlyphParams {
+                    px: 128.0,
+                    py: 256.0,
+                    em: f32::from(requested),
+                    ch,
+                    opacity: 1.0,
+                },
+                font_bytes.as_slice(),
+                face_index,
+            ));
+        }
+
+        let cache = EMOJI_RASTER_CACHE.read().unwrap();
+        let matching_entries = cache
+            .keys()
+            .filter(|key| {
+                key.font_ptr == font_bytes.as_ptr() as usize
+                    && key.font_len == font_bytes.len()
+                    && key.face_index == face_index
+                    && key.glyph_id == gid.0
+            })
+            .count();
+        assert_eq!(
+            matching_entries, 1,
+            "requests {first_request} and {second_request} resolved to one strike"
+        );
     }
 
     fn font_dir() -> String {
