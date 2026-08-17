@@ -46,8 +46,11 @@ jobs:
             base_dir="$RUNNER_TEMP/golden-base"
             git worktree add --detach "$base_dir" "$BASELINE_SHA"
             npm ci --prefix "$base_dir/tools/golden_compare"
-            "$base_dir/scripts/update_golden_output.sh" --png-only
-            node "$base_dir/tools/golden_compare/generate_reference.mjs"
+            (
+              cd "$base_dir"
+              ./scripts/update_golden_output.sh --png-only
+              node tools/golden_compare/generate_reference.mjs
+            )
             python3 tools/golden_compare/compare_golden.py \
               --test-cases "$base_dir/tests/golden/test_cases.txt" \
               --fixtures "$base_dir/tests/golden/fixtures" \

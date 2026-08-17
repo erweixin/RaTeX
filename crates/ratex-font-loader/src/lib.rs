@@ -518,17 +518,12 @@ pub(crate) fn source_key(font_dir: &str, font_id: FontId) -> FontSourceKey {
 
 /// Cheaper source discriminator for the per-glyph outline cache.
 ///
-/// `source_key` canonicalizes `font_dir` because it also keys the persistent
-/// raw/parsed font caches; doing that on every glyph lookup would add a
-/// filesystem syscall per glyph. Outline cache keys only need to avoid mixing
-/// distinct directories, so a plain path value is sufficient.
+/// This uses the same canonical directory identity as the persistent
+/// raw/parsed font caches. Callers intern it once per loaded font, avoiding a
+/// filesystem lookup on each glyph while preventing stale outline reuse when
+/// a relative path or symlink later resolves to a different directory.
 pub(crate) fn outline_source_key(font_dir: &str, font_id: FontId) -> FontSourceKey {
-    match font_id {
-        FontId::CjkRegular => FontSourceKey::SystemUnicode,
-        FontId::CjkFallback => FontSourceKey::SystemFallback,
-        FontId::EmojiFallback => FontSourceKey::SystemEmoji,
-        _ => outline_katex_source_key(font_dir),
-    }
+    source_key(font_dir, font_id)
 }
 
 /// Intern a font source for outline-cache lookups.
@@ -537,16 +532,6 @@ pub(crate) fn outline_source_key(font_dir: &str, font_id: FontId) -> FontSourceK
 /// returns a cheap copyable ID for [`outline_cache::get_or_compute_outline_with_source_id`].
 pub fn outline_source_id(font_dir: &str, font_id: FontId) -> OutlineSourceId {
     intern_outline_source(outline_source_key(font_dir, font_id))
-}
-
-#[cfg(feature = "embed-fonts")]
-fn outline_katex_source_key(_font_dir: &str) -> FontSourceKey {
-    FontSourceKey::Embedded
-}
-
-#[cfg(not(feature = "embed-fonts"))]
-fn outline_katex_source_key(font_dir: &str) -> FontSourceKey {
-    FontSourceKey::Directory(PathBuf::from(font_dir))
 }
 
 #[cfg(feature = "embed-fonts")]
@@ -679,6 +664,35 @@ mod tests {
         let mut out: HashMap<FontId, ParsedFont> = HashMap::new();
         assert!(collect_cached_parsed(font_dir, &wanted, &cached, &mut out));
         assert!(!out.contains_key(&FontId::EmojiFallback));
+    }
+
+    #[cfg(all(not(feature = "embed-fonts"), unix))]
+    #[test]
+    fn outline_source_id_changes_when_symlink_target_changes() {
+        use std::os::unix::fs::symlink;
+
+        let root = std::env::temp_dir().join(format!(
+            "ratex-outline-source-test-{}-{}",
+            std::process::id(),
+            line!()
+        ));
+        let target_a = root.join("a");
+        let target_b = root.join("b");
+        let link = root.join("fonts");
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&target_a).expect("create first font directory");
+        std::fs::create_dir_all(&target_b).expect("create second font directory");
+        symlink(&target_a, &link).expect("create font directory symlink");
+
+        let link = link.to_string_lossy().to_string();
+        let source_a = outline_source_id(&link, FontId::MainRegular);
+
+        std::fs::remove_file(&link).expect("remove old font directory symlink");
+        symlink(&target_b, &link).expect("retarget font directory symlink");
+        let source_b = outline_source_id(&link, FontId::MainRegular);
+
+        assert_ne!(source_a, source_b);
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[cfg(not(feature = "embed-fonts"))]

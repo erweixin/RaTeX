@@ -48,6 +48,23 @@ static OUTLINE_CACHE: LazyLock<RwLock<HashMap<OutlineCacheKey, OutlineData>>> =
 /// from retaining outline data indefinitely in long-running processes.
 const OUTLINE_CACHE_CAP: usize = 16_384;
 
+fn insert_outline(
+    cache: &mut HashMap<OutlineCacheKey, OutlineData>,
+    key: OutlineCacheKey,
+    curves: OutlineData,
+    cap: usize,
+) -> OutlineData {
+    if let Some(existing) = cache.get(&key) {
+        return Arc::clone(existing);
+    }
+    if cache.len() >= cap {
+        cache.clear();
+    }
+    let result = Arc::clone(&curves);
+    cache.insert(key, curves);
+    result
+}
+
 /// Retrieve cached outline curves, or compute + cache them via `font.outline()`.
 ///
 /// Position and scale are **not** applied — callers must transform the curves
@@ -136,15 +153,7 @@ fn get_or_compute_outline_with_key(
 
     let mut cache = OUTLINE_CACHE.write().unwrap();
     // Double-check: another thread may have inserted while we computed
-    if let Some(existing) = cache.get(&key) {
-        return Some(Arc::clone(existing));
-    }
-    if cache.len() >= OUTLINE_CACHE_CAP {
-        cache.clear();
-    }
-    let result = Arc::clone(&curves);
-    cache.insert(key, curves);
-    Some(result)
+    Some(insert_outline(&mut cache, key, curves, OUTLINE_CACHE_CAP))
 }
 
 /// `FontVec` counterpart to [`get_or_compute_outline_with_source_id`].
@@ -180,15 +189,7 @@ pub fn get_or_compute_outline_fontvec(
     let curves: Arc<[OutlineCurve]> = outline.curves.into();
 
     let mut cache = OUTLINE_CACHE.write().unwrap();
-    if let Some(existing) = cache.get(&key) {
-        return Some(Arc::clone(existing));
-    }
-    if cache.len() >= OUTLINE_CACHE_CAP {
-        cache.clear();
-    }
-    let result = Arc::clone(&curves);
-    cache.insert(key, curves);
-    Some(result)
+    Some(insert_outline(&mut cache, key, curves, OUTLINE_CACHE_CAP))
 }
 
 #[cfg(test)]
@@ -210,5 +211,22 @@ mod tests {
         #[cfg(feature = "embed-fonts")]
         assert_eq!(base, other_source);
         assert_ne!(base, other_glyph);
+    }
+
+    #[test]
+    fn outline_cache_clears_before_exceeding_capacity() {
+        let source = outline_source_id("/tmp/fonts", FontId::MainRegular);
+        let key_a = outline_cache_key(source, FontId::MainRegular, GlyphId(10));
+        let key_b = outline_cache_key(source, FontId::MainRegular, GlyphId(11));
+        let curves: OutlineData = Arc::from([]);
+        let mut cache = HashMap::new();
+
+        insert_outline(&mut cache, key_a.clone(), Arc::clone(&curves), 1);
+        assert!(cache.contains_key(&key_a));
+
+        insert_outline(&mut cache, key_b.clone(), curves, 1);
+        assert_eq!(cache.len(), 1);
+        assert!(!cache.contains_key(&key_a));
+        assert!(cache.contains_key(&key_b));
     }
 }
