@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use ab_glyph::{Font, FontRef, OutlineCurve};
 use ratex_font::FontId;
-use ratex_font_loader::{outline_source_id, FontSet, OutlineSourceId};
+use ratex_font_loader::{FontSet, OutlineSourceId};
 use ratex_types::{Color, DisplayItem, DisplayList, PathCommand};
 use thiserror::Error;
 
@@ -65,7 +65,7 @@ pub fn render_to_cairo(
         .unwrap_or("");
     let fonts = ratex_font_loader::load_fonts_for_items(font_dir, &display_list.items)
         .map_err(CairoError::Font)?;
-    let font_refs = build_font_refs(font_dir, &fonts).map_err(CairoError::Font)?;
+    let font_refs = build_font_refs(&fonts).map_err(CairoError::Font)?;
 
     let em = options.font_size as f32;
     let pad = options.padding as f32;
@@ -154,21 +154,12 @@ struct CairoFontRef<'a> {
     source_id: OutlineSourceId,
 }
 
-fn build_font_refs<'a>(
-    font_dir: &'a str,
-    data: &'a FontSet,
-) -> Result<HashMap<FontId, CairoFontRef<'a>>, String> {
+fn build_font_refs(data: &FontSet) -> Result<HashMap<FontId, CairoFontRef<'_>>, String> {
     let mut font_refs = HashMap::new();
-    for (id, bytes) in data.iter() {
+    for (id, bytes, source_id) in data.iter_with_source() {
         let font = FontRef::try_from_slice_and_index(bytes, sfnt_collection_index(*id))
             .map_err(|e| format!("Failed to parse font {:?}: {}", id, e))?;
-        font_refs.insert(
-            *id,
-            CairoFontRef {
-                font,
-                source_id: outline_source_id(font_dir, *id),
-            },
-        );
+        font_refs.insert(*id, CairoFontRef { font, source_id });
     }
 
     if !font_refs.contains_key(&FontId::MainRegular) {

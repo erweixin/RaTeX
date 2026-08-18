@@ -39,7 +39,7 @@ except ImportError:
 
 
 REPORT_VERSION = 1
-METRIC_VERSION = "ratex-ink-v1"
+METRIC_VERSION = "ratex-ink-v2"
 INK_THRESHOLD = 240
 NORM_HEIGHT = 120
 DEFAULT_PASS_THRESHOLD = 0.30
@@ -316,7 +316,7 @@ def compute_ink_metrics(
     *,
     prooftree_tolerant: bool = False,
 ) -> dict[str, Any]:
-    """Compute the versioned ratex-ink-v1 metric."""
+    """Compute the versioned ratex-ink-v2 metric."""
     ref_crop = crop_to_content(ref_img)
     test_crop = crop_to_content(test_img)
     ref_norm = normalize_size(ref_crop)

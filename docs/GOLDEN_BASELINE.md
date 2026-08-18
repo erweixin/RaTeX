@@ -17,7 +17,7 @@ Ubuntu runner family. The full CI artifact report records:
 - commit SHA and whether the local worktree was dirty;
 - raw test-case SHA-256 and canonical suite hash;
 - fixture and output manifest SHA-256 values;
-- metric version (`ratex-ink-v1`);
+- metric version (`ratex-ink-v2`);
 - actual KaTeX, Puppeteer, and Chromium versions/revisions;
 - Rust, Cargo, Node, Python, Pillow, and NumPy versions;
 - OS image metadata;

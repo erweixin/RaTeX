@@ -10,7 +10,23 @@ use ratex_types::display_item::DisplayItem;
 pub mod outline_cache;
 
 pub type FontBytes = Arc<Vec<u8>>;
-type CachedFont = Option<FontBytes>;
+
+#[derive(Debug, Clone)]
+struct LoadedFont {
+    bytes: FontBytes,
+    source_id: OutlineSourceId,
+}
+
+impl LoadedFont {
+    fn new(bytes: FontBytes) -> Self {
+        Self {
+            bytes,
+            source_id: fresh_outline_source_id(),
+        }
+    }
+}
+
+type CachedFont = Option<LoadedFont>;
 
 const FONT_MAP: &[(FontId, &str)] = &[
     (FontId::MainRegular, "KaTeX_Main-Regular.ttf"),
@@ -53,11 +69,11 @@ struct CacheKey {
     font_id: FontId,
 }
 
-/// Cheap per-glyph cache key component identifying a concrete font source.
+/// Cheap per-glyph cache key component identifying a concrete loaded font.
 ///
-/// Directory/system-font keys are interned once; outline lookups then only
-/// hash/copy a `u64` instead of building and hashing a `PathBuf` for every
-/// glyph.
+/// Loader-created IDs identify the generation of the raw bytes, so reloading
+/// a replaced file cannot reuse outlines from an older cache entry. The
+/// source-interning compatibility API below also returns this type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct OutlineSourceId(u64);
 
@@ -69,6 +85,10 @@ static OUTLINE_SOURCE_IDS: LazyLock<RwLock<HashMap<FontSourceKey, u64>>> =
 /// mapping; IDs are allocated monotonically, so previously cached outlines
 /// keep their original (still valid) source IDs and simply become cold.
 const OUTLINE_SOURCE_CACHE_CAP: usize = 4096;
+
+fn fresh_outline_source_id() -> OutlineSourceId {
+    OutlineSourceId(NEXT_OUTLINE_SOURCE_ID.fetch_add(1, Ordering::Relaxed))
+}
 
 fn intern_outline_source(source: FontSourceKey) -> OutlineSourceId {
     {
@@ -89,9 +109,9 @@ fn intern_outline_source(source: FontSourceKey) -> OutlineSourceId {
     if sources.len() >= OUTLINE_SOURCE_CACHE_CAP {
         sources.clear();
     }
-    let id = NEXT_OUTLINE_SOURCE_ID.fetch_add(1, Ordering::Relaxed);
-    sources.insert(source, id);
-    OutlineSourceId(id)
+    let source_id = fresh_outline_source_id();
+    sources.insert(source, source_id.0);
+    source_id
 }
 
 pub(crate) fn legacy_outline_source_id() -> OutlineSourceId {
@@ -112,12 +132,12 @@ enum ParsedFontCacheEntry {
 
 #[derive(Debug, Clone)]
 pub struct FontSet {
-    fonts: HashMap<FontId, FontBytes>,
+    fonts: HashMap<FontId, LoadedFont>,
 }
 
 impl FontSet {
     pub fn get(&self, id: &FontId) -> Option<&[u8]> {
-        self.fonts.get(id).map(|bytes| bytes.as_slice())
+        self.fonts.get(id).map(|font| font.bytes.as_slice())
     }
 
     pub fn contains_key(&self, id: &FontId) -> bool {
@@ -125,7 +145,15 @@ impl FontSet {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (&FontId, &[u8])> {
-        self.fonts.iter().map(|(id, bytes)| (id, bytes.as_slice()))
+        self.fonts
+            .iter()
+            .map(|(id, font)| (id, font.bytes.as_slice()))
+    }
+
+    pub fn iter_with_source(&self) -> impl Iterator<Item = (&FontId, &[u8], OutlineSourceId)> {
+        self.fonts
+            .iter()
+            .map(|(id, font)| (id, font.bytes.as_slice(), font.source_id))
     }
 }
 
@@ -134,7 +162,7 @@ impl From<HashMap<FontId, Vec<u8>>> for FontSet {
         Self {
             fonts: fonts
                 .into_iter()
-                .map(|(id, bytes)| (id, Arc::new(bytes)))
+                .map(|(id, bytes)| (id, LoadedFont::new(Arc::new(bytes))))
                 .collect(),
         }
     }
@@ -146,8 +174,8 @@ impl From<HashMap<FontId, Vec<u8>>> for FontSet {
 /// and kern subtables, so glyph lookup and outline extraction do not re-parse
 /// the font on every render. The global parsed-font cache owns one `Arc`, and
 /// this set holds an additional `Arc` clone for the current render. Each entry
-/// also carries its interned [`OutlineSourceId`] so outline lookups do not need
-/// to rebuild the font source key.
+/// also carries the raw-font generation's [`OutlineSourceId`], preventing
+/// outlines from a replaced and reloaded font file from being reused.
 ///
 /// The accessors intentionally return `ab_glyph::FontVec`, so the public API
 /// surface of this crate follows the `ab_glyph` version used by RaTeX. Treat
@@ -317,19 +345,20 @@ pub fn load_fonts_for_plan_parsed(
     let mut out = HashMap::new();
     let cache = parsed_cache();
 
+    // Consult the raw cache first so parsed entries can be matched against the
+    // exact byte generation they were built from. A path-only parsed-cache hit
+    // is unsafe after the raw entry has been evicted and the file replaced.
+    let raw = load_fonts_for_plan(font_dir, plan)?;
+
     {
         let cached = cache
             .read()
             .map_err(|_| "parsed font cache poisoned".to_string())?;
-        if collect_cached_parsed(font_dir, &wanted, &cached, &mut out) {
+        if collect_cached_parsed(font_dir, &wanted, &raw, &cached, &mut out) {
             validate_required_parsed(plan, &out)?;
             return Ok(ParsedFontSet { fonts: out });
         }
     }
-
-    // Ensure raw bytes are available first; then collect the font entries that
-    // are still missing from the parsed cache.
-    let raw = load_fonts_for_plan(font_dir, plan)?;
 
     let mut to_parse = Vec::new();
     let mut unavailable = Vec::new();
@@ -339,11 +368,14 @@ pub fn load_fonts_for_plan_parsed(
             .map_err(|_| "parsed font cache poisoned".to_string())?;
         for &font_id in &wanted {
             let key = cache_key(font_dir, font_id);
-            if cached.contains_key(&key) {
+            if cached
+                .get(&key)
+                .is_some_and(|entry| parsed_entry_matches_raw(entry, raw.fonts.get(&font_id)))
+            {
                 continue;
             }
-            match raw.get(&font_id) {
-                Some(bytes) => to_parse.push((font_id, bytes.to_vec())),
+            match raw.fonts.get(&font_id) {
+                Some(loaded) => to_parse.push((font_id, loaded.bytes.to_vec(), loaded.source_id)),
                 None => unavailable.push(font_id),
             }
         }
@@ -353,9 +385,8 @@ pub fn load_fonts_for_plan_parsed(
     // the prepared byte buffer, so parsing neither serializes with other
     // renderers nor clones that buffer again.
     let mut parsed = Vec::new();
-    for (font_id, bytes) in to_parse {
+    for (font_id, bytes, source_id) in to_parse {
         let font = parse_font_vec(font_id, bytes)?;
-        let source_id = intern_outline_source(outline_source_key(font_dir, font_id));
         parsed.push((font_id, ParsedFont { font, source_id }));
     }
 
@@ -363,8 +394,8 @@ pub fn load_fonts_for_plan_parsed(
         let mut cached = cache
             .write()
             .map_err(|_| "parsed font cache poisoned".to_string())?;
-        // Another thread may have inserted entries while we were parsing, so
-        // only make room for and fill keys that are still absent.
+        // Replacing an entry with another raw generation does not increase the
+        // cache size; only genuinely new keys need eviction room.
         let pending = unavailable
             .iter()
             .filter(|&&font_id| !cached.contains_key(&cache_key(font_dir, font_id)))
@@ -381,17 +412,16 @@ pub fn load_fonts_for_plan_parsed(
             wanted_keys.contains(key)
         });
         for font_id in unavailable {
-            cached
-                .entry(cache_key(font_dir, font_id))
-                .or_insert(ParsedFontCacheEntry::Missing);
+            cached.insert(cache_key(font_dir, font_id), ParsedFontCacheEntry::Missing);
         }
         for (font_id, parsed_font) in parsed {
-            cached
-                .entry(cache_key(font_dir, font_id))
-                .or_insert(ParsedFontCacheEntry::Parsed(parsed_font));
+            cached.insert(
+                cache_key(font_dir, font_id),
+                ParsedFontCacheEntry::Parsed(parsed_font),
+            );
         }
         // Re-collect; `out` may already contain entries from the read fast path.
-        collect_cached_parsed(font_dir, &wanted, &cached, &mut out);
+        collect_cached_parsed(font_dir, &wanted, &raw, &cached, &mut out);
     }
 
     validate_required_parsed(plan, &out)?;
@@ -408,23 +438,36 @@ fn parse_font_vec(font_id: FontId, bytes: Vec<u8>) -> Result<Arc<FontVec>, Strin
 fn collect_cached_parsed(
     font_dir: &str,
     wanted: &HashSet<FontId>,
+    raw: &FontSet,
     cached: &HashMap<CacheKey, ParsedFontCacheEntry>,
     out: &mut HashMap<FontId, ParsedFont>,
 ) -> bool {
     let mut all_known = true;
     for &font_id in wanted {
         let key = cache_key(font_dir, font_id);
-        match cached.get(&key) {
-            Some(ParsedFontCacheEntry::Parsed(parsed)) => {
+        match (cached.get(&key), raw.fonts.get(&font_id)) {
+            (Some(ParsedFontCacheEntry::Parsed(parsed)), Some(loaded))
+                if parsed.source_id == loaded.source_id =>
+            {
                 out.insert(font_id, parsed.clone());
             }
-            Some(ParsedFontCacheEntry::Missing) => {}
-            None => {
+            (Some(ParsedFontCacheEntry::Missing), None) => {}
+            _ => {
                 all_known = false;
             }
         }
     }
     all_known
+}
+
+fn parsed_entry_matches_raw(entry: &ParsedFontCacheEntry, raw: Option<&LoadedFont>) -> bool {
+    match (entry, raw) {
+        (ParsedFontCacheEntry::Parsed(parsed), Some(loaded)) => {
+            parsed.source_id == loaded.source_id
+        }
+        (ParsedFontCacheEntry::Missing, None) => true,
+        _ => false,
+    }
 }
 
 fn validate_required_parsed(
@@ -476,7 +519,7 @@ pub fn load_fonts_for_plan(font_dir: &str, plan: &FontLoadPlan) -> Result<FontSe
             wanted_keys.contains(key)
         });
         for font_id in missing {
-            let loaded = load_font_bytes(font_dir, font_id)?;
+            let loaded = load_font_bytes(font_dir, font_id)?.map(LoadedFont::new);
             cached.insert(cache_key(font_dir, font_id), loaded);
         }
         // Re-collect without clearing `out`: fonts already inserted during the
@@ -493,14 +536,14 @@ fn collect_cached(
     font_dir: &str,
     wanted: &HashSet<FontId>,
     cached: &HashMap<CacheKey, CachedFont>,
-    out: &mut HashMap<FontId, FontBytes>,
+    out: &mut HashMap<FontId, LoadedFont>,
 ) -> bool {
     let mut all_known = true;
     for &font_id in wanted {
         let key = cache_key(font_dir, font_id);
         match cached.get(&key) {
-            Some(Some(bytes)) => {
-                out.insert(font_id, Arc::clone(bytes));
+            Some(Some(font)) => {
+                out.insert(font_id, font.clone());
             }
             Some(None) => {}
             None => {
@@ -513,7 +556,7 @@ fn collect_cached(
 
 fn validate_required(
     plan: &FontLoadPlan,
-    loaded: &HashMap<FontId, FontBytes>,
+    loaded: &HashMap<FontId, LoadedFont>,
 ) -> Result<(), String> {
     for &font_id in plan.required() {
         if !loaded.contains_key(&font_id) {
@@ -677,6 +720,7 @@ mod tests {
         let font_dir = "/tmp/ratex-font-loader-test-missing-optional";
         let mut wanted = HashSet::new();
         wanted.insert(FontId::EmojiFallback);
+        let raw = FontSet::from(HashMap::<FontId, Vec<u8>>::new());
 
         let mut cached = HashMap::new();
         cached.insert(
@@ -685,8 +729,120 @@ mod tests {
         );
 
         let mut out: HashMap<FontId, ParsedFont> = HashMap::new();
-        assert!(collect_cached_parsed(font_dir, &wanted, &cached, &mut out));
+        assert!(collect_cached_parsed(
+            font_dir, &wanted, &raw, &cached, &mut out
+        ));
         assert!(!out.contains_key(&FontId::EmojiFallback));
+    }
+
+    #[test]
+    fn reloaded_font_bytes_get_a_fresh_outline_source() {
+        use ab_glyph::{Font, FontRef};
+
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let regular = std::fs::read(manifest_dir.join("../../fonts/KaTeX_Main-Regular.ttf"))
+            .expect("read Main-Regular");
+        let bold = std::fs::read(manifest_dir.join("../../fonts/KaTeX_Main-Bold.ttf"))
+            .expect("read Main-Bold");
+
+        // Model two loads of the same logical path/FontId before and after its
+        // raw cache entry has been evicted and the file replaced.
+        let first = FontSet::from(HashMap::from([(FontId::MainRegular, regular)]));
+        let second = FontSet::from(HashMap::from([(FontId::MainRegular, bold)]));
+        let (_, first_bytes, first_source) = first.iter_with_source().next().unwrap();
+        let (_, second_bytes, second_source) = second.iter_with_source().next().unwrap();
+        assert_ne!(first_source, second_source);
+
+        let first_font = FontRef::try_from_slice(first_bytes).expect("parse first font");
+        let second_font = FontRef::try_from_slice(second_bytes).expect("parse second font");
+        let first_glyph = first_font.glyph_id('x');
+        let second_glyph = second_font.glyph_id('x');
+        assert_eq!(first_glyph, second_glyph);
+
+        let first_outline = outline_cache::get_or_compute_outline_with_source_id(
+            FontId::MainRegular,
+            &first_font,
+            first_source,
+            first_glyph,
+        )
+        .expect("first outline");
+        let second_outline = outline_cache::get_or_compute_outline_with_source_id(
+            FontId::MainRegular,
+            &second_font,
+            second_source,
+            second_glyph,
+        )
+        .expect("second outline");
+
+        assert!(!Arc::ptr_eq(&first_outline, &second_outline));
+        assert_ne!(format!("{first_outline:?}"), format!("{second_outline:?}"));
+    }
+
+    #[cfg(not(feature = "embed-fonts"))]
+    #[test]
+    fn parsed_cache_rejects_an_evicted_and_replaced_raw_font() {
+        use ab_glyph::Font;
+
+        let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let regular = manifest_dir.join("../../fonts/KaTeX_Main-Regular.ttf");
+        let bold = manifest_dir.join("../../fonts/KaTeX_Main-Bold.ttf");
+        let font_dir = std::env::temp_dir().join(format!(
+            "ratex-font-generation-test-{}-{}",
+            std::process::id(),
+            line!()
+        ));
+        let _ = std::fs::remove_dir_all(&font_dir);
+        std::fs::create_dir_all(&font_dir).expect("create temp font directory");
+        let installed = font_dir.join("KaTeX_Main-Regular.ttf");
+        std::fs::copy(&regular, &installed).expect("install first font generation");
+
+        let plan = FontLoadPlan {
+            required: HashSet::from([FontId::MainRegular]),
+            optional: HashSet::new(),
+        };
+        let font_dir = font_dir.to_string_lossy().to_string();
+        let first = load_fonts_for_plan_parsed(&font_dir, &plan).expect("load first generation");
+        let (_, first_font, first_source) = first.iter_with_source().next().unwrap();
+        let first_glyph = first_font.glyph_id('x');
+        let first_outline = outline_cache::get_or_compute_outline_fontvec(
+            FontId::MainRegular,
+            first_font,
+            first_source,
+            first_glyph,
+        )
+        .expect("first outline");
+
+        // Simulate the bounded raw cache evicting this directory while its
+        // parsed entry remains hot, then replace the file at the same path.
+        cache()
+            .write()
+            .unwrap()
+            .remove(&cache_key(&font_dir, FontId::MainRegular));
+        std::fs::copy(&bold, &installed).expect("install second font generation");
+
+        let second = load_fonts_for_plan_parsed(&font_dir, &plan).expect("load second generation");
+        let (_, second_font, second_source) = second.iter_with_source().next().unwrap();
+        assert_ne!(first_source, second_source);
+        let second_glyph = second_font.glyph_id('x');
+        assert_eq!(first_glyph, second_glyph);
+        let second_outline = outline_cache::get_or_compute_outline_fontvec(
+            FontId::MainRegular,
+            second_font,
+            second_source,
+            second_glyph,
+        )
+        .expect("second outline");
+        assert_ne!(format!("{first_outline:?}"), format!("{second_outline:?}"));
+
+        cache()
+            .write()
+            .unwrap()
+            .remove(&cache_key(&font_dir, FontId::MainRegular));
+        parsed_cache()
+            .write()
+            .unwrap()
+            .remove(&cache_key(&font_dir, FontId::MainRegular));
+        let _ = std::fs::remove_dir_all(font_dir);
     }
 
     #[test]

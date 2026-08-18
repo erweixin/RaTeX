@@ -758,6 +758,90 @@ fn outline_bbox(
     (min_x, min_y, max_x, max_y)
 }
 
+fn build_outline_path(
+    curves: &[ab_glyph::OutlineCurve],
+    px: f32,
+    py: f32,
+    scale: f32,
+) -> Option<tiny_skia::Path> {
+    let mut builder = PathBuilder::new();
+    let mut last_end: Option<(f32, f32)> = None;
+
+    for curve in curves {
+        use ab_glyph::OutlineCurve;
+        let (start, end) = match curve {
+            OutlineCurve::Line(p0, p1) => (
+                (px + p0.x * scale, py - p0.y * scale),
+                (px + p1.x * scale, py - p1.y * scale),
+            ),
+            OutlineCurve::Quad(p0, _, p2) => (
+                (px + p0.x * scale, py - p0.y * scale),
+                (px + p2.x * scale, py - p2.y * scale),
+            ),
+            OutlineCurve::Cubic(p0, _, _, p3) => (
+                (px + p0.x * scale, py - p0.y * scale),
+                (px + p3.x * scale, py - p3.y * scale),
+            ),
+        };
+
+        let need_move = match last_end {
+            None => true,
+            Some((lx, ly)) => (lx - start.0).abs() > 0.01 || (ly - start.1).abs() > 0.01,
+        };
+        if need_move {
+            if last_end.is_some() {
+                builder.close();
+            }
+            builder.move_to(start.0, start.1);
+        }
+
+        match curve {
+            OutlineCurve::Line(_, p1) => {
+                builder.line_to(px + p1.x * scale, py - p1.y * scale);
+            }
+            OutlineCurve::Quad(_, p1, p2) => {
+                builder.quad_to(
+                    px + p1.x * scale,
+                    py - p1.y * scale,
+                    px + p2.x * scale,
+                    py - p2.y * scale,
+                );
+            }
+            OutlineCurve::Cubic(_, p1, p2, p3) => {
+                builder.cubic_to(
+                    px + p1.x * scale,
+                    py - p1.y * scale,
+                    px + p2.x * scale,
+                    py - p2.y * scale,
+                    px + p3.x * scale,
+                    py - p3.y * scale,
+                );
+            }
+        }
+        last_end = Some(end);
+    }
+
+    if last_end.is_some() {
+        builder.close();
+    }
+    builder.finish()
+}
+
+fn glyph_mask_fully_inside(
+    pixmap: &Pixmap,
+    dst_x: i32,
+    dst_y: i32,
+    mask_w: u32,
+    mask_h: u32,
+) -> bool {
+    let dst_x = i64::from(dst_x);
+    let dst_y = i64::from(dst_y);
+    dst_x >= 0
+        && dst_y >= 0
+        && dst_x + i64::from(mask_w) <= i64::from(pixmap.width())
+        && dst_y + i64::from(mask_h) <= i64::from(pixmap.height())
+}
+
 fn render_glyph_with_font(
     pixmap: &mut Pixmap,
     px: f32,
@@ -817,8 +901,9 @@ fn render_glyph_with_font(
     let mask_h = ((max_y.ceil() + 1.0) - top).max(1.0) as u32;
     let dst_x = left as i32;
     let dst_y = top as i32;
+    let cacheable = glyph_mask_fully_inside(pixmap, dst_x, dst_y, mask_w, mask_h);
 
-    {
+    if cacheable {
         let cache = GLYPH_MASK_CACHE.read().unwrap();
         if let Some(mask) = cache.entries.get(&cache_key) {
             let mask = Arc::clone(mask);
@@ -828,82 +913,26 @@ fn render_glyph_with_font(
         }
     }
 
-    let mut builder = PathBuilder::new();
-    let mut last_end: Option<(f32, f32)> = None;
-
-    for curve in curves.iter() {
-        use ab_glyph::OutlineCurve;
-        let (start, end) = match curve {
-            OutlineCurve::Line(p0, p1) => {
-                let sx = px + p0.x * scale;
-                let sy = py - p0.y * scale;
-                let ex = px + p1.x * scale;
-                let ey = py - p1.y * scale;
-                ((sx, sy), (ex, ey))
-            }
-            OutlineCurve::Quad(p0, _, p2) => {
-                let sx = px + p0.x * scale;
-                let sy = py - p0.y * scale;
-                let ex = px + p2.x * scale;
-                let ey = py - p2.y * scale;
-                ((sx, sy), (ex, ey))
-            }
-            OutlineCurve::Cubic(p0, _, _, p3) => {
-                let sx = px + p0.x * scale;
-                let sy = py - p0.y * scale;
-                let ex = px + p3.x * scale;
-                let ey = py - p3.y * scale;
-                ((sx, sy), (ex, ey))
-            }
-        };
-
-        // New contour if start doesn't match previous end
-        let need_move = match last_end {
-            None => true,
-            Some((lx, ly)) => (lx - start.0).abs() > 0.01 || (ly - start.1).abs() > 0.01,
-        };
-
-        if need_move {
-            if last_end.is_some() {
-                builder.close();
-            }
-            builder.move_to(start.0, start.1);
-        }
-
-        match curve {
-            OutlineCurve::Line(_, p1) => {
-                builder.line_to(px + p1.x * scale, py - p1.y * scale);
-            }
-            OutlineCurve::Quad(_, p1, p2) => {
-                builder.quad_to(
-                    px + p1.x * scale,
-                    py - p1.y * scale,
-                    px + p2.x * scale,
-                    py - p2.y * scale,
-                );
-            }
-            OutlineCurve::Cubic(_, p1, p2, p3) => {
-                builder.cubic_to(
-                    px + p1.x * scale,
-                    py - p1.y * scale,
-                    px + p2.x * scale,
-                    py - p2.y * scale,
-                    px + p3.x * scale,
-                    py - p3.y * scale,
-                );
-            }
-        }
-
-        last_end = Some(end);
-    }
-
-    if last_end.is_some() {
-        builder.close();
-    }
-
-    let Some(path) = builder.finish() else {
+    let Some(path) = build_outline_path(&curves, px, py, scale) else {
         return false;
     };
+
+    if !cacheable {
+        // tiny-skia's antialiasing at a destination edge is not always
+        // pixel-identical to rasterizing the full glyph offscreen and clipping
+        // during the blit. Preserve the direct-render result for clipped
+        // glyphs; they are uncommon and cannot safely share an offscreen mask.
+        let mut paint = paint_for_color(color);
+        paint.anti_alias = true;
+        pixmap.fill_path(
+            &path,
+            &paint,
+            FillRule::Winding,
+            Transform::identity(),
+            None,
+        );
+        return true;
+    }
 
     // Rasterize into a mask pixmap sized to the glyph's bounds plus a 1 px
     // anti-aliasing margin. The path is translated by the mask's integer
@@ -1630,5 +1659,15 @@ mod glyph_mask_cache_tests {
         let _b = render("x^2 + y^2 = z^2");
         let c = render("a+b=c");
         assert_eq!(a.data(), c.data());
+    }
+
+    #[test]
+    fn clipped_glyph_keeps_direct_fill_antialiasing() {
+        // The wide mathclap subscript pushes one glyph across the left canvas
+        // edge. Rasterizing it into a full offscreen mask and clipping during
+        // the blit changes tiny-skia's coverage at this exact edge pixel.
+        let pixmap = render(r"\sum_{\mathclap{1\le i\le n}} x_{i}");
+        let offset = (82 * pixmap.width() as usize) * 4;
+        assert_eq!(&pixmap.data()[offset..offset + 4], &[48, 48, 48, 255]);
     }
 }
