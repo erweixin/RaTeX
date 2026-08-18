@@ -178,6 +178,68 @@ fn sfnt_collection_index(id: FontId) -> u32 {
     }
 }
 
+/// Render with a system fallback that is loaded only after a prior face could
+/// not draw the glyph. The temporary references borrow the returned font set
+/// for this one attempt; the raw bytes themselves remain in the loader cache.
+#[allow(clippy::too_many_arguments)]
+fn render_char_with_system_fallback(
+    cr: &cairo::Context,
+    point: Point,
+    font_id: FontId,
+    ch: char,
+    color: Color,
+    em: f32,
+    font_cache: &HashMap<FontId, CairoFontRef<'_>>,
+) -> Result<bool, CairoError> {
+    if let Some(font) = font_cache.get(&font_id) {
+        let glyph_id = font.font.glyph_id(ch);
+        return if glyph_id.0 == 0 {
+            Ok(false)
+        } else {
+            render_glyph_with_font(
+                cr,
+                point,
+                FontGlyph {
+                    font_id,
+                    font: &font.font,
+                    source_id: font.source_id,
+                    glyph_id,
+                },
+                color,
+                em,
+            )
+        };
+    }
+
+    let mut fonts = FontSet::from(HashMap::new());
+    if !fonts
+        .ensure_system_font(font_id)
+        .map_err(CairoError::Font)?
+    {
+        return Ok(false);
+    }
+    let fallback_refs = build_font_refs(&fonts).map_err(CairoError::Font)?;
+    let Some(font) = fallback_refs.get(&font_id) else {
+        return Ok(false);
+    };
+    let glyph_id = font.font.glyph_id(ch);
+    if glyph_id.0 == 0 {
+        return Ok(false);
+    }
+    render_glyph_with_font(
+        cr,
+        point,
+        FontGlyph {
+            font_id,
+            font: &font.font,
+            source_id: font.source_id,
+            glyph_id,
+        },
+        color,
+        em,
+    )
+}
+
 #[allow(clippy::too_many_arguments)]
 fn render_glyph(
     cr: &cairo::Context,
@@ -252,23 +314,15 @@ fn render_glyph(
         if try_draw_emoji_or_outline(cr, point, ch, color, em, font_cache)? {
             return Ok(());
         }
-        if let Some(fallback_font) = font_cache.get(&FontId::CjkFallback) {
-            let fallback_id = fallback_font.font.glyph_id(ch);
-            if fallback_id.0 != 0 {
-                let _ = render_glyph_with_font(
-                    cr,
-                    point,
-                    FontGlyph {
-                        font_id: FontId::CjkFallback,
-                        font: &fallback_font.font,
-                        source_id: fallback_font.source_id,
-                        glyph_id: fallback_id,
-                    },
-                    color,
-                    em,
-                )?;
-            }
-        }
+        let _ = render_char_with_system_fallback(
+            cr,
+            point,
+            FontId::CjkFallback,
+            ch,
+            color,
+            em,
+            font_cache,
+        )?;
         return Ok(());
     }
 
@@ -364,48 +418,17 @@ fn try_system_unicode_fallback(
         }
     }
 
-    if let Some(font) = font_cache.get(&FontId::CjkRegular) {
-        let glyph_id = font.font.glyph_id(ch);
-        if glyph_id.0 != 0
-            && render_glyph_with_font(
-                cr,
-                point,
-                FontGlyph {
-                    font_id: FontId::CjkRegular,
-                    font: &font.font,
-                    source_id: font.source_id,
-                    glyph_id,
-                },
-                color,
-                em,
-            )?
-        {
-            return Ok(true);
-        }
+    if render_char_with_system_fallback(cr, point, FontId::CjkRegular, ch, color, em, font_cache)? {
+        return Ok(true);
     }
 
     if try_draw_emoji_or_outline(cr, point, ch, color, em, font_cache)? {
         return Ok(true);
     }
 
-    if let Some(font) = font_cache.get(&FontId::CjkFallback) {
-        let glyph_id = font.font.glyph_id(ch);
-        if glyph_id.0 != 0
-            && render_glyph_with_font(
-                cr,
-                point,
-                FontGlyph {
-                    font_id: FontId::CjkFallback,
-                    font: &font.font,
-                    source_id: font.source_id,
-                    glyph_id,
-                },
-                color,
-                em,
-            )?
-        {
-            return Ok(true);
-        }
+    if render_char_with_system_fallback(cr, point, FontId::CjkFallback, ch, color, em, font_cache)?
+    {
+        return Ok(true);
     }
 
     Ok(false)
@@ -419,29 +442,14 @@ fn try_draw_emoji_or_outline(
     em: f32,
     font_cache: &HashMap<FontId, CairoFontRef<'_>>,
 ) -> Result<bool, CairoError> {
+    if !ratex_unicode_font::is_emoji_candidate(ch) {
+        return Ok(false);
+    }
     if try_draw_emoji_png(cr, point, em, ch)? {
         return Ok(true);
     }
 
-    if let Some(font) = font_cache.get(&FontId::EmojiFallback) {
-        let glyph_id = font.font.glyph_id(ch);
-        if glyph_id.0 != 0 {
-            return render_glyph_with_font(
-                cr,
-                point,
-                FontGlyph {
-                    font_id: FontId::EmojiFallback,
-                    font: &font.font,
-                    source_id: font.source_id,
-                    glyph_id,
-                },
-                color,
-                em,
-            );
-        }
-    }
-
-    Ok(false)
+    render_char_with_system_fallback(cr, point, FontId::EmojiFallback, ch, color, em, font_cache)
 }
 
 struct FontGlyph<'a> {

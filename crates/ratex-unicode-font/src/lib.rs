@@ -16,30 +16,29 @@ mod emoji_raster;
 
 pub use emoji_raster::{emoji_png_raster_for_char, emoji_raster_for_char, EmojiRasterStrike};
 
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
-use std::sync::{Arc, LazyLock, OnceLock, RwLock};
+use std::path::Path;
+use std::sync::{Arc, OnceLock};
 use system_fonts::{find_for_system_locale, FontStyle, FoundFontSource};
 
-/// Shared immutable font-file storage.
+/// Shared immutable, owned font-file storage.
 ///
-/// System fonts are normally backed by a read-only file mapping, so even very
-/// large TTCs consume physical memory only for pages actually touched by the
-/// parser or rasterizer. Cloning this value never copies the font bytes.
-#[derive(Clone)]
-pub struct FontData(Arc<dyn AsRef<[u8]> + Send + Sync>);
+/// Loading a font copies its contents into a `Vec`, so the returned slices
+/// remain valid even if an externally managed font file is later replaced or
+/// truncated. Cloning this value never copies the font bytes.
+#[derive(Clone, Debug)]
+pub struct FontData {
+    bytes: Arc<Vec<u8>>,
+}
 
 impl FontData {
-    fn new(storage: impl AsRef<[u8]> + Send + Sync + 'static) -> Self {
-        Self(Arc::new(storage))
-    }
-
-    fn from_shared(storage: Arc<dyn AsRef<[u8]> + Send + Sync>) -> Self {
-        Self(storage)
+    fn new(bytes: Vec<u8>) -> Self {
+        Self {
+            bytes: Arc::new(bytes),
+        }
     }
 
     pub fn as_slice(&self) -> &[u8] {
-        self.0.as_ref().as_ref()
+        self.bytes.as_slice()
     }
 
     pub fn len(&self) -> usize {
@@ -61,26 +60,11 @@ impl AsRef<[u8]> for FontData {
     }
 }
 
-impl std::fmt::Debug for FontData {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter
-            .debug_struct("FontData")
-            .field("len", &self.as_slice().len())
-            .finish()
-    }
-}
-
 /// `(full font file bytes, face index within TTC or 0 for single-font / unknown collection face)`.
 static UNICODE_FONT: OnceLock<Option<(FontData, u32)>> = OnceLock::new();
 static SYSTEM_FALLBACK_FONT: OnceLock<Option<(FontData, u32)>> = OnceLock::new();
 /// `(full font file bytes, face index within TTC or 0 for single font)`.
 static EMOJI_FONT: OnceLock<Option<(FontData, u32)>> = OnceLock::new();
-
-/// Canonical path → shared mapping. This also deduplicates primary and fallback
-/// discovery when both resolve to the same physical font file.
-static FONT_FILE_CACHE: LazyLock<RwLock<HashMap<PathBuf, FontData>>> =
-    LazyLock::new(|| RwLock::new(HashMap::new()));
-const FONT_FILE_CACHE_CAP: usize = 16;
 
 /// Raw TTF/OTF bytes of a discovered Unicode font, or `None` if no suitable font was found.
 ///
@@ -152,55 +136,134 @@ pub fn emoji_font_face_index() -> Option<u32> {
 }
 
 /// Fast codepoint filter used before touching the large color-emoji font.
-/// False positives are acceptable (the cmap is still authoritative), while
-/// ordinary CJK and mathematical symbols must remain false so they never map
-/// the emoji TTC as a side effect of fallback probing.
+///
+/// These ranges cover Unicode's `Emoji=Yes` property. False positives are
+/// acceptable because the cmap remains authoritative, but false negatives
+/// would make an emoji unreachable through the color-font fallback.
 pub fn is_emoji_candidate(ch: char) -> bool {
-    matches!(
-        ch as u32,
-        0x1F000..=0x1FAFF
-            | 0x2300..=0x23FF
-            | 0x2600..=0x27BF
-            | 0x2B00..=0x2BFF
-            | 0x00A9
-            | 0x00AE
-            | 0x203C
-            | 0x2049
-            | 0x2122
-            | 0x2139
-            | 0x3030
-            | 0x303D
-            | 0x3297
-            | 0x3299
-    )
+    let cp = ch as u32;
+    EMOJI_RANGES
+        .binary_search_by(|&(start, end)| {
+            if cp < start {
+                std::cmp::Ordering::Greater
+            } else if cp > end {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Equal
+            }
+        })
+        .is_ok()
 }
 
-// Compatibility shims for callers that still require owned bytes. RaTeX's
-// renderers use the `FontData` APIs above, so these copies are never created on
-// the normal path.
-static LEGACY_UNICODE_FONT: OnceLock<Option<Arc<Vec<u8>>>> = OnceLock::new();
-static LEGACY_FALLBACK_FONT: OnceLock<Option<Arc<Vec<u8>>>> = OnceLock::new();
-static LEGACY_EMOJI_FONT: OnceLock<Option<Arc<Vec<u8>>>> = OnceLock::new();
+// Unicode Emoji=Yes ranges, ordered for binary search. Keep this conservative:
+// broad ranges are preferable to a false negative that skips emoji fallback.
+const EMOJI_RANGES: &[(u32, u32)] = &[
+    (0x0023, 0x0023),
+    (0x002A, 0x002A),
+    (0x0030, 0x0039),
+    (0x00A9, 0x00A9),
+    (0x00AE, 0x00AE),
+    (0x203C, 0x203C),
+    (0x2049, 0x2049),
+    (0x2122, 0x2122),
+    (0x2139, 0x2139),
+    (0x2194, 0x2199),
+    (0x21A9, 0x21AA),
+    (0x231A, 0x231B),
+    (0x2328, 0x2328),
+    (0x23CF, 0x23CF),
+    (0x23E9, 0x23F3),
+    (0x23F8, 0x23FA),
+    (0x24C2, 0x24C2),
+    (0x25AA, 0x25AB),
+    (0x25B6, 0x25B6),
+    (0x25C0, 0x25C0),
+    (0x25FB, 0x25FE),
+    (0x2600, 0x2604),
+    (0x260E, 0x260E),
+    (0x2611, 0x2611),
+    (0x2614, 0x2615),
+    (0x2618, 0x2618),
+    (0x261D, 0x261D),
+    (0x2620, 0x2620),
+    (0x2622, 0x2623),
+    (0x2626, 0x2626),
+    (0x262A, 0x262A),
+    (0x262E, 0x262F),
+    (0x2638, 0x263A),
+    (0x2640, 0x2640),
+    (0x2642, 0x2642),
+    (0x2648, 0x2653),
+    (0x265F, 0x2660),
+    (0x2663, 0x2663),
+    (0x2665, 0x2666),
+    (0x2668, 0x2668),
+    (0x267B, 0x267B),
+    (0x267E, 0x267F),
+    (0x2692, 0x2697),
+    (0x2699, 0x2699),
+    (0x269B, 0x269C),
+    (0x26A0, 0x26A1),
+    (0x26A7, 0x26A7),
+    (0x26AA, 0x26AB),
+    (0x26B0, 0x26B1),
+    (0x26BD, 0x26BE),
+    (0x26C4, 0x26C5),
+    (0x26C8, 0x26C8),
+    (0x26CE, 0x26CF),
+    (0x26D1, 0x26D1),
+    (0x26D3, 0x26D4),
+    (0x26E9, 0x26EA),
+    (0x26F0, 0x26F5),
+    (0x26F7, 0x26FA),
+    (0x26FD, 0x26FD),
+    (0x2702, 0x2702),
+    (0x2705, 0x2705),
+    (0x2708, 0x270D),
+    (0x270F, 0x270F),
+    (0x2712, 0x2712),
+    (0x2714, 0x2714),
+    (0x2716, 0x2716),
+    (0x271D, 0x271D),
+    (0x2721, 0x2721),
+    (0x2728, 0x2728),
+    (0x2733, 0x2734),
+    (0x2744, 0x2744),
+    (0x2747, 0x2747),
+    (0x274C, 0x274C),
+    (0x274E, 0x274E),
+    (0x2753, 0x2755),
+    (0x2757, 0x2757),
+    (0x2763, 0x2764),
+    (0x2795, 0x2797),
+    (0x27A1, 0x27A1),
+    (0x27B0, 0x27B0),
+    (0x27BF, 0x27BF),
+    (0x2934, 0x2935),
+    (0x2B05, 0x2B07),
+    (0x2B1B, 0x2B1C),
+    (0x2B50, 0x2B50),
+    (0x2B55, 0x2B55),
+    (0x3030, 0x3030),
+    (0x303D, 0x303D),
+    (0x3297, 0x3297),
+    (0x3299, 0x3299),
+    (0x1F000, 0x1FAFF),
+];
 
-#[deprecated(note = "use load_unicode_font_data to avoid copying large system fonts")]
+#[deprecated(note = "use load_unicode_font_data")]
 pub fn load_unicode_font_arc() -> Option<Arc<Vec<u8>>> {
-    LEGACY_UNICODE_FONT
-        .get_or_init(|| load_unicode_font_data().map(|data| Arc::new(data.as_slice().to_vec())))
-        .clone()
+    load_unicode_font_data().map(|data| data.bytes)
 }
 
-#[deprecated(note = "use load_fallback_font_data to avoid copying large system fonts")]
+#[deprecated(note = "use load_fallback_font_data")]
 pub fn load_fallback_font_arc() -> Option<Arc<Vec<u8>>> {
-    LEGACY_FALLBACK_FONT
-        .get_or_init(|| load_fallback_font_data().map(|data| Arc::new(data.as_slice().to_vec())))
-        .clone()
+    load_fallback_font_data().map(|data| data.bytes)
 }
 
-#[deprecated(note = "use load_emoji_font_data to avoid copying large system fonts")]
+#[deprecated(note = "use load_emoji_font_data")]
 pub fn load_emoji_font_arc() -> Option<Arc<Vec<u8>>> {
-    LEGACY_EMOJI_FONT
-        .get_or_init(|| load_emoji_font_data().map(|data| Arc::new(data.as_slice().to_vec())))
-        .clone()
+    load_emoji_font_data().map(|data| data.bytes)
 }
 
 /// TrueType / OpenType **single** font (not `.ttc`). For collections see [`is_sfnt_container`].
@@ -316,7 +379,7 @@ fn load_font_spec(spec: &str) -> Option<(FontData, u32)> {
         (spec, None)
     };
 
-    let bytes = map_font_file(Path::new(path))?;
+    let bytes = load_font_file(Path::new(path))?;
     if !is_sfnt_container(bytes.as_slice()) {
         return None;
     }
@@ -341,29 +404,9 @@ fn load_font_spec(spec: &str) -> Option<(FontData, u32)> {
     Some((bytes, face_index))
 }
 
-fn map_font_file(path: &Path) -> Option<FontData> {
+fn load_font_file(path: &Path) -> Option<FontData> {
     let key = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-    if let Some(cached) = FONT_FILE_CACHE.read().ok()?.get(&key).cloned() {
-        return Some(cached);
-    }
-
-    let file = std::fs::File::open(&key).ok()?;
-    // SAFETY: the mapping is read-only and `FontData` owns it for the full
-    // lifetime of every returned slice. System font files are immutable in
-    // normal operation; replacing a path creates a new mapping on the next
-    // process rather than mutating this one.
-    let mapped = unsafe { memmap2::MmapOptions::new().map(&file).ok()? };
-    let data = FontData::new(mapped);
-
-    let mut cached = FONT_FILE_CACHE.write().ok()?;
-    if let Some(existing) = cached.get(&key) {
-        return Some(existing.clone());
-    }
-    if cached.len() >= FONT_FILE_CACHE_CAP {
-        cached.clear();
-    }
-    cached.insert(key, data.clone());
-    Some(data)
+    std::fs::read(key).ok().map(FontData::new)
 }
 
 fn find_face_index_by_family(path: &str, family_hint: &str) -> Option<u32> {
@@ -425,9 +468,9 @@ fn discover_emoji_font() -> Option<(FontData, u32)> {
                 continue;
             };
             let data = match &face.source {
-                fontdb::Source::File(path) => map_font_file(path),
+                fontdb::Source::File(path) => load_font_file(path),
                 fontdb::Source::SharedFile(_, storage) | fontdb::Source::Binary(storage) => {
-                    Some(FontData::from_shared(Arc::clone(storage)))
+                    Some(FontData::new(storage.as_ref().as_ref().to_vec()))
                 }
             };
             let Some(data) = data else {
@@ -527,15 +570,25 @@ mod tests {
     }
 
     #[test]
-    #[cfg(target_os = "macos")]
-    fn canonical_font_paths_share_one_mapping() {
-        let alias = Path::new("/Library/Fonts/Arial Unicode.ttf");
-        let target = Path::new("/System/Library/Fonts/Supplemental/Arial Unicode.ttf");
-        if !alias.exists() || !target.exists() {
-            return;
+    fn emoji_candidate_filter_covers_emoji_property_edges() {
+        for ch in ['#', '↔', '⌨', '☀', '⚕', '🛝', '🫨'] {
+            assert!(is_emoji_candidate(ch), "{ch:?} should reach emoji fallback");
         }
-        let first = map_font_file(alias).expect("map alias");
-        let second = map_font_file(target).expect("map target");
-        assert_eq!(first.as_slice().as_ptr(), second.as_slice().as_ptr());
+    }
+
+    #[test]
+    fn font_file_bytes_remain_valid_after_path_is_replaced() {
+        let path = std::env::temp_dir().join(format!(
+            "ratex-unicode-font-owned-bytes-{}-{}",
+            std::process::id(),
+            line!()
+        ));
+        std::fs::write(&path, [1, 2, 3]).expect("write initial bytes");
+        let data = load_font_file(&path).expect("read initial bytes");
+
+        std::fs::write(&path, [4]).expect("replace font path");
+        assert_eq!(data.as_slice(), [1, 2, 3]);
+
+        std::fs::remove_file(path).expect("remove temporary font file");
     }
 }

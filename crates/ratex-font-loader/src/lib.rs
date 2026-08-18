@@ -31,9 +31,9 @@ impl FontBytes {
         self.as_slice().to_vec()
     }
 
-    /// Bytes retained directly by the raw-font cache. System fonts are held by
-    /// `ratex-unicode-font`'s process-wide mmap cache, so retaining another
-    /// `FontData` handle here does not copy or own their mapped bytes.
+    /// Bytes retained directly by the raw-font cache. System fonts are owned
+    /// by `ratex-unicode-font`'s process-wide discovery caches, so retaining
+    /// another `FontData` handle here does not duplicate their owned bytes.
     fn cache_byte_len(&self) -> usize {
         match self {
             Self::Owned(bytes) => bytes.len(),
@@ -289,9 +289,9 @@ impl ParsedFontSet {
             .map(|(id, parsed)| (id, parsed.font.as_ref(), parsed.source_id))
     }
 
-    /// Large/system fonts kept in shared read-only storage (normally mmap).
-    /// Renderers borrow these bytes as `FontRef` instead of copying the whole
-    /// file into a long-lived `Vec` or `FontVec` allocation.
+    /// Large/system fonts kept in shared owned storage. Renderers borrow these
+    /// bytes as `FontRef` instead of copying the whole file into a long-lived
+    /// `Vec` or `FontVec` allocation.
     pub fn iter_raw_with_source(&self) -> impl Iterator<Item = (&FontId, &[u8], OutlineSourceId)> {
         self.raw_fonts
             .iter()
@@ -322,32 +322,24 @@ pub struct FontLoadPlan {
 impl FontLoadPlan {
     pub fn for_display_items(items: &[DisplayItem]) -> Self {
         let mut required = HashSet::new();
-        let mut optional = HashSet::new();
 
         for item in items {
-            if let DisplayItem::GlyphPath {
-                font, char_code, ..
-            } = item
-            {
+            if let DisplayItem::GlyphPath { font, .. } = item {
                 if let Some(font_id) = FontId::parse(font) {
                     required.insert(font_id);
-                    if may_need_runtime_unicode_fallback(font_id, *char_code) {
-                        // A fallback is rare, but when it is needed every glyph in this
-                        // render must share the same lazy FontRef. Loading the small
-                        // three-font plan once prevents reparsing a system font for each
-                        // missing glyph while keeping ordinary math on the no-system-font
-                        // fast path.
-                        optional.insert(FontId::CjkRegular);
-                        optional.insert(FontId::EmojiFallback);
-                        optional.insert(FontId::CjkFallback);
-                    }
                 }
             }
         }
 
         required.insert(FontId::MainRegular);
 
-        Self { required, optional }
+        // System Unicode fallbacks are deliberately not part of the initial
+        // plan. Renderers load each layer only after the previous font cannot
+        // draw a glyph, keeping large emoji TTCs off normal render paths.
+        Self {
+            required,
+            optional: HashSet::new(),
+        }
     }
 
     pub fn required(&self) -> &HashSet<FontId> {
@@ -363,7 +355,7 @@ impl FontLoadPlan {
 struct FontCache {
     entries: HashMap<CacheKey, CachedFont>,
     /// Heap bytes retained by owned raw font buffers. System `FontData` is
-    /// mmap-backed and owned by `ratex-unicode-font`, not this cache.
+    /// owned by `ratex-unicode-font`'s discovery caches, not this cache.
     bytes: usize,
 }
 
@@ -401,13 +393,6 @@ fn is_system_font_id(font_id: FontId) -> bool {
         font_id,
         FontId::CjkRegular | FontId::CjkFallback | FontId::EmojiFallback
     )
-}
-
-fn may_need_runtime_unicode_fallback(font_id: FontId, char_code: u32) -> bool {
-    matches!(
-        font_id,
-        FontId::CjkRegular | FontId::CjkFallback | FontId::EmojiFallback
-    ) || (char_code > 0x7f && ratex_font::get_char_metrics(font_id, char_code).is_none())
 }
 
 fn parsed_font_policy(font_id: FontId, byte_len: usize) -> ParsedFontPolicy {
@@ -966,14 +951,11 @@ mod tests {
     }
 
     #[test]
-    fn missing_non_ascii_glyph_prefetches_reusable_unicode_fallbacks() {
+    fn missing_non_ascii_glyph_defers_unicode_fallbacks() {
         let plan = FontLoadPlan::for_display_items(&[glyph(FontId::MainRegular, '⌘' as u32)]);
 
         assert!(plan.required.contains(&FontId::MainRegular));
-        assert!(plan.optional.contains(&FontId::CjkRegular));
-        assert!(plan.optional.contains(&FontId::EmojiFallback));
-        assert!(plan.optional.contains(&FontId::CjkFallback));
-        assert!(!plan.required.contains(&FontId::CjkRegular));
+        assert!(plan.optional.is_empty());
     }
 
     #[test]
@@ -981,15 +963,19 @@ mod tests {
         let plan = FontLoadPlan::for_display_items(&[glyph(FontId::CjkRegular, '你' as u32)]);
 
         assert!(plan.required.contains(&FontId::CjkRegular));
-        assert!(plan.optional.contains(&FontId::CjkRegular));
-        assert!(plan.optional.contains(&FontId::EmojiFallback));
-        assert!(plan.optional.contains(&FontId::CjkFallback));
+        assert!(plan.optional.is_empty());
     }
 
     #[test]
     fn raw_font_cache_enforces_byte_budget_without_retaining_oversized_font() {
-        let key_a = cache_key("/tmp/ratex-raw-cache-a", FontId::MainRegular);
-        let key_b = cache_key("/tmp/ratex-raw-cache-b", FontId::MainRegular);
+        let key_a = CacheKey {
+            source: FontSourceKey::Legacy,
+            font_id: FontId::MainRegular,
+        };
+        let key_b = CacheKey {
+            source: FontSourceKey::Legacy,
+            font_id: FontId::MainBold,
+        };
         let mut cached = FontCache::default();
 
         let small = || Some(LoadedFont::new(FontBytes::Owned(Arc::new(vec![0; 6]))));
