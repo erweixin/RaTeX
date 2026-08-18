@@ -924,11 +924,13 @@ mod tests {
         assert!(fonts.contains_key(&FontId::MainRegular));
         assert!(!fonts.contains_key(&FontId::Size1Regular));
 
-        let cached = parsed_cache().read().unwrap();
-        assert!(matches!(
-            cached.get(&cache_key(&font_dir, FontId::Size1Regular)),
-            Some(ParsedFontCacheEntry::Missing)
-        ));
+        {
+            let cached = parsed_cache().read().unwrap();
+            assert!(matches!(
+                cached.get(&cache_key(&font_dir, FontId::Size1Regular)),
+                Some(ParsedFontCacheEntry::Missing)
+            ));
+        }
 
         // A second load must observe the same cached result (the missing
         // optional font is a known `None`, so the fast path can be used).
