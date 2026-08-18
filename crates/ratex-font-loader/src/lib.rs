@@ -30,6 +30,16 @@ impl FontBytes {
     fn to_vec(&self) -> Vec<u8> {
         self.as_slice().to_vec()
     }
+
+    /// Bytes retained directly by the raw-font cache. System fonts are held by
+    /// `ratex-unicode-font`'s process-wide mmap cache, so retaining another
+    /// `FontData` handle here does not copy or own their mapped bytes.
+    fn cache_byte_len(&self) -> usize {
+        match self {
+            Self::Owned(bytes) => bytes.len(),
+            Self::System(_) => 0,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -312,12 +322,25 @@ pub struct FontLoadPlan {
 impl FontLoadPlan {
     pub fn for_display_items(items: &[DisplayItem]) -> Self {
         let mut required = HashSet::new();
-        let optional = HashSet::new();
+        let mut optional = HashSet::new();
 
         for item in items {
-            if let DisplayItem::GlyphPath { font, .. } = item {
+            if let DisplayItem::GlyphPath {
+                font, char_code, ..
+            } = item
+            {
                 if let Some(font_id) = FontId::parse(font) {
                     required.insert(font_id);
+                    if may_need_runtime_unicode_fallback(font_id, *char_code) {
+                        // A fallback is rare, but when it is needed every glyph in this
+                        // render must share the same lazy FontRef. Loading the small
+                        // three-font plan once prevents reparsing a system font for each
+                        // missing glyph while keeping ordinary math on the no-system-font
+                        // fast path.
+                        optional.insert(FontId::CjkRegular);
+                        optional.insert(FontId::EmojiFallback);
+                        optional.insert(FontId::CjkFallback);
+                    }
                 }
             }
         }
@@ -336,13 +359,25 @@ impl FontLoadPlan {
     }
 }
 
-static FONT_CACHE: OnceLock<RwLock<HashMap<CacheKey, CachedFont>>> = OnceLock::new();
+#[derive(Default)]
+struct FontCache {
+    entries: HashMap<CacheKey, CachedFont>,
+    /// Heap bytes retained by owned raw font buffers. System `FontData` is
+    /// mmap-backed and owned by `ratex-unicode-font`, not this cache.
+    bytes: usize,
+}
+
+static FONT_CACHE: OnceLock<RwLock<FontCache>> = OnceLock::new();
 
 /// Bound the global raw/parsed font caches when many distinct `font_dir`
 /// values are used. Entries are value objects (`Arc` clones), so eviction is
 /// safe for already-returned `FontSet`/`ParsedFontSet` handles; subsequent
 /// renders simply reload and reparse.
 const FONT_CACHE_CAP: usize = 4096;
+/// Aggregate budget for raw owned font buffers. This is deliberately
+/// independent from the entry limit so a small number of unusually large
+/// custom font files cannot turn the cache into an unbounded allocation.
+const FONT_CACHE_BYTE_CAP: usize = 32 * 1024 * 1024;
 const PARSED_FONT_CACHE_CAP: usize = 4096;
 
 /// Only small fonts are duplicated into an owned `FontVec`. System CJK and
@@ -368,6 +403,13 @@ fn is_system_font_id(font_id: FontId) -> bool {
     )
 }
 
+fn may_need_runtime_unicode_fallback(font_id: FontId, char_code: u32) -> bool {
+    matches!(
+        font_id,
+        FontId::CjkRegular | FontId::CjkFallback | FontId::EmojiFallback
+    ) || (char_code > 0x7f && ratex_font::get_char_metrics(font_id, char_code).is_none())
+}
+
 fn parsed_font_policy(font_id: FontId, byte_len: usize) -> ParsedFontPolicy {
     if is_system_font_id(font_id) || byte_len > PARSED_FONT_MAX_BYTES {
         ParsedFontPolicy::RawOnly
@@ -376,28 +418,49 @@ fn parsed_font_policy(font_id: FontId, byte_len: usize) -> ParsedFontPolicy {
     }
 }
 
-/// Evict unrelated entries only when an insertion would exceed `cap`.
-///
-/// Keeping this decision on the write path is important: a cache that is at
-/// capacity can still serve hits indefinitely without becoming cold.
-fn make_cache_room_for_insert<K, V>(
-    cache: &mut HashMap<K, V>,
-    pending: usize,
-    cap: usize,
-    mut keep: impl FnMut(&K) -> bool,
+fn cache() -> &'static RwLock<FontCache> {
+    FONT_CACHE.get_or_init(|| RwLock::new(FontCache::default()))
+}
+
+fn cached_font_byte_len(entry: &CachedFont) -> usize {
+    entry.as_ref().map_or(0, |font| font.bytes.cache_byte_len())
+}
+
+/// Insert a raw font cache entry while enforcing both entry and byte limits.
+/// An oversized owned font remains usable by the caller but is deliberately
+/// not retained for future renders.
+fn insert_font_cache_entry_with_limits(
+    cache: &mut FontCache,
+    key: CacheKey,
+    entry: CachedFont,
+    entry_cap: usize,
+    byte_cap: usize,
 ) {
-    if pending == 0 || cache.len().saturating_add(pending) <= cap {
+    let entry_bytes = cached_font_byte_len(&entry);
+    if entry_bytes > byte_cap {
         return;
     }
 
-    cache.retain(|key, _| keep(key));
-    if cache.len().saturating_add(pending) > cap {
-        cache.clear();
+    if let Some(previous) = cache.entries.remove(&key) {
+        cache.bytes = cache.bytes.saturating_sub(cached_font_byte_len(&previous));
     }
+    if cache.entries.len() >= entry_cap || cache.bytes.saturating_add(entry_bytes) > byte_cap {
+        cache.entries.clear();
+        cache.bytes = 0;
+    }
+    cache.bytes += entry_bytes;
+    cache.entries.insert(key, entry);
 }
 
-fn cache() -> &'static RwLock<HashMap<CacheKey, CachedFont>> {
-    FONT_CACHE.get_or_init(|| RwLock::new(HashMap::new()))
+fn insert_font_cache_entry(cache: &mut FontCache, key: CacheKey, entry: CachedFont) {
+    insert_font_cache_entry_with_limits(cache, key, entry, FONT_CACHE_CAP, FONT_CACHE_BYTE_CAP);
+}
+
+#[cfg(test)]
+fn remove_font_cache_entry(cache: &mut FontCache, key: &CacheKey) {
+    if let Some(previous) = cache.entries.remove(key) {
+        cache.bytes = cache.bytes.saturating_sub(cached_font_byte_len(&previous));
+    }
 }
 
 static PARSED_FONT_CACHE: LazyLock<RwLock<ParsedFontCache>> =
@@ -712,7 +775,7 @@ pub fn load_fonts_for_plan(font_dir: &str, plan: &FontLoadPlan) -> Result<FontSe
         let cached = cache
             .read()
             .map_err(|_| "font cache poisoned".to_string())?;
-        if collect_cached(font_dir, &wanted, &cached, &mut out) {
+        if collect_cached(font_dir, &wanted, &cached.entries, &mut out) {
             validate_required(plan, &out)?;
             return Ok(FontSet { fonts: out });
         }
@@ -725,23 +788,21 @@ pub fn load_fonts_for_plan(font_dir: &str, plan: &FontLoadPlan) -> Result<FontSe
         let missing: Vec<_> = wanted
             .iter()
             .copied()
-            .filter(|&font_id| !cached.contains_key(&cache_key(font_dir, font_id)))
+            .filter(|&font_id| !cached.entries.contains_key(&cache_key(font_dir, font_id)))
             .collect();
-        let wanted_keys: HashSet<_> = wanted
-            .iter()
-            .map(|&font_id| cache_key(font_dir, font_id))
-            .collect();
-        make_cache_room_for_insert(&mut cached, missing.len(), FONT_CACHE_CAP, |key| {
-            wanted_keys.contains(key)
-        });
         for font_id in missing {
             let loaded = load_font_bytes(font_dir, font_id)?.map(LoadedFont::new);
-            cached.insert(cache_key(font_dir, font_id), loaded);
+            if let Some(font) = loaded.as_ref() {
+                // Keep a caller-owned clone even if this entry is too large to
+                // cache or evicts older entries that are also part of `wanted`.
+                out.insert(font_id, font.clone());
+            }
+            insert_font_cache_entry(&mut cached, cache_key(font_dir, font_id), loaded);
         }
         // Re-collect without clearing `out`: fonts already inserted during the
         // read-lock fast path stay in place (overwritten with identical Arc
         // clones), and newly loaded fonts are added.
-        collect_cached(font_dir, &wanted, &cached, &mut out);
+        collect_cached(font_dir, &wanted, &cached.entries, &mut out);
     }
 
     validate_required(plan, &out)?;
@@ -905,13 +966,13 @@ mod tests {
     }
 
     #[test]
-    fn non_ascii_fallback_is_not_prefetched() {
+    fn missing_non_ascii_glyph_prefetches_reusable_unicode_fallbacks() {
         let plan = FontLoadPlan::for_display_items(&[glyph(FontId::MainRegular, '⌘' as u32)]);
 
         assert!(plan.required.contains(&FontId::MainRegular));
-        assert!(!plan.optional.contains(&FontId::CjkRegular));
-        assert!(!plan.optional.contains(&FontId::EmojiFallback));
-        assert!(!plan.optional.contains(&FontId::CjkFallback));
+        assert!(plan.optional.contains(&FontId::CjkRegular));
+        assert!(plan.optional.contains(&FontId::EmojiFallback));
+        assert!(plan.optional.contains(&FontId::CjkFallback));
         assert!(!plan.required.contains(&FontId::CjkRegular));
     }
 
@@ -920,9 +981,33 @@ mod tests {
         let plan = FontLoadPlan::for_display_items(&[glyph(FontId::CjkRegular, '你' as u32)]);
 
         assert!(plan.required.contains(&FontId::CjkRegular));
-        assert!(!plan.optional.contains(&FontId::CjkRegular));
-        assert!(!plan.optional.contains(&FontId::EmojiFallback));
-        assert!(!plan.optional.contains(&FontId::CjkFallback));
+        assert!(plan.optional.contains(&FontId::CjkRegular));
+        assert!(plan.optional.contains(&FontId::EmojiFallback));
+        assert!(plan.optional.contains(&FontId::CjkFallback));
+    }
+
+    #[test]
+    fn raw_font_cache_enforces_byte_budget_without_retaining_oversized_font() {
+        let key_a = cache_key("/tmp/ratex-raw-cache-a", FontId::MainRegular);
+        let key_b = cache_key("/tmp/ratex-raw-cache-b", FontId::MainRegular);
+        let mut cached = FontCache::default();
+
+        let small = || Some(LoadedFont::new(FontBytes::Owned(Arc::new(vec![0; 6]))));
+        insert_font_cache_entry_with_limits(&mut cached, key_a.clone(), small(), 8, 8);
+        assert_eq!(cached.bytes, 6);
+        assert!(cached.entries.contains_key(&key_a));
+
+        // A new entry that would exceed the aggregate budget clears old
+        // values, then stores the new one within the same budget.
+        insert_font_cache_entry_with_limits(&mut cached, key_b.clone(), small(), 8, 8);
+        assert_eq!(cached.bytes, 6);
+        assert!(!cached.entries.contains_key(&key_a));
+        assert!(cached.entries.contains_key(&key_b));
+
+        let too_large = Some(LoadedFont::new(FontBytes::Owned(Arc::new(vec![0; 9]))));
+        insert_font_cache_entry_with_limits(&mut cached, key_a.clone(), too_large, 8, 8);
+        assert_eq!(cached.bytes, 6);
+        assert!(!cached.entries.contains_key(&key_a));
     }
 
     #[test]
@@ -1036,7 +1121,7 @@ mod tests {
 
         let font_dir = font_dir.to_string_lossy().to_string();
         let key = cache_key(&font_dir, FontId::MainRegular);
-        cache().write().unwrap().remove(&key);
+        remove_font_cache_entry(&mut cache().write().unwrap(), &key);
         remove_parsed_cache_entry(&key).unwrap();
         TEST_PARSE_COUNTS.lock().unwrap().remove(&key);
 
@@ -1065,7 +1150,7 @@ mod tests {
         }
         assert_eq!(TEST_PARSE_COUNTS.lock().unwrap().get(&key), Some(&1));
 
-        cache().write().unwrap().remove(&key);
+        remove_font_cache_entry(&mut cache().write().unwrap(), &key);
         remove_parsed_cache_entry(&key).unwrap();
         TEST_PARSE_COUNTS.lock().unwrap().remove(&key);
         let _ = std::fs::remove_dir_all(font_dir);
@@ -1150,10 +1235,10 @@ mod tests {
 
         // Simulate the bounded raw cache evicting this directory while its
         // parsed entry remains hot, then replace the file at the same path.
-        cache()
-            .write()
-            .unwrap()
-            .remove(&cache_key(&font_dir, FontId::MainRegular));
+        remove_font_cache_entry(
+            &mut cache().write().unwrap(),
+            &cache_key(&font_dir, FontId::MainRegular),
+        );
         std::fs::copy(&bold, &installed).expect("install second font generation");
 
         let second = load_fonts_for_plan_parsed(&font_dir, &plan).expect("load second generation");
@@ -1170,32 +1255,12 @@ mod tests {
         .expect("second outline");
         assert_ne!(format!("{first_outline:?}"), format!("{second_outline:?}"));
 
-        cache()
-            .write()
-            .unwrap()
-            .remove(&cache_key(&font_dir, FontId::MainRegular));
+        remove_font_cache_entry(
+            &mut cache().write().unwrap(),
+            &cache_key(&font_dir, FontId::MainRegular),
+        );
         remove_parsed_cache_entry(&cache_key(&font_dir, FontId::MainRegular)).unwrap();
         let _ = std::fs::remove_dir_all(font_dir);
-    }
-
-    #[test]
-    fn full_cache_hit_does_not_trigger_eviction() {
-        let mut cached = HashMap::from([(1_u8, "one"), (2, "two")]);
-
-        make_cache_room_for_insert(&mut cached, 0, 2, |_| false);
-
-        assert_eq!(cached.len(), 2);
-        assert_eq!(cached.get(&1), Some(&"one"));
-        assert_eq!(cached.get(&2), Some(&"two"));
-    }
-
-    #[test]
-    fn cache_miss_evicts_only_unrelated_entries() {
-        let mut cached = HashMap::from([(1_u8, "keep"), (2, "evict")]);
-
-        make_cache_room_for_insert(&mut cached, 1, 2, |key| *key == 1);
-
-        assert_eq!(cached, HashMap::from([(1, "keep")]));
     }
 
     #[cfg(all(not(feature = "embed-fonts"), unix))]

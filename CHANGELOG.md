@@ -25,11 +25,14 @@ section.
   fonts stay in shared read-only mappings and are borrowed as `FontRef`, so a
   render does not retain a whole-font heap copy. CJK loads only its primary
   face; emoji and secondary CJK fallback files are mapped only after a glyph
-  actually falls through to them. Canonical paths share one mapping. Parsed
-  payloads have a 32 MiB aggregate budget and concurrent cold loads share one
-  parse per font generation. Raw-font, parsed-font, and font-source caches also
-  retain their 4096-entry bounds; eviction only drops cache entries, so
-  returned shared font handles remain valid.
+  actually falls through to them. When a KaTeX-missing non-ASCII glyph needs
+  fallback, its Unicode/emoji fallback set is loaded once for the complete
+  render so every glyph reuses the same `FontRef`. Canonical paths share one
+  mapping. Raw owned-font payloads and parsed payloads each have a 32 MiB
+  aggregate budget; concurrent cold loads share one parse per font generation.
+  Raw-font, parsed-font, and font-source caches also retain their 4096-entry
+  bounds. Eviction only drops cache entries, so returned shared font handles
+  remain valid.
 - **PNG**: encode from a directly demultiplied RGBA buffer with a pre-sized
   encoder output buffer (and shrink it before returning). The `png` crate
   0.17 already defaults to `Compression::Fast`, `Sub` filtering, and
@@ -59,3 +62,26 @@ matrix 769 → 287 μs (−63%), CJK 577 → 243 μs (−58%), emoji 420 → 196
 
 Quality is unchanged: golden ink scores are identical (main suite 0.9019,
 mhchem 0.8814), and PNG pixels / SVG bytes match the previous implementation.
+
+### Latest main comparison and test device
+
+Latest verification compares the previous `0.1.14` release (`public/main`) to
+`Unreleased` after the raw-font cache byte budget and fallback-reuse changes.
+It is a warmed, single-run sample
+of the same 100-formula release benchmark; timings naturally vary with system
+load.
+
+| Metric | `0.1.14` | `Unreleased` | Change |
+|---|---:|---:|---:|
+| End-to-end PNG | 276 μs | 225 μs | −18% |
+| PNG throughput | 3,623 formulas/s | 4,444 formulas/s | +23% |
+| Maximum RSS | 416.1 MiB | 54.6 MiB | −87% |
+| macOS peak memory footprint | 38.2 MiB | 38.4 MiB | +0.2 MiB |
+
+The RSS reduction reflects avoiding whole-font heap copies and sharing mapped
+system-font data. `peak memory footprint` uses a different macOS accounting
+method and remains effectively unchanged in this sample.
+
+Test device: Mac mini (Mac16,10), Apple M4 (10 CPU cores), 32 GB unified
+memory, macOS 26.3.1 (25D2128), Darwin 25.3.0 / arm64. Command:
+`/usr/bin/time -l cargo test --offline -p ratex-render --test bench_render --release -- --ignored --nocapture`.
