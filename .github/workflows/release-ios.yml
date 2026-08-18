@@ -25,6 +25,12 @@ jobs:
             aarch64-apple-darwin,
             x86_64-apple-darwin
 
+      - name: Install iOS Rust toolchain
+        run: |
+          rustup toolchain install nightly-2026-08-16 --profile minimal --component rust-src
+          rustup target add --toolchain nightly-2026-08-16 \
+            aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
 
