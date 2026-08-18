@@ -80,11 +80,12 @@ pub fn render_to_pdf(
     let page_h = total_h * em + 2.0 * pad + 2.0 * vertical_guard;
 
     // Load raw font data (lazy: only fonts referenced by this display list).
-    let font_data = ratex_font_loader::load_fonts_for_items(&options.font_dir, &display_list.items)
-        .map_err(PdfError::Font)?;
+    let mut font_data =
+        ratex_font_loader::load_fonts_for_items(&options.font_dir, &display_list.items)
+            .map_err(PdfError::Font)?;
 
     // Pass 1: collect glyph usage (emoji → raster XObjects; other faces → subset fonts).
-    let collected = fonts::collect_glyph_usage(&display_list.items, &font_data, em);
+    let collected = fonts::collect_glyph_usage(&display_list.items, &mut font_data, em);
 
     // Build the PDF.
     let mut pdf = Pdf::new();

@@ -182,6 +182,31 @@ pub(crate) fn resolve_pdf_glyph(
     None
 }
 
+fn resolve_pdf_glyph_lazy(
+    font_data: &mut RawFontData,
+    font_name: &str,
+    char_code: u32,
+) -> Option<(FontId, u16)> {
+    if let Some(resolved) = resolve_pdf_glyph(font_data, font_name, char_code) {
+        return Some(resolved);
+    }
+
+    let _ = font_data.ensure_system_font(FontId::CjkRegular);
+    if let Some(resolved) = resolve_pdf_glyph(font_data, font_name, char_code) {
+        return Some(resolved);
+    }
+
+    if char::from_u32(char_code).is_some_and(ratex_unicode_font::is_emoji_candidate) {
+        let _ = font_data.ensure_system_font(FontId::EmojiFallback);
+        if let Some(resolved) = resolve_pdf_glyph(font_data, font_name, char_code) {
+            return Some(resolved);
+        }
+    }
+
+    let _ = font_data.ensure_system_font(FontId::CjkFallback);
+    resolve_pdf_glyph(font_data, font_name, char_code)
+}
+
 /// Info about a glyph we want to embed.
 #[derive(Clone, Debug)]
 pub(crate) struct GlyphInfo {
@@ -222,7 +247,7 @@ pub(crate) struct EmbeddedEmojiImage {
 /// Collect font subset usage and emoji raster usage (`EmojiFallback` is drawn as images, not Type0).
 pub(crate) fn collect_glyph_usage(
     items: &[ratex_types::display_item::DisplayItem],
-    font_data: &RawFontData,
+    font_data: &mut RawFontData,
     body_em: f64,
 ) -> CollectedGlyphs {
     let mut usage_map: HashMap<FontId, HashSet<(u16, u32)>> = HashMap::new();
@@ -243,9 +268,7 @@ pub(crate) fn collect_glyph_usage(
             // Always collect sbix rasters for emoji / dingbat blocks when a color font is loaded,
             // independent of [`resolve_pdf_glyph`] (avoids edge cases where CJK/Main still "claim" a CP).
             // BUT: only if the emoji font actually has PNG rasters (Windows COLR fonts don't).
-            if prefer_color_emoji_raster(*char_code)
-                && ratex_unicode_font::load_emoji_font_arc().is_some()
-            {
+            if prefer_color_emoji_raster(*char_code) {
                 // Check if PNG raster is actually available before collecting as emoji
                 let ch = char::from_u32(*char_code);
                 let has_png = ch
@@ -261,7 +284,7 @@ pub(crate) fn collect_glyph_usage(
                 }
                 // If no PNG available, fall through to vector outline rendering
             }
-            if let Some((face, gid)) = resolve_pdf_glyph(font_data, font, *char_code) {
+            if let Some((face, gid)) = resolve_pdf_glyph_lazy(font_data, font, *char_code) {
                 if face == FontId::EmojiFallback {
                     // Check if PNG raster is available
                     let ch = char::from_u32(*char_code);
@@ -681,11 +704,11 @@ mod macos_cjk_pdf_tests {
         let main_path =
             Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fonts/KaTeX_Main-Regular.ttf");
         let main = std::fs::read(main_path).expect("KaTeX_Main-Regular");
-        let emoji = ratex_unicode_font::load_emoji_font_arc().expect("system emoji font");
+        let emoji = ratex_unicode_font::load_emoji_font_data().expect("system emoji font");
         let mut data = HashMap::new();
         data.insert(FontId::MainRegular, main);
         data.insert(FontId::CjkRegular, ag);
-        data.insert(FontId::EmojiFallback, (*emoji).clone());
+        data.insert(FontId::EmojiFallback, emoji.as_slice().to_vec());
         let data: RawFontData = data.into();
         let r = resolve_pdf_glyph(&data, "CJK-Regular", 0x1F600);
         assert!(

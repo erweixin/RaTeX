@@ -10,5 +10,6 @@ description = "System Unicode font discovery for RaTeX fallback rendering"
 
 [dependencies]
 fontdb = { version = "0.23", features = ["std"] }
+memmap2 = "0.9"
 system-fonts = "0.1"
 ttf-parser = "0.25"

@@ -1,22 +1,108 @@
 //! Glyph outlines as SVG `<path>` via `ab_glyph` (feature `standalone`).
 
+use std::cell::OnceCell;
 use std::collections::HashMap;
 
-use ab_glyph::{Font, FontVec, OutlineCurve};
+use ab_glyph::{Font, FontRef, FontVec, OutlineCurve};
 use ratex_font::FontId;
 use ratex_font_loader::{OutlineSourceId, ParsedFontSet};
 
-#[derive(Clone, Copy)]
+pub(crate) enum SvgFont<'a> {
+    Parsed(&'a FontVec),
+    Raw(Box<LazyRawFont<'a>>),
+}
+
+pub(crate) struct LazyRawFont<'a> {
+    bytes: &'a [u8],
+    face_index: u32,
+    parsed: OnceCell<Result<FontRef<'a>, ab_glyph::InvalidFont>>,
+}
+
+impl<'a> LazyRawFont<'a> {
+    fn get(&self) -> Option<&FontRef<'a>> {
+        self.parsed
+            .get_or_init(|| FontRef::try_from_slice_and_index(self.bytes, self.face_index))
+            .as_ref()
+            .ok()
+    }
+}
+
+impl SvgFont<'_> {
+    fn glyph_id(&self, ch: char) -> ab_glyph::GlyphId {
+        match self {
+            Self::Parsed(font) => font.glyph_id(ch),
+            Self::Raw(raw) => raw
+                .get()
+                .map_or(ab_glyph::GlyphId(0), |font| font.glyph_id(ch)),
+        }
+    }
+
+    fn units_per_em(&self) -> Option<f32> {
+        match self {
+            Self::Parsed(font) => font.units_per_em(),
+            Self::Raw(raw) => raw.get().and_then(Font::units_per_em),
+        }
+    }
+
+    fn h_advance_unscaled(&self, glyph_id: ab_glyph::GlyphId) -> f32 {
+        match self {
+            Self::Parsed(font) => font.h_advance_unscaled(glyph_id),
+            Self::Raw(raw) => raw
+                .get()
+                .map_or(0.0, |font| font.h_advance_unscaled(glyph_id)),
+        }
+    }
+
+    fn cached_outline(
+        &self,
+        font_id: FontId,
+        source_id: OutlineSourceId,
+        glyph_id: ab_glyph::GlyphId,
+    ) -> Option<std::sync::Arc<[OutlineCurve]>> {
+        match self {
+            Self::Parsed(font) => ratex_font_loader::outline_cache::get_or_compute_outline_fontvec(
+                font_id, font, source_id, glyph_id,
+            ),
+            Self::Raw(raw) => raw.get().and_then(|font| {
+                ratex_font_loader::outline_cache::get_or_compute_outline_with_source_id(
+                    font_id, font, source_id, glyph_id,
+                )
+            }),
+        }
+    }
+}
+
 pub(crate) struct SvgFontRef<'a> {
-    font: &'a FontVec,
+    font: SvgFont<'a>,
     source_id: OutlineSourceId,
 }
 
-/// Build a `FontId → (&FontVec, OutlineSourceId)` map from the parsed-font cache.
+/// Build a map combining cached small `FontVec`s with borrowed raw large fonts.
 pub(crate) fn build_font_refs(data: &ParsedFontSet) -> HashMap<FontId, SvgFontRef<'_>> {
-    data.iter_with_source()
-        .map(|(id, font, source_id)| (*id, SvgFontRef { font, source_id }))
-        .collect()
+    let mut refs = HashMap::new();
+    for (id, font, source_id) in data.iter_with_source() {
+        refs.insert(
+            *id,
+            SvgFontRef {
+                font: SvgFont::Parsed(font),
+                source_id,
+            },
+        );
+    }
+    for (id, bytes, source_id) in data.iter_raw_with_source() {
+        refs.insert(
+            *id,
+            SvgFontRef {
+                font: SvgFont::Raw(Box::new(LazyRawFont {
+                    bytes,
+                    face_index: ratex_font_loader::font_face_index(*id),
+                    parsed: OnceCell::new(),
+                })),
+                source_id,
+            },
+        );
+    }
+    refs
 }
 
 /// Vector path or color-emoji raster (`sbix` PNG as `data:image/png`), matching `ratex-render::render_glyph`.
@@ -44,10 +130,10 @@ pub(crate) fn standalone_glyph(
 ) -> Option<StandaloneGlyph> {
     let font_id = FontId::parse(font_name).unwrap_or(FontId::MainRegular);
     let font_entry = match font_cache.get(&font_id) {
-        Some(entry) => *entry,
-        None => *font_cache.get(&FontId::MainRegular)?,
+        Some(entry) => entry,
+        None => font_cache.get(&FontId::MainRegular)?,
     };
-    let font = font_entry.font;
+    let font = &font_entry.font;
 
     let ch = ratex_font::katex_ttf_glyph_char(font_id, char_code);
     let glyph_id = font.glyph_id(ch);
@@ -83,22 +169,14 @@ pub(crate) fn standalone_glyph(
         if let Some(g) = try_emoji_raster_then_vector_svg(px, py, glyph_em, ch, font_cache) {
             return Some(g);
         }
-        if let Some(fb) = font_cache.get(&FontId::CjkFallback) {
-            let fid = fb.font.glyph_id(ch);
-            if fid.0 != 0 {
-                return outline_to_d(
-                    px,
-                    py,
-                    glyph_em,
-                    FontId::CjkFallback,
-                    fb.source_id,
-                    fb.font,
-                    fid,
-                )
-                .map(StandaloneGlyph::Path);
-            }
-        }
-        return None;
+        return outline_char_with_system_fallback(
+            px,
+            py,
+            glyph_em,
+            ch,
+            FontId::CjkFallback,
+            font_cache,
+        );
     }
 
     if font_id == FontId::CjkFallback {
@@ -131,8 +209,49 @@ pub(crate) fn standalone_glyph(
     let skip_main = font_id == FontId::MainRegular;
     try_system_unicode_fallback_svg(px, py, glyph_em, ch, font_cache, skip_main)
 }
+
+fn outline_char_with_entry(
+    px: f32,
+    py: f32,
+    em: f32,
+    ch: char,
+    font_id: FontId,
+    entry: &SvgFontRef<'_>,
+) -> Option<StandaloneGlyph> {
+    let glyph_id = entry.font.glyph_id(ch);
+    if glyph_id.0 == 0 {
+        return None;
+    }
+    outline_to_d(px, py, em, font_id, entry.source_id, &entry.font, glyph_id)
+        .map(StandaloneGlyph::Path)
+}
+
+fn outline_char_with_system_fallback(
+    px: f32,
+    py: f32,
+    em: f32,
+    ch: char,
+    font_id: FontId,
+    font_cache: &HashMap<FontId, SvgFontRef<'_>>,
+) -> Option<StandaloneGlyph> {
+    if let Some(entry) = font_cache.get(&font_id) {
+        return outline_char_with_entry(px, py, em, ch, font_id, entry);
+    }
+
+    let fonts = ratex_font_loader::load_system_font_parsed(font_id)
+        .ok()
+        .flatten()?;
+    let fallback_refs = build_font_refs(&fonts);
+    let entry = fallback_refs.get(&font_id)?;
+    outline_char_with_entry(px, py, em, ch, font_id, entry)
+}
+
 fn try_emoji_png_data_url(px: f32, py: f32, em: f32, ch: char) -> Option<StandaloneGlyph> {
     use base64::{engine::general_purpose::STANDARD, Engine as _};
+
+    if !ratex_unicode_font::is_emoji_candidate(ch) {
+        return None;
+    }
 
     #[cfg(target_os = "macos")]
     let request_em = em * 2.0;
@@ -168,24 +287,13 @@ fn try_emoji_raster_then_vector_svg(
     ch: char,
     font_cache: &HashMap<FontId, SvgFontRef<'_>>,
 ) -> Option<StandaloneGlyph> {
+    if !ratex_unicode_font::is_emoji_candidate(ch) {
+        return None;
+    }
     if let Some(img) = try_emoji_png_data_url(px, py, em, ch) {
         return Some(img);
     }
-    let emoji_font = font_cache.get(&FontId::EmojiFallback)?;
-    let eid = emoji_font.font.glyph_id(ch);
-    if eid.0 == 0 {
-        return None;
-    }
-    outline_to_d(
-        px,
-        py,
-        em,
-        FontId::EmojiFallback,
-        emoji_font.source_id,
-        emoji_font.font,
-        eid,
-    )
-    .map(StandaloneGlyph::Path)
+    outline_char_with_system_fallback(px, py, em, ch, FontId::EmojiFallback, font_cache)
 }
 fn try_emoji_raster_or_vector_svg(
     px: f32,
@@ -193,7 +301,7 @@ fn try_emoji_raster_or_vector_svg(
     em: f32,
     ch: char,
     source_id: OutlineSourceId,
-    font: &FontVec,
+    font: &SvgFont<'_>,
     glyph_id: ab_glyph::GlyphId,
 ) -> Option<StandaloneGlyph> {
     if let Some(img) = try_emoji_png_data_url(px, py, em, ch) {
@@ -220,7 +328,7 @@ fn try_system_unicode_fallback_svg(
                     em,
                     FontId::MainRegular,
                     fallback.source_id,
-                    fallback.font,
+                    &fallback.font,
                     fid,
                 ) {
                     return Some(StandaloneGlyph::Path(d));
@@ -228,27 +336,15 @@ fn try_system_unicode_fallback_svg(
             }
         }
     }
-    if let Some(cjk) = font_cache.get(&FontId::CjkRegular) {
-        let cid = cjk.font.glyph_id(ch);
-        if cid.0 != 0 {
-            if let Some(d) =
-                outline_to_d(px, py, em, FontId::CjkRegular, cjk.source_id, cjk.font, cid)
-            {
-                return Some(StandaloneGlyph::Path(d));
-            }
-        }
+    if let Some(glyph) =
+        outline_char_with_system_fallback(px, py, em, ch, FontId::CjkRegular, font_cache)
+    {
+        return Some(glyph);
     }
     if let Some(g) = try_emoji_raster_then_vector_svg(px, py, em, ch, font_cache) {
         return Some(g);
     }
-    if let Some(fb) = font_cache.get(&FontId::CjkFallback) {
-        let fid = fb.font.glyph_id(ch);
-        if fid.0 != 0 {
-            return outline_to_d(px, py, em, FontId::CjkFallback, fb.source_id, fb.font, fid)
-                .map(StandaloneGlyph::Path);
-        }
-    }
-    None
+    outline_char_with_system_fallback(px, py, em, ch, FontId::CjkFallback, font_cache)
 }
 fn outline_to_d(
     px: f32,
@@ -256,7 +352,7 @@ fn outline_to_d(
     em: f32,
     font_id: FontId,
     source_id: OutlineSourceId,
-    font: &FontVec,
+    font: &SvgFont<'_>,
     glyph_id: ab_glyph::GlyphId,
 ) -> Option<String> {
     let mut d = String::with_capacity(256);
@@ -278,12 +374,10 @@ fn outline_to_d_into(
     em: f32,
     font_id: FontId,
     source_id: OutlineSourceId,
-    font: &FontVec,
+    font: &SvgFont<'_>,
     glyph_id: ab_glyph::GlyphId,
 ) -> bool {
-    let Some(curves) = ratex_font_loader::outline_cache::get_or_compute_outline_fontvec(
-        font_id, font, source_id, glyph_id,
-    ) else {
+    let Some(curves) = font.cached_outline(font_id, source_id, glyph_id) else {
         return false;
     };
     let units_per_em = font.units_per_em().unwrap_or(1000.0);

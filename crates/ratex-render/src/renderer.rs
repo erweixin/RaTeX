@@ -1,7 +1,8 @@
+use std::cell::OnceCell;
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, RwLock};
 
-use ab_glyph::{Font, FontVec};
+use ab_glyph::{Font, FontRef, FontVec};
 use ratex_font::FontId;
 use ratex_font_loader::{OutlineSourceId, ParsedFontSet};
 use ratex_types::color::Color;
@@ -119,27 +120,195 @@ fn normalized_alpha(alpha: f32) -> f32 {
     }
 }
 
-#[derive(Clone, Copy)]
-struct ParsedFontRef<'a> {
-    font: &'a FontVec,
+enum RendererFont<'a> {
+    Parsed(&'a FontVec),
+    Raw(Box<LazyRawFont<'a>>),
+}
+
+struct LazyRawFont<'a> {
+    bytes: &'a [u8],
+    face_index: u32,
+    parsed: OnceCell<Result<FontRef<'a>, ab_glyph::InvalidFont>>,
+}
+
+impl<'a> LazyRawFont<'a> {
+    fn get(&self) -> Option<&FontRef<'a>> {
+        self.parsed
+            .get_or_init(|| FontRef::try_from_slice_and_index(self.bytes, self.face_index))
+            .as_ref()
+            .ok()
+    }
+}
+
+trait RendererFontOps: Font {
+    fn cached_outline(
+        &self,
+        font_id: FontId,
+        source_id: OutlineSourceId,
+        glyph_id: ab_glyph::GlyphId,
+    ) -> Option<Arc<[ab_glyph::OutlineCurve]>>;
+}
+
+impl RendererFontOps for FontVec {
+    fn cached_outline(
+        &self,
+        font_id: FontId,
+        source_id: OutlineSourceId,
+        glyph_id: ab_glyph::GlyphId,
+    ) -> Option<Arc<[ab_glyph::OutlineCurve]>> {
+        ratex_font_loader::outline_cache::get_or_compute_outline_fontvec(
+            font_id, self, source_id, glyph_id,
+        )
+    }
+}
+
+impl RendererFontOps for FontRef<'_> {
+    fn cached_outline(
+        &self,
+        font_id: FontId,
+        source_id: OutlineSourceId,
+        glyph_id: ab_glyph::GlyphId,
+    ) -> Option<Arc<[ab_glyph::OutlineCurve]>> {
+        ratex_font_loader::outline_cache::get_or_compute_outline_with_source_id(
+            font_id, self, source_id, glyph_id,
+        )
+    }
+}
+
+struct RendererFontRef<'a> {
+    font: RendererFont<'a>,
     source_id: OutlineSourceId,
 }
 
-/// Build a `FontId → (&FontVec, OutlineSourceId)` map from the parsed-font cache.
+/// Build a map combining cached small `FontVec`s with borrowed raw large fonts.
 ///
-/// The parsed fonts are already cached globally by `ratex-font-loader`, so
-/// this is just a reference map for the current render call.
-fn build_font_refs(data: &ParsedFontSet) -> HashMap<FontId, ParsedFontRef<'_>> {
-    data.iter_with_source()
-        .map(|(id, font, source_id)| (*id, ParsedFontRef { font, source_id }))
-        .collect()
+/// Raw `FontRef`s borrow the `ParsedFontSet`'s `Arc`-backed bytes and therefore
+/// do not copy large CJK/emoji TTF/TTC containers.
+fn build_font_refs(data: &ParsedFontSet) -> HashMap<FontId, RendererFontRef<'_>> {
+    let mut refs = HashMap::new();
+    for (id, font, source_id) in data.iter_with_source() {
+        refs.insert(
+            *id,
+            RendererFontRef {
+                font: RendererFont::Parsed(font),
+                source_id,
+            },
+        );
+    }
+    for (id, bytes, source_id) in data.iter_raw_with_source() {
+        refs.insert(
+            *id,
+            RendererFontRef {
+                font: RendererFont::Raw(Box::new(LazyRawFont {
+                    bytes,
+                    face_index: ratex_font_loader::font_face_index(*id),
+                    parsed: OnceCell::new(),
+                })),
+                source_id,
+            },
+        );
+    }
+    refs
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_char_with_entry(
+    pixmap: &mut Pixmap,
+    px: f32,
+    py: f32,
+    font_id: FontId,
+    ch: char,
+    color: &Color,
+    em: f32,
+    entry: &RendererFontRef<'_>,
+) -> bool {
+    match &entry.font {
+        RendererFont::Parsed(font) => render_char_with_font(
+            pixmap,
+            px,
+            py,
+            font_id,
+            ch,
+            color,
+            em,
+            *font,
+            entry.source_id,
+        ),
+        RendererFont::Raw(raw) => raw.get().is_some_and(|font| {
+            render_char_with_font(
+                pixmap,
+                px,
+                py,
+                font_id,
+                ch,
+                color,
+                em,
+                font,
+                entry.source_id,
+            )
+        }),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_char_with_system_fallback(
+    pixmap: &mut Pixmap,
+    px: f32,
+    py: f32,
+    font_id: FontId,
+    ch: char,
+    color: &Color,
+    em: f32,
+    font_cache: &HashMap<FontId, RendererFontRef<'_>>,
+) -> bool {
+    if let Some(entry) = font_cache.get(&font_id) {
+        return render_char_with_entry(pixmap, px, py, font_id, ch, color, em, entry);
+    }
+
+    let Ok(Some(fonts)) = ratex_font_loader::load_system_font_parsed(font_id) else {
+        return false;
+    };
+    let fallback_refs = build_font_refs(&fonts);
+    let Some(entry) = fallback_refs.get(&font_id) else {
+        return false;
+    };
+    render_char_with_entry(pixmap, px, py, font_id, ch, color, em, entry)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_char_with_font<F: RendererFontOps + ?Sized>(
+    pixmap: &mut Pixmap,
+    px: f32,
+    py: f32,
+    font_id: FontId,
+    ch: char,
+    color: &Color,
+    em: f32,
+    font: &F,
+    source_id: OutlineSourceId,
+) -> bool {
+    let glyph_id = font.glyph_id(ch);
+    glyph_id.0 != 0
+        && render_glyph_with_font(
+            pixmap,
+            px,
+            py,
+            FontGlyph {
+                font_id,
+                font,
+                source_id,
+                glyph_id,
+            },
+            color,
+            em,
+        )
 }
 
 /// Render all items in the DisplayList using the given font cache.
 fn render_display_list(
     pixmap: &mut Pixmap,
     display_list: &DisplayList,
-    font_cache: &HashMap<FontId, ParsedFontRef<'_>>,
+    font_cache: &HashMap<FontId, RendererFontRef<'_>>,
     em_px: f32,
     pad_px: f32,
     dpr: f32,
@@ -241,75 +410,42 @@ fn try_system_unicode_fallback(
     ch: char,
     color: &Color,
     em: f32,
-    font_cache: &HashMap<FontId, ParsedFontRef<'_>>,
+    font_cache: &HashMap<FontId, RendererFontRef<'_>>,
     skip_main_regular: bool,
 ) -> bool {
     if !skip_main_regular {
         if let Some(fallback) = font_cache.get(&FontId::MainRegular) {
-            let fid = fallback.font.glyph_id(ch);
-            if fid.0 != 0
-                && render_glyph_with_font(
-                    pixmap,
-                    px,
-                    py,
-                    FontGlyph {
-                        font_id: FontId::MainRegular,
-                        font: fallback.font,
-                        source_id: fallback.source_id,
-                        glyph_id: fid,
-                    },
-                    color,
-                    em,
-                )
+            if render_char_with_entry(pixmap, px, py, FontId::MainRegular, ch, color, em, fallback)
             {
                 return true;
             }
         }
     }
-    if let Some(cjk_font) = font_cache.get(&FontId::CjkRegular) {
-        let fid = cjk_font.font.glyph_id(ch);
-        if fid.0 != 0
-            && render_glyph_with_font(
-                pixmap,
-                px,
-                py,
-                FontGlyph {
-                    font_id: FontId::CjkRegular,
-                    font: cjk_font.font,
-                    source_id: cjk_font.source_id,
-                    glyph_id: fid,
-                },
-                color,
-                em,
-            )
-        {
-            return true;
-        }
+    if render_char_with_system_fallback(
+        pixmap,
+        px,
+        py,
+        FontId::CjkRegular,
+        ch,
+        color,
+        em,
+        font_cache,
+    ) {
+        return true;
     }
     if try_emoji_vector_then_bitmap(pixmap, px, py, ch, color, em, font_cache) {
         return true;
     }
-    if let Some(fb_font) = font_cache.get(&FontId::CjkFallback) {
-        let fid = fb_font.font.glyph_id(ch);
-        if fid.0 != 0
-            && render_glyph_with_font(
-                pixmap,
-                px,
-                py,
-                FontGlyph {
-                    font_id: FontId::CjkFallback,
-                    font: fb_font.font,
-                    source_id: fb_font.source_id,
-                    glyph_id: fid,
-                },
-                color,
-                em,
-            )
-        {
-            return true;
-        }
-    }
-    false
+    render_char_with_system_fallback(
+        pixmap,
+        px,
+        py,
+        FontId::CjkFallback,
+        ch,
+        color,
+        em,
+        font_cache,
+    )
 }
 
 /// Color fonts (e.g. Apple Color Emoji) often expose a minimal `glyf` outline for COLR masking
@@ -323,32 +459,24 @@ fn try_emoji_vector_then_bitmap(
     ch: char,
     color: &Color,
     em: f32,
-    font_cache: &HashMap<FontId, ParsedFontRef<'_>>,
+    font_cache: &HashMap<FontId, RendererFontRef<'_>>,
 ) -> bool {
+    if !ratex_unicode_font::is_emoji_candidate(ch) {
+        return false;
+    }
     if try_blit_emoji_raster_fallback(pixmap, px, py, em, ch, color) {
         return true;
     }
-    if let Some(emoji_font) = font_cache.get(&FontId::EmojiFallback) {
-        let eid = emoji_font.font.glyph_id(ch);
-        if eid.0 != 0
-            && render_glyph_with_font(
-                pixmap,
-                px,
-                py,
-                FontGlyph {
-                    font_id: FontId::EmojiFallback,
-                    font: emoji_font.font,
-                    source_id: emoji_font.source_id,
-                    glyph_id: eid,
-                },
-                color,
-                em,
-            )
-        {
-            return true;
-        }
-    }
-    false
+    render_char_with_system_fallback(
+        pixmap,
+        px,
+        py,
+        FontId::EmojiFallback,
+        ch,
+        color,
+        em,
+        font_cache,
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -359,18 +487,62 @@ fn render_glyph(
     font_id: FontId,
     char_code: u32,
     color: &Color,
-    font_cache: &HashMap<FontId, ParsedFontRef<'_>>,
+    font_cache: &HashMap<FontId, RendererFontRef<'_>>,
     em: f32,
 ) {
     let font_entry = match font_cache.get(&font_id) {
-        Some(entry) => *entry,
+        Some(entry) => entry,
         None => match font_cache.get(&FontId::MainRegular) {
-            Some(entry) => *entry,
+            Some(entry) => entry,
             None => return,
         },
     };
-    let font = font_entry.font;
 
+    match &font_entry.font {
+        RendererFont::Parsed(font) => render_glyph_from_font(
+            pixmap,
+            px,
+            py,
+            font_id,
+            char_code,
+            color,
+            font_cache,
+            em,
+            *font,
+            font_entry.source_id,
+        ),
+        RendererFont::Raw(raw) => {
+            if let Some(font) = raw.get() {
+                render_glyph_from_font(
+                    pixmap,
+                    px,
+                    py,
+                    font_id,
+                    char_code,
+                    color,
+                    font_cache,
+                    em,
+                    font,
+                    font_entry.source_id,
+                );
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn render_glyph_from_font<F: RendererFontOps + ?Sized>(
+    pixmap: &mut Pixmap,
+    px: f32,
+    py: f32,
+    font_id: FontId,
+    char_code: u32,
+    color: &Color,
+    font_cache: &HashMap<FontId, RendererFontRef<'_>>,
+    em: f32,
+    font: &F,
+    source_id: OutlineSourceId,
+) {
     let ch = ratex_font::katex_ttf_glyph_char(font_id, char_code);
     let glyph_id = font.glyph_id(ch);
 
@@ -390,7 +562,7 @@ fn render_glyph(
             FontGlyph {
                 font_id,
                 font,
-                source_id: font_entry.source_id,
+                source_id,
                 glyph_id,
             },
             color,
@@ -408,7 +580,7 @@ fn render_glyph(
             FontGlyph {
                 font_id: FontId::CjkRegular,
                 font,
-                source_id: font_entry.source_id,
+                source_id,
                 glyph_id,
             },
             color,
@@ -419,25 +591,17 @@ fn render_glyph(
         if try_emoji_vector_then_bitmap(pixmap, px, py, ch, color, em, font_cache) {
             return;
         }
-        if let Some(fb_font) = font_cache.get(&FontId::CjkFallback) {
-            let fid = fb_font.font.glyph_id(ch);
-            if fid.0 != 0
-                && render_glyph_with_font(
-                    pixmap,
-                    px,
-                    py,
-                    FontGlyph {
-                        font_id: FontId::CjkFallback,
-                        font: fb_font.font,
-                        source_id: fb_font.source_id,
-                        glyph_id: fid,
-                    },
-                    color,
-                    em,
-                )
-            {
-                return;
-            }
+        if render_char_with_system_fallback(
+            pixmap,
+            px,
+            py,
+            FontId::CjkFallback,
+            ch,
+            color,
+            em,
+            font_cache,
+        ) {
+            return;
         }
         return;
     }
@@ -450,7 +614,7 @@ fn render_glyph(
             FontGlyph {
                 font_id: FontId::CjkFallback,
                 font,
-                source_id: font_entry.source_id,
+                source_id,
                 glyph_id,
             },
             color,
@@ -469,7 +633,7 @@ fn render_glyph(
         FontGlyph {
             font_id,
             font,
-            source_id: font_entry.source_id,
+            source_id,
             glyph_id,
         },
         color,
@@ -482,9 +646,9 @@ fn render_glyph(
     let _ = try_system_unicode_fallback(pixmap, px, py, ch, color, em, font_cache, skip_main);
 }
 
-struct FontGlyph<'a> {
+struct FontGlyph<'a, F: ?Sized> {
     font_id: FontId,
-    font: &'a FontVec,
+    font: &'a F,
     source_id: OutlineSourceId,
     glyph_id: ab_glyph::GlyphId,
 }
@@ -499,10 +663,10 @@ struct RasterGlyphParams {
 
 /// Cache key for decoded color-emoji raster strikes.
 ///
-/// The font bytes are held in an `Arc` inside `ratex-unicode-font`, so the
+/// The font bytes are held in shared immutable storage inside `ratex-unicode-font`, so the
 /// pointer/length pair is stable for the process lifetime and avoids cloning
 /// or hashing the font data on every lookup. This cache must only be fed from
-/// that process-lifetime `OnceLock<Arc<Vec<u8>>>`; transient buffers could be
+/// that process-lifetime `OnceLock<FontData>`; transient buffers could be
 /// freed and their address reused by a different font.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct EmojiRasterCacheKey {
@@ -842,20 +1006,15 @@ fn glyph_mask_fully_inside(
         && dst_y + i64::from(mask_h) <= i64::from(pixmap.height())
 }
 
-fn render_glyph_with_font(
+fn render_glyph_with_font<F: RendererFontOps + ?Sized>(
     pixmap: &mut Pixmap,
     px: f32,
     py: f32,
-    g: FontGlyph<'_>,
+    g: FontGlyph<'_, F>,
     color: &Color,
     em: f32,
 ) -> bool {
-    let curves = match ratex_font_loader::outline_cache::get_or_compute_outline_fontvec(
-        g.font_id,
-        g.font,
-        g.source_id,
-        g.glyph_id,
-    ) {
+    let curves = match g.font.cached_outline(g.font_id, g.source_id, g.glyph_id) {
         Some(c) => c,
         None => return false,
     };
@@ -982,7 +1141,7 @@ fn try_blit_emoji_raster_fallback(
     ch: char,
     color: &Color,
 ) -> bool {
-    let Some(bytes) = ratex_unicode_font::load_emoji_font_arc() else {
+    let Some(bytes) = ratex_unicode_font::load_emoji_font_data() else {
         return false;
     };
     let idx = ratex_unicode_font::emoji_font_face_index().unwrap_or(0);
@@ -1482,7 +1641,7 @@ mod glyph_mask_cache_tests {
 
     #[test]
     fn emoji_requests_resolving_to_one_strike_share_one_cache_entry() {
-        let Some(font_bytes) = ratex_unicode_font::load_emoji_font_arc() else {
+        let Some(font_bytes) = ratex_unicode_font::load_emoji_font_data() else {
             return;
         };
         let face_index = ratex_unicode_font::emoji_font_face_index().unwrap_or(0);

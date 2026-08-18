@@ -20,10 +20,16 @@ section.
   blits instead of curve flattening + anti-aliased fills. Glyph-mask cache
   capped at 8192 entries and 64 MiB of pixel data; decoded emoji-strike cache
   capped at 4096 entries and 64 MiB of decoded pixel data.
-- **Fonts**: bound the raw-font, parsed-font, and font-source caches at 4096
-  entries each so long-running renderers with many distinct font directories
-  do not grow without limit. Eviction only drops cache entries; returned
-  `Arc`-backed font handles remain valid.
+- **Fonts**: use a layered parsed-font cache. Small non-system fonts (up to
+  4 MiB each) keep the `FontVec` fast path, while CJK, emoji, and other large
+  fonts stay in shared read-only mappings and are borrowed as `FontRef`, so a
+  render does not retain a whole-font heap copy. CJK loads only its primary
+  face; emoji and secondary CJK fallback files are mapped only after a glyph
+  actually falls through to them. Canonical paths share one mapping. Parsed
+  payloads have a 32 MiB aggregate budget and concurrent cold loads share one
+  parse per font generation. Raw-font, parsed-font, and font-source caches also
+  retain their 4096-entry bounds; eviction only drops cache entries, so
+  returned shared font handles remain valid.
 - **PNG**: encode from a directly demultiplied RGBA buffer with a pre-sized
   encoder output buffer (and shrink it before returning). The `png` crate
   0.17 already defaults to `Compression::Fast`, `Sub` filtering, and

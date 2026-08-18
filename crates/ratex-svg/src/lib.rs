@@ -90,7 +90,7 @@ pub fn render_to_svg_with_color_syntax(
     let load_fonts = opts.embed_glyphs;
 
     // Pre-render standalone glyphs while the `ParsedFontSet` and its borrowed
-    // `FontVec` references are alive, then drop them. The emitted paths/images
+    // parsed/raw font references are alive, then drop them. The emitted paths/images
     // are self-contained, so the body loop below does not need the font cache.
     #[cfg(feature = "standalone")]
     let prerendered_glyphs: Option<Vec<Option<standalone::StandaloneGlyph>>> = {

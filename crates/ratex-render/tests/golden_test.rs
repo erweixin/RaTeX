@@ -361,7 +361,7 @@ fn count_ink_coverage(png_bytes: &[u8]) -> (f64, u32, u32) {
 /// Skips gracefully when no system Unicode font is found.
 #[test]
 fn cjk_smoke_non_blank_rendering() {
-    if ratex_unicode_font::load_unicode_font_arc().is_none() {
+    if ratex_unicode_font::load_unicode_font_data().is_none() {
         eprintln!("SKIP cjk_smoke: no system Unicode font found");
         return;
     }
