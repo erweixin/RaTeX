@@ -99,6 +99,7 @@ pub fn render_to_svg_with_color_syntax(
                 ratex_font_loader::load_fonts_for_items_parsed(&opts.font_dir, &list.items)
             {
                 let font_refs = standalone::build_font_refs(&fonts);
+                let system_fonts = ratex_font_loader::SystemFontResolver::new();
                 let em = opts.em_px();
                 let pad = opts.padding;
                 let mut out = Vec::with_capacity(list.items.len());
@@ -115,7 +116,15 @@ pub fn render_to_svg_with_color_syntax(
                         let px = (*x * em + pad) as f32;
                         let py = (*y * em + pad) as f32;
                         let glyph_em = (*scale * em) as f32;
-                        standalone::standalone_glyph(px, py, glyph_em, font, *char_code, &font_refs)
+                        standalone::standalone_glyph(
+                            px,
+                            py,
+                            glyph_em,
+                            font,
+                            *char_code,
+                            &font_refs,
+                            &system_fonts,
+                        )
                     } else {
                         None
                     };

@@ -3,19 +3,22 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock, Mutex, OnceLock, RwLock};
 
-use ab_glyph::FontVec;
+use ab_glyph::{FontRef, FontVec};
 use ratex_font::FontId;
 use ratex_types::display_item::DisplayItem;
 
 pub mod outline_cache;
 
+/// Backwards-compatible owned font byte buffer used by the public API.
+pub type FontBytes = Arc<Vec<u8>>;
+
 #[derive(Debug, Clone)]
-enum FontBytes {
+enum FontStorage {
     Owned(Arc<Vec<u8>>),
     System(ratex_unicode_font::FontData),
 }
 
-impl FontBytes {
+impl FontStorage {
     fn as_slice(&self) -> &[u8] {
         match self {
             Self::Owned(bytes) => bytes.as_slice(),
@@ -44,12 +47,12 @@ impl FontBytes {
 
 #[derive(Debug, Clone)]
 struct LoadedFont {
-    bytes: FontBytes,
+    bytes: FontStorage,
     source_id: OutlineSourceId,
 }
 
 impl LoadedFont {
-    fn new(bytes: FontBytes) -> Self {
+    fn new(bytes: FontStorage) -> Self {
         Self {
             bytes,
             source_id: fresh_outline_source_id(),
@@ -104,7 +107,7 @@ struct CacheKey {
 ///
 /// Loader-created IDs identify the generation of the raw bytes, so reloading
 /// a replaced file cannot reuse outlines from an older cache entry. The
-/// source-interning compatibility API below also returns this type.
+/// system-font resolver and deprecated compatibility cache also use this type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct OutlineSourceId(u64);
 
@@ -112,9 +115,8 @@ static NEXT_OUTLINE_SOURCE_ID: AtomicU64 = AtomicU64::new(1);
 static OUTLINE_SOURCE_IDS: LazyLock<RwLock<HashMap<FontSourceKey, u64>>> =
     LazyLock::new(|| RwLock::new(HashMap::new()));
 
-/// Bound the source-intern table. Clearing it only drops the path-to-id
-/// mapping; IDs are allocated monotonically, so previously cached outlines
-/// keep their original (still valid) source IDs and simply become cold.
+/// Bound the source-intern table. IDs are allocated monotonically, so clearing
+/// the table cannot alias a previously cached outline source.
 const OUTLINE_SOURCE_CACHE_CAP: usize = 4096;
 
 fn fresh_outline_source_id() -> OutlineSourceId {
@@ -244,7 +246,7 @@ impl From<HashMap<FontId, Vec<u8>>> for FontSet {
         Self {
             fonts: fonts
                 .into_iter()
-                .map(|(id, bytes)| (id, LoadedFont::new(FontBytes::Owned(Arc::new(bytes)))))
+                .map(|(id, bytes)| (id, LoadedFont::new(FontStorage::Owned(Arc::new(bytes)))))
                 .collect(),
         }
     }
@@ -311,6 +313,91 @@ pub fn font_face_index(font_id: FontId) -> u32 {
         FontId::CjkFallback => ratex_unicode_font::fallback_font_face_index().unwrap_or(0),
         _ => 0,
     }
+}
+
+/// One parsed process-lifetime system font retained by a
+/// [`SystemFontResolver`].
+///
+/// The parsed face borrows the immutable buffer owned by
+/// `ratex-unicode-font`'s process-wide `OnceLock`; no whole-font byte copy is
+/// made. Its source ID is safe to use with the source-aware outline cache.
+pub struct ResolvedSystemFont {
+    font: FontRef<'static>,
+    source_id: OutlineSourceId,
+}
+
+impl ResolvedSystemFont {
+    pub fn font(&self) -> &FontRef<'static> {
+        &self.font
+    }
+
+    pub fn source_id(&self) -> OutlineSourceId {
+        self.source_id
+    }
+}
+
+type ResolvedSystemFontCell = OnceLock<Result<Option<ResolvedSystemFont>, String>>;
+
+/// Per-render lazy cache for parsed CJK and emoji fallback faces.
+///
+/// Create one resolver for a complete PNG, standalone SVG, or Cairo render and
+/// pass it through every glyph lookup. Each fallback face is discovered and
+/// parsed only on its first miss, then reused for the rest of that render.
+/// Dropping the resolver releases the parsed face while the shared system-font
+/// byte buffer remains in `ratex-unicode-font`'s process-wide cache.
+#[derive(Default)]
+pub struct SystemFontResolver {
+    cjk_regular: ResolvedSystemFontCell,
+    emoji: ResolvedSystemFontCell,
+    cjk_fallback: ResolvedSystemFontCell,
+}
+
+impl SystemFontResolver {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn get(&self, font_id: FontId) -> Result<Option<&ResolvedSystemFont>, String> {
+        let cell = match font_id {
+            FontId::CjkRegular => &self.cjk_regular,
+            FontId::EmojiFallback => &self.emoji,
+            FontId::CjkFallback => &self.cjk_fallback,
+            _ => {
+                return Err(format!(
+                    "{} is not a system fallback font",
+                    font_id.as_str()
+                ))
+            }
+        };
+
+        match cell.get_or_init(|| parse_system_font(font_id)) {
+            Ok(font) => Ok(font.as_ref()),
+            Err(err) => Err(err.clone()),
+        }
+    }
+}
+
+fn parse_system_font(font_id: FontId) -> Result<Option<ResolvedSystemFont>, String> {
+    let data = match font_id {
+        FontId::CjkRegular => ratex_unicode_font::unicode_font_data_ref(),
+        FontId::CjkFallback => ratex_unicode_font::fallback_font_data_ref(),
+        FontId::EmojiFallback => ratex_unicode_font::emoji_font_data_ref(),
+        _ => {
+            return Err(format!(
+                "{} is not a system fallback font",
+                font_id.as_str()
+            ))
+        }
+    };
+    let Some(data) = data else {
+        return Ok(None);
+    };
+    let font = FontRef::try_from_slice_and_index(data.as_slice(), font_face_index(font_id))
+        .map_err(|err| format!("Failed to parse font {}: {err:?}", font_id.as_str()))?;
+    Ok(Some(ResolvedSystemFont {
+        font,
+        source_id: intern_outline_source(source_key("", font_id)),
+    }))
 }
 
 #[derive(Debug, Clone)]
@@ -441,7 +528,7 @@ fn insert_font_cache_entry(cache: &mut FontCache, key: CacheKey, entry: CachedFo
     insert_font_cache_entry_with_limits(cache, key, entry, FONT_CACHE_CAP, FONT_CACHE_BYTE_CAP);
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "embed-fonts")))]
 fn remove_font_cache_entry(cache: &mut FontCache, key: &CacheKey) {
     if let Some(previous) = cache.entries.remove(key) {
         cache.bytes = cache.bytes.saturating_sub(cached_font_byte_len(&previous));
@@ -483,6 +570,9 @@ pub fn load_fonts_for_items_parsed(
 ///
 /// This keeps CJK and emoji edge cases out of the normal render plan while
 /// still sharing the global raw/outline caches when fallback is necessary.
+/// Renderers resolving more than one glyph should instead keep one
+/// [`SystemFontResolver`] for the full render so the borrowed `FontRef` is
+/// parsed only once.
 pub fn load_system_font_parsed(font_id: FontId) -> Result<Option<ParsedFontSet>, String> {
     if !is_system_font_id(font_id) {
         return Err(format!(
@@ -844,24 +934,6 @@ pub(crate) fn source_key(font_dir: &str, font_id: FontId) -> FontSourceKey {
     }
 }
 
-/// Cheaper source discriminator for the per-glyph outline cache.
-///
-/// This uses the same canonical directory identity as the persistent
-/// raw/parsed font caches. Callers intern it once per loaded font, avoiding a
-/// filesystem lookup on each glyph while preventing stale outline reuse when
-/// a relative path or symlink later resolves to a different directory.
-pub(crate) fn outline_source_key(font_dir: &str, font_id: FontId) -> FontSourceKey {
-    source_key(font_dir, font_id)
-}
-
-/// Intern a font source for outline-cache lookups.
-///
-/// This is intended to be called once per loaded font (not once per glyph) and
-/// returns a cheap copyable ID for [`outline_cache::get_or_compute_outline_with_source_id`].
-pub fn outline_source_id(font_dir: &str, font_id: FontId) -> OutlineSourceId {
-    intern_outline_source(outline_source_key(font_dir, font_id))
-}
-
 #[cfg(feature = "embed-fonts")]
 fn katex_source_key(_font_dir: &str) -> FontSourceKey {
     FontSourceKey::Embedded
@@ -878,23 +950,23 @@ fn normalize_font_dir(font_dir: &str) -> PathBuf {
     path.canonicalize().unwrap_or_else(|_| path.to_path_buf())
 }
 
-fn load_font_bytes(font_dir: &str, font_id: FontId) -> Result<Option<FontBytes>, String> {
+fn load_font_bytes(font_dir: &str, font_id: FontId) -> Result<Option<FontStorage>, String> {
     match font_id {
         FontId::CjkRegular => {
-            Ok(ratex_unicode_font::load_unicode_font_data().map(FontBytes::System))
+            Ok(ratex_unicode_font::load_unicode_font_data().map(FontStorage::System))
         }
         FontId::CjkFallback => {
-            Ok(ratex_unicode_font::load_fallback_font_data().map(FontBytes::System))
+            Ok(ratex_unicode_font::load_fallback_font_data().map(FontStorage::System))
         }
         FontId::EmojiFallback => {
-            Ok(ratex_unicode_font::load_emoji_font_data().map(FontBytes::System))
+            Ok(ratex_unicode_font::load_emoji_font_data().map(FontStorage::System))
         }
         _ => load_katex_font(font_dir, font_id),
     }
 }
 
 #[cfg(not(feature = "embed-fonts"))]
-fn load_katex_font(font_dir: &str, font_id: FontId) -> Result<Option<FontBytes>, String> {
+fn load_katex_font(font_dir: &str, font_id: FontId) -> Result<Option<FontStorage>, String> {
     let Some(filename) = FONT_MAP
         .iter()
         .find(|(id, _)| *id == font_id)
@@ -907,12 +979,12 @@ fn load_katex_font(font_dir: &str, font_id: FontId) -> Result<Option<FontBytes>,
         return Ok(None);
     }
     std::fs::read(&path)
-        .map(|bytes| Some(FontBytes::Owned(Arc::new(bytes))))
+        .map(|bytes| Some(FontStorage::Owned(Arc::new(bytes))))
         .map_err(|e| format!("Failed to read {}: {e}", path.display()))
 }
 
 #[cfg(feature = "embed-fonts")]
-fn load_katex_font(_font_dir: &str, font_id: FontId) -> Result<Option<FontBytes>, String> {
+fn load_katex_font(_font_dir: &str, font_id: FontId) -> Result<Option<FontStorage>, String> {
     let Some(filename) = FONT_MAP
         .iter()
         .find(|(id, _)| *id == font_id)
@@ -921,7 +993,7 @@ fn load_katex_font(_font_dir: &str, font_id: FontId) -> Result<Option<FontBytes>
         return Ok(None);
     };
     Ok(ratex_katex_fonts::ttf_bytes(filename)
-        .map(|cow| FontBytes::Owned(Arc::new(cow.into_owned()))))
+        .map(|cow| FontStorage::Owned(Arc::new(cow.into_owned()))))
 }
 
 #[cfg(test)]
@@ -938,6 +1010,31 @@ mod tests {
             char_code,
             color: Color::BLACK,
         }
+    }
+
+    #[test]
+    fn system_font_resolver_retains_one_parsed_face_per_render() {
+        let resolver = SystemFontResolver::new();
+        let Some(first) = resolver
+            .get(FontId::CjkRegular)
+            .expect("system Unicode font should parse")
+        else {
+            return;
+        };
+        let second = resolver
+            .get(FontId::CjkRegular)
+            .expect("cached system Unicode font should remain valid")
+            .expect("system Unicode font disappeared within one render");
+
+        assert!(std::ptr::eq(first, second));
+        assert!(std::ptr::eq(first.font(), second.font()));
+        assert_eq!(first.source_id(), second.source_id());
+    }
+
+    #[test]
+    fn system_font_resolver_rejects_non_system_fonts() {
+        let resolver = SystemFontResolver::new();
+        assert!(resolver.get(FontId::MainRegular).is_err());
     }
 
     #[test]
@@ -978,7 +1075,7 @@ mod tests {
         };
         let mut cached = FontCache::default();
 
-        let small = || Some(LoadedFont::new(FontBytes::Owned(Arc::new(vec![0; 6]))));
+        let small = || Some(LoadedFont::new(FontStorage::Owned(Arc::new(vec![0; 6]))));
         insert_font_cache_entry_with_limits(&mut cached, key_a.clone(), small(), 8, 8);
         assert_eq!(cached.bytes, 6);
         assert!(cached.entries.contains_key(&key_a));
@@ -990,7 +1087,7 @@ mod tests {
         assert!(!cached.entries.contains_key(&key_a));
         assert!(cached.entries.contains_key(&key_b));
 
-        let too_large = Some(LoadedFont::new(FontBytes::Owned(Arc::new(vec![0; 9]))));
+        let too_large = Some(LoadedFont::new(FontStorage::Owned(Arc::new(vec![0; 9]))));
         insert_font_cache_entry_with_limits(&mut cached, key_a.clone(), too_large, 8, 8);
         assert_eq!(cached.bytes, 6);
         assert!(!cached.entries.contains_key(&key_a));
@@ -1247,35 +1344,6 @@ mod tests {
         );
         remove_parsed_cache_entry(&cache_key(&font_dir, FontId::MainRegular)).unwrap();
         let _ = std::fs::remove_dir_all(font_dir);
-    }
-
-    #[cfg(all(not(feature = "embed-fonts"), unix))]
-    #[test]
-    fn outline_source_id_changes_when_symlink_target_changes() {
-        use std::os::unix::fs::symlink;
-
-        let root = std::env::temp_dir().join(format!(
-            "ratex-outline-source-test-{}-{}",
-            std::process::id(),
-            line!()
-        ));
-        let target_a = root.join("a");
-        let target_b = root.join("b");
-        let link = root.join("fonts");
-        let _ = std::fs::remove_dir_all(&root);
-        std::fs::create_dir_all(&target_a).expect("create first font directory");
-        std::fs::create_dir_all(&target_b).expect("create second font directory");
-        symlink(&target_a, &link).expect("create font directory symlink");
-
-        let link = link.to_string_lossy().to_string();
-        let source_a = outline_source_id(&link, FontId::MainRegular);
-
-        std::fs::remove_file(&link).expect("remove old font directory symlink");
-        symlink(&target_b, &link).expect("retarget font directory symlink");
-        let source_b = outline_source_id(&link, FontId::MainRegular);
-
-        assert_ne!(source_a, source_b);
-        let _ = std::fs::remove_dir_all(root);
     }
 
     #[cfg(not(feature = "embed-fonts"))]

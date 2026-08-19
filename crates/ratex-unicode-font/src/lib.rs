@@ -75,10 +75,20 @@ static EMOJI_FONT: OnceLock<Option<(FontData, u32)>> = OnceLock::new();
 ///
 /// The result is cached after the first call.
 pub fn load_unicode_font_data() -> Option<FontData> {
+    unicode_font_data_ref().cloned()
+}
+
+/// Process-lifetime view of the cached primary Unicode font.
+///
+/// Unlike [`load_unicode_font_data`], this does not clone the `FontData`
+/// handle. The returned storage is owned by this crate's global `OnceLock`, so
+/// render-scoped font resolvers can safely retain borrowed parsed faces without
+/// copying a large TTF/TTC buffer.
+pub fn unicode_font_data_ref() -> Option<&'static FontData> {
     UNICODE_FONT
         .get_or_init(load_unicode_fallback_font)
         .as_ref()
-        .map(|(bytes, _)| bytes.clone())
+        .map(|(bytes, _)| bytes)
 }
 
 /// Collection index for the cached primary Unicode face (`0` when not a collection).
@@ -97,10 +107,15 @@ pub fn unicode_font_face_index() -> Option<u32> {
 ///
 /// The result is cached after the first call.
 pub fn load_fallback_font_data() -> Option<FontData> {
+    fallback_font_data_ref().cloned()
+}
+
+/// Process-lifetime view of the cached secondary Unicode fallback font.
+pub fn fallback_font_data_ref() -> Option<&'static FontData> {
     SYSTEM_FALLBACK_FONT
         .get_or_init(load_secondary_fallback_font)
         .as_ref()
-        .map(|(bytes, _)| bytes.clone())
+        .map(|(bytes, _)| bytes)
 }
 
 /// Collection index for the cached fallback Unicode face (`0` when not a collection).
@@ -121,10 +136,15 @@ pub fn fallback_font_face_index() -> Option<u32> {
 ///
 /// The result is cached after the first call.
 pub fn load_emoji_font_data() -> Option<FontData> {
+    emoji_font_data_ref().cloned()
+}
+
+/// Process-lifetime view of the cached system emoji font.
+pub fn emoji_font_data_ref() -> Option<&'static FontData> {
     EMOJI_FONT
         .get_or_init(discover_emoji_font)
         .as_ref()
-        .map(|(bytes, _)| bytes.clone())
+        .map(|(bytes, _)| bytes)
 }
 
 /// Collection index for the cached emoji face (`0` when the font is not a TTC).

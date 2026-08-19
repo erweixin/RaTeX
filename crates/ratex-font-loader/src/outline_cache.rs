@@ -15,7 +15,7 @@ use std::sync::{Arc, LazyLock, RwLock};
 use ab_glyph::{Font, FontRef, FontVec, GlyphId, OutlineCurve, VariableFont};
 use ratex_font::FontId;
 
-use crate::{font_face_index, legacy_outline_source_id, outline_source_id, OutlineSourceId};
+use crate::{font_face_index, legacy_outline_source_id, OutlineSourceId};
 
 type OutlineData = Arc<[OutlineCurve]>;
 
@@ -72,24 +72,12 @@ fn insert_outline(
 ///
 /// For variable fonts, sets `wght=400` (Regular) if the axis exists and supports it.
 ///
-/// Prefer [`get_or_compute_outline_with_source_id`] in renderers: this helper
-/// interns `font_dir` on every call and is intended for API compatibility and
-/// one-off callers.
-pub fn get_or_compute_outline_with_source(
-    font_id: FontId,
-    font: &FontRef<'_>,
-    font_dir: &str,
-    glyph_id: GlyphId,
-) -> Option<Arc<[OutlineCurve]>> {
-    get_or_compute_outline_with_source_id(
-        font_id,
-        font,
-        outline_source_id(font_dir, font_id),
-        glyph_id,
-    )
-}
-
-/// Source-aware raw-font outline lookup using an already-interned source id.
+/// Source-aware raw-font outline lookup using a loader-provided generation ID.
+///
+/// Obtain `source` from `ParsedFontSet::iter_raw_with_source`,
+/// `FontSet::iter_with_source`, or `ResolvedSystemFont::source_id`. A loaded
+/// generation, rather than a path, is required so replacing a font file in
+/// place cannot return an outline cached from the old bytes.
 pub fn get_or_compute_outline_with_source_id(
     font_id: FontId,
     font: &FontRef<'_>,
@@ -101,11 +89,10 @@ pub fn get_or_compute_outline_with_source_id(
 
 /// Deprecated compatibility entry point.
 ///
-/// Prefer [`get_or_compute_outline_with_source`] or
-/// [`get_or_compute_outline_with_source_id`]: this wrapper has no font source
-/// information, so all calls through it share a legacy cache bucket.
+/// Prefer [`get_or_compute_outline_with_source_id`]: this wrapper has no font
+/// source information, so all calls through it share a legacy cache bucket.
 #[deprecated(
-    note = "use `get_or_compute_outline_with_source` so outline cache keys include the font source"
+    note = "use `get_or_compute_outline_with_source_id` with a loader-provided generation ID"
 )]
 pub fn get_or_compute_outline(
     font_id: FontId,
@@ -198,24 +185,21 @@ mod tests {
 
     #[test]
     fn outline_cache_key_includes_source_face_and_glyph() {
-        let source_a = outline_source_id("/tmp/fonts-a", FontId::MainRegular);
-        let source_b = outline_source_id("/tmp/fonts-b", FontId::MainRegular);
+        let source_a = crate::fresh_outline_source_id();
+        let source_b = crate::fresh_outline_source_id();
         let base = outline_cache_key(source_a, FontId::MainRegular, GlyphId(10));
         let same = outline_cache_key(source_a, FontId::MainRegular, GlyphId(10));
         let other_source = outline_cache_key(source_b, FontId::MainRegular, GlyphId(10));
         let other_glyph = outline_cache_key(source_a, FontId::MainRegular, GlyphId(11));
 
         assert_eq!(base, same);
-        #[cfg(not(feature = "embed-fonts"))]
         assert_ne!(base, other_source);
-        #[cfg(feature = "embed-fonts")]
-        assert_eq!(base, other_source);
         assert_ne!(base, other_glyph);
     }
 
     #[test]
     fn outline_cache_clears_before_exceeding_capacity() {
-        let source = outline_source_id("/tmp/fonts", FontId::MainRegular);
+        let source = crate::fresh_outline_source_id();
         let key_a = outline_cache_key(source, FontId::MainRegular, GlyphId(10));
         let key_b = outline_cache_key(source, FontId::MainRegular, GlyphId(11));
         let curves: OutlineData = Arc::from([]);

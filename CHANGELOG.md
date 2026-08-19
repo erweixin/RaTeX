@@ -22,17 +22,18 @@ section.
   capped at 4096 entries and 64 MiB of decoded pixel data.
 - **Fonts**: use a layered parsed-font cache. Small non-system fonts (up to
   4 MiB each) keep the `FontVec` fast path, while CJK, emoji, and other large
-  fonts stay in shared read-only mappings and are borrowed as `FontRef`, so a
-  render does not retain a whole-font heap copy. CJK loads only its primary
-  face; emoji and secondary CJK fallback files are mapped only after a glyph
-  actually falls through to them. When a KaTeX-missing non-ASCII glyph needs
-  fallback, its Unicode/emoji fallback set is loaded once for the complete
-  render so every glyph reuses the same `FontRef`. Canonical paths share one
-  mapping. Raw owned-font payloads and parsed payloads each have a 32 MiB
-  aggregate budget; concurrent cold loads share one parse per font generation.
-  Raw-font, parsed-font, and font-source caches also retain their 4096-entry
-  bounds. Eviction only drops cache entries, so returned shared font handles
-  remain valid.
+  fonts stay in shared immutable, `Arc`-backed owned buffers and are borrowed
+  as `FontRef`, so a render does not retain a whole-font heap copy. CJK loads
+  only its primary face; emoji and secondary CJK fallback files are loaded only
+  after a glyph actually falls through to them. One per-render resolver then
+  retains each parsed fallback face for PNG, standalone SVG, and Cairo, so
+  every later glyph reuses the same `FontRef`. Canonical custom-font paths
+  share one cached payload. Cache-owned raw font payloads and `FontVec` parsed
+  payloads each have a 32 MiB aggregate budget; process-wide system-font
+  buffers are shared but are not charged to those budgets. Concurrent cold
+  loads share one parse per font generation. Raw-font and parsed-font caches
+  also retain their 4096-entry bounds. Eviction only drops cache entries, so
+  returned shared font handles remain valid.
 - **PNG**: encode from a directly demultiplied RGBA buffer with a pre-sized
   encoder output buffer (and shrink it before returning). The `png` crate
   0.17 already defaults to `Compression::Fast`, `Sub` filtering, and
@@ -78,9 +79,11 @@ load.
 | Maximum RSS | 416.1 MiB | 54.6 MiB | −87% |
 | macOS peak memory footprint | 38.2 MiB | 38.4 MiB | +0.2 MiB |
 
-The RSS reduction reflects avoiding whole-font heap copies and sharing mapped
-system-font data. `peak memory footprint` uses a different macOS accounting
-method and remains effectively unchanged in this sample.
+The RSS reduction reflects avoiding whole-font heap copies and sharing
+process-wide, `Arc`-backed owned system-font buffers. These buffers are not
+memory-mapped and are outside the loader's 32 MiB raw/parsed cache budgets.
+`peak memory footprint` uses a different macOS accounting method and remains
+effectively unchanged in this sample.
 
 Test device: Mac mini (Mac16,10), Apple M4 (10 CPU cores), 32 GB unified
 memory, macOS 26.3.1 (25D2128), Darwin 25.3.0 / arm64. Command:
