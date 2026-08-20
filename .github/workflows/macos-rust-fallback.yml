@@ -1,0 +1,25 @@
+name: macOS Rust fallback tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  fallback-tests:
+    runs-on: macos-15
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Test system-font and renderer fallback paths
+        run: |
+          cargo test -p ratex-unicode-font
+          cargo test -p ratex-font-loader
+          cargo test -p ratex-render
+          cargo test -p ratex-pdf
+          cargo test -p ratex-svg --features standalone
