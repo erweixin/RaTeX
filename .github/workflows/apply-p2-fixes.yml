@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   apply:
-    if: github.event.head_commit.message == 'chore: apply P2 fixes'
+    if: github.event.head_commit.message == 'chore: retry P2 fixes'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
@@ -24,59 +24,68 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           renderer = Path('crates/ratex-render/src/renderer.rs')
           text = renderer.read_text()
-          old = '    let mut out = Vec::with_capacity(pixmap.width() as usize * pixmap.height() as usize);'
-          new = '''    // Grow with the compressed stream instead of reserving one byte per raw
-              // pixel. Formula PNGs are highly compressible, so a width*height
-              // reservation can add tens of MiB to peak RSS for large images.
-              let mut out = Vec::new();'''
-          assert text.count(old) == 1, 'unexpected PNG output allocation site'
-          text = text.replace(old, new)
-          old_comment = '''    // Keep the generous encoder capacity out of the returned API buffer.
-              // Formula PNGs compress especially well at large dimensions; a 180 px/em
-              // benchmark retained 1.60 MiB without this call versus 137 KiB after it,
-              // with no reproducible render-time regression in the 100-formula A/B.
-              out.shrink_to_fit();'''
-          new_comment = '''    // Trim the encoder's normal growth slack before returning. Starting from
-              // an empty Vec keeps peak output-buffer memory proportional to compressed
-              // data rather than raw pixel count.
-              out.shrink_to_fit();'''
-          assert text.count(old_comment) == 1, 'unexpected PNG shrink comment'
-          text = text.replace(old_comment, new_comment)
+          allocation = '    let mut out = Vec::with_capacity(pixmap.width() as usize * pixmap.height() as usize);'
+          assert text.count(allocation) == 1, 'unexpected PNG output allocation site'
           text = text.replace(
-              'fn encoded_png_does_not_keep_preallocation_capacity()',
-              'fn encoded_png_returns_compact_buffer()',
+              allocation,
+              '    // Grow with the compressed stream instead of reserving one byte per raw\n'
+              '    // pixel. Formula PNGs are highly compressible, so a width*height reserve\n'
+              '    // can add tens of MiB to peak RSS for large images.\n'
+              '    let mut out = Vec::new();',
           )
+          shrink_pattern = re.compile(
+              r'    // Keep the generous encoder capacity out of the returned API buffer\.\n'
+              r'    // Formula PNGs compress especially well at large dimensions; a 180 px/em\n'
+              r'    // benchmark retained 1\.60 MiB without this call versus 137 KiB after it,\n'
+              r'    // with no reproducible render-time regression in the 100-formula A/B\.\n'
+              r'    out\.shrink_to_fit\(\);'
+          )
+          text, count = shrink_pattern.subn(
+              '    // Trim the encoder\'s normal growth slack before returning. Starting from\n'
+              '    // an empty Vec keeps peak output-buffer memory proportional to compressed\n'
+              '    // data rather than raw pixel count.\n'
+              '    out.shrink_to_fit();',
+              text,
+          )
+          assert count == 1, f'unexpected PNG shrink comment count: {count}'
+          old_test = 'fn encoded_png_does_not_keep_preallocation_capacity()'
+          assert text.count(old_test) == 1, 'unexpected PNG compact-buffer test name'
+          text = text.replace(old_test, 'fn encoded_png_returns_compact_buffer()')
           renderer.write_text(text)
 
           unicode = Path('crates/ratex-unicode-font/src/lib.rs')
           text = unicode.read_text()
-          text = text.replace(
-              'SYSTEM_FALLBACK_FONT\n        .get_or_init(load_secondary_fallback_font)',
-              'SYSTEM_FALLBACK_FONT\n        .get_or_init(discover_system_font)',
+          old_init = '.get_or_init(load_secondary_fallback_font)'
+          assert text.count(old_init) == 2, 'unexpected secondary fallback initializer count'
+          text = text.replace(old_init, '.get_or_init(discover_system_font)')
+          secondary_pattern = re.compile(
+              r'    // 2\. System font discovery\n'
+              r'    discover_system_font\(\)\n'
+              r'}\n\n'
+              r'fn load_secondary_fallback_font\(\) -> Option<\(FontData, u32\)> \{\n'
+              r'    // With no user override the primary is already the preferred system font;\n'
+              r'    // reuse it instead of repeating discovery and creating another mapping\.\n'
+              r'    if std::env::var_os\("RATEX_UNICODE_FONT"\)\.is_none\(\) \{\n'
+              r'        return UNICODE_FONT\.get_or_init\(load_unicode_fallback_font\)\.clone\(\);\n'
+              r'    \}\n'
+              r'    discover_system_font\(\)\n'
+              r'}'
           )
-          assert text.count('get_or_init(discover_system_font)') >= 2
-          old_primary = '''    // 2. System font discovery
-              discover_system_font()
-          }
-
-          fn load_secondary_fallback_font() -> Option<(FontData, u32)> {
-              // With no user override the primary is already the preferred system font;
-              // reuse it instead of repeating discovery and creating another mapping.
-              if std::env::var_os("RATEX_UNICODE_FONT").is_none() {
-                  return UNICODE_FONT.get_or_init(load_unicode_fallback_font).clone();
-              }
-              discover_system_font()
-          }'''
-          new_primary = '''    // 2. System font discovery. Reuse the dedicated system-only cache so the
-              // primary and secondary share storage when no override is configured, while
-              // the secondary remains independent of later environment-variable changes.
-              SYSTEM_FALLBACK_FONT.get_or_init(discover_system_font).clone()
-          }'''
-          assert text.count(old_primary) == 1, 'unexpected Unicode fallback implementation'
-          text = text.replace(old_primary, new_primary)
+          replacement = (
+              '    // 2. System font discovery. Reuse the dedicated system-only cache so the\n'
+              '    // primary and secondary share storage when no override is configured, while\n'
+              '    // the secondary remains independent of environment changes after the primary\n'
+              '    // cache has been initialized.\n'
+              '    SYSTEM_FALLBACK_FONT.get_or_init(discover_system_font).clone()\n'
+              '}'
+          )
+          text, count = secondary_pattern.subn(replacement, text)
+          assert count == 1, f'unexpected Unicode fallback implementation count: {count}'
+          assert 'load_secondary_fallback_font' not in text
           unicode.write_text(text)
           PY
           cargo fmt --all
