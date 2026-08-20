@@ -1,0 +1,94 @@
+name: Apply P2 fixes
+
+on:
+  push:
+    branches: [feat-improve]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.event.head_commit.message == 'chore: apply P2 fixes'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat-improve
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Apply reviewed P2 fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          renderer = Path('crates/ratex-render/src/renderer.rs')
+          text = renderer.read_text()
+          old = '    let mut out = Vec::with_capacity(pixmap.width() as usize * pixmap.height() as usize);'
+          new = '''    // Grow with the compressed stream instead of reserving one byte per raw
+              // pixel. Formula PNGs are highly compressible, so a width*height
+              // reservation can add tens of MiB to peak RSS for large images.
+              let mut out = Vec::new();'''
+          assert text.count(old) == 1, 'unexpected PNG output allocation site'
+          text = text.replace(old, new)
+          old_comment = '''    // Keep the generous encoder capacity out of the returned API buffer.
+              // Formula PNGs compress especially well at large dimensions; a 180 px/em
+              // benchmark retained 1.60 MiB without this call versus 137 KiB after it,
+              // with no reproducible render-time regression in the 100-formula A/B.
+              out.shrink_to_fit();'''
+          new_comment = '''    // Trim the encoder's normal growth slack before returning. Starting from
+              // an empty Vec keeps peak output-buffer memory proportional to compressed
+              // data rather than raw pixel count.
+              out.shrink_to_fit();'''
+          assert text.count(old_comment) == 1, 'unexpected PNG shrink comment'
+          text = text.replace(old_comment, new_comment)
+          text = text.replace(
+              'fn encoded_png_does_not_keep_preallocation_capacity()',
+              'fn encoded_png_returns_compact_buffer()',
+          )
+          renderer.write_text(text)
+
+          unicode = Path('crates/ratex-unicode-font/src/lib.rs')
+          text = unicode.read_text()
+          text = text.replace(
+              'SYSTEM_FALLBACK_FONT\n        .get_or_init(load_secondary_fallback_font)',
+              'SYSTEM_FALLBACK_FONT\n        .get_or_init(discover_system_font)',
+          )
+          assert text.count('get_or_init(discover_system_font)') >= 2
+          old_primary = '''    // 2. System font discovery
+              discover_system_font()
+          }
+
+          fn load_secondary_fallback_font() -> Option<(FontData, u32)> {
+              // With no user override the primary is already the preferred system font;
+              // reuse it instead of repeating discovery and creating another mapping.
+              if std::env::var_os("RATEX_UNICODE_FONT").is_none() {
+                  return UNICODE_FONT.get_or_init(load_unicode_fallback_font).clone();
+              }
+              discover_system_font()
+          }'''
+          new_primary = '''    // 2. System font discovery. Reuse the dedicated system-only cache so the
+              // primary and secondary share storage when no override is configured, while
+              // the secondary remains independent of later environment-variable changes.
+              SYSTEM_FALLBACK_FONT.get_or_init(discover_system_font).clone()
+          }'''
+          assert text.count(old_primary) == 1, 'unexpected Unicode fallback implementation'
+          text = text.replace(old_primary, new_primary)
+          unicode.write_text(text)
+          PY
+          cargo fmt --all
+          cargo test -p ratex-unicode-font
+          cargo test -p ratex-font-loader
+          cargo test -p ratex-render
+          git diff --check
+      - name: Commit and push fixes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- crates/ratex-render/src/renderer.rs crates/ratex-unicode-font/src/lib.rs
+          git diff --cached --quiet && exit 1
+          git commit -m 'fix: address performance review findings'
+          git push origin HEAD:feat-improve
