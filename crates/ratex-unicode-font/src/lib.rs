@@ -113,7 +113,7 @@ pub fn load_fallback_font_data() -> Option<FontData> {
 /// Process-lifetime view of the cached secondary Unicode fallback font.
 pub fn fallback_font_data_ref() -> Option<&'static FontData> {
     SYSTEM_FALLBACK_FONT
-        .get_or_init(load_secondary_fallback_font)
+        .get_or_init(discover_system_font)
         .as_ref()
         .map(|(bytes, _)| bytes)
 }
@@ -121,7 +121,7 @@ pub fn fallback_font_data_ref() -> Option<&'static FontData> {
 /// Collection index for the cached fallback Unicode face (`0` when not a collection).
 pub fn fallback_font_face_index() -> Option<u32> {
     SYSTEM_FALLBACK_FONT
-        .get_or_init(load_secondary_fallback_font)
+        .get_or_init(discover_system_font)
         .as_ref()
         .map(|(_, i)| *i)
 }
@@ -311,17 +311,13 @@ fn load_unicode_fallback_font() -> Option<(FontData, u32)> {
         }
     }
 
-    // 2. System font discovery
-    discover_system_font()
-}
-
-fn load_secondary_fallback_font() -> Option<(FontData, u32)> {
-    // With no user override the primary is already the preferred system font;
-    // reuse it instead of repeating discovery and creating another mapping.
-    if std::env::var_os("RATEX_UNICODE_FONT").is_none() {
-        return UNICODE_FONT.get_or_init(load_unicode_fallback_font).clone();
-    }
-    discover_system_font()
+    // 2. System font discovery. Reuse the dedicated system-only cache so the
+    // primary and secondary share storage when no override is configured, while
+    // the secondary remains independent of environment changes after the primary
+    // cache has been initialized.
+    SYSTEM_FALLBACK_FONT
+        .get_or_init(discover_system_font)
+        .clone()
 }
 
 /// Discover a font from system paths and locale-aware system-fonts presets (does NOT check

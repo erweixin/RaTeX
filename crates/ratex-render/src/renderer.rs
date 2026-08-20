@@ -1561,7 +1561,10 @@ fn encode_png(pixmap: &Pixmap) -> Result<Vec<u8>, String> {
     // `FilterType::Sub`, and non-adaptive filtering; the explicit settings
     // below keep that contract even if the defaults change.
     let data = demultiply_rgba(pixmap.data());
-    let mut out = Vec::with_capacity(pixmap.width() as usize * pixmap.height() as usize);
+    // Grow with the compressed stream instead of reserving one byte per raw
+    // pixel. Formula PNGs are highly compressible, so a width*height reserve
+    // can add tens of MiB to peak RSS for large images.
+    let mut out = Vec::new();
     {
         let mut encoder = png::Encoder::new(&mut out, pixmap.width(), pixmap.height());
         encoder.set_color(png::ColorType::Rgba);
@@ -1576,10 +1579,9 @@ fn encode_png(pixmap: &Pixmap) -> Result<Vec<u8>, String> {
             .write_image_data(&data)
             .map_err(|e| format!("PNG encode error: {e}"))?;
     }
-    // Keep the generous encoder capacity out of the returned API buffer.
-    // Formula PNGs compress especially well at large dimensions; a 180 px/em
-    // benchmark retained 1.60 MiB without this call versus 137 KiB after it,
-    // with no reproducible render-time regression in the 100-formula A/B.
+    // Trim the encoder's normal growth slack before returning. Starting from
+    // an empty Vec keeps peak output-buffer memory proportional to compressed
+    // data rather than raw pixel count.
     out.shrink_to_fit();
     Ok(out)
 }
@@ -1657,7 +1659,7 @@ mod glyph_mask_cache_tests {
     }
 
     #[test]
-    fn encoded_png_does_not_keep_preallocation_capacity() {
+    fn encoded_png_returns_compact_buffer() {
         let opts = RenderOptions {
             font_dir: font_dir(),
             font_size: 300.0,
