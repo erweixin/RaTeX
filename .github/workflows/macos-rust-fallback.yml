@@ -23,3 +23,98 @@ jobs:
           cargo test -p ratex-render
           cargo test -p ratex-pdf
           cargo test -p ratex-svg --features standalone
+
+  apply-p2-fixes:
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'feat-improve'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat-improve
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Apply reviewed P2 fixes and test
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          renderer = Path('crates/ratex-render/src/renderer.rs')
+          text = renderer.read_text()
+          allocation = '    let mut out = Vec::with_capacity(pixmap.width() as usize * pixmap.height() as usize);'
+          assert text.count(allocation) == 1, 'unexpected PNG output allocation site'
+          text = text.replace(
+              allocation,
+              '    // Grow with the compressed stream instead of reserving one byte per raw\n'
+              '    // pixel. Formula PNGs are highly compressible, so a width*height reserve\n'
+              '    // can add tens of MiB to peak RSS for large images.\n'
+              '    let mut out = Vec::new();',
+          )
+          old_comment = (
+              '    // Keep the generous encoder capacity out of the returned API buffer.\n'
+              '    // Formula PNGs compress especially well at large dimensions; a 180 px/em\n'
+              '    // benchmark retained 1.60 MiB without this call versus 137 KiB after it,\n'
+              '    // with no reproducible render-time regression in the 100-formula A/B.\n'
+              '    out.shrink_to_fit();'
+          )
+          new_comment = (
+              "    // Trim the encoder's normal growth slack before returning. Starting from\n"
+              '    // an empty Vec keeps peak output-buffer memory proportional to compressed\n'
+              '    // data rather than raw pixel count.\n'
+              '    out.shrink_to_fit();'
+          )
+          assert text.count(old_comment) == 1, 'unexpected PNG shrink comment'
+          text = text.replace(old_comment, new_comment)
+          old_test = 'fn encoded_png_does_not_keep_preallocation_capacity()'
+          assert text.count(old_test) == 1, 'unexpected PNG compact-buffer test name'
+          text = text.replace(old_test, 'fn encoded_png_returns_compact_buffer()')
+          renderer.write_text(text)
+
+          unicode = Path('crates/ratex-unicode-font/src/lib.rs')
+          text = unicode.read_text()
+          old_init = '.get_or_init(load_secondary_fallback_font)'
+          assert text.count(old_init) == 2, 'unexpected secondary fallback initializer count'
+          text = text.replace(old_init, '.get_or_init(discover_system_font)')
+          old_block = (
+              '    // 2. System font discovery\n'
+              '    discover_system_font()\n'
+              '}\n\n'
+              'fn load_secondary_fallback_font() -> Option<(FontData, u32)> {\n'
+              '    // With no user override the primary is already the preferred system font;\n'
+              '    // reuse it instead of repeating discovery and creating another mapping.\n'
+              '    if std::env::var_os("RATEX_UNICODE_FONT").is_none() {\n'
+              '        return UNICODE_FONT.get_or_init(load_unicode_fallback_font).clone();\n'
+              '    }\n'
+              '    discover_system_font()\n'
+              '}'
+          )
+          new_block = (
+              '    // 2. System font discovery. Reuse the dedicated system-only cache so the\n'
+              '    // primary and secondary share storage when no override is configured, while\n'
+              '    // the secondary remains independent of environment changes after the primary\n'
+              '    // cache has been initialized.\n'
+              '    SYSTEM_FALLBACK_FONT.get_or_init(discover_system_font).clone()\n'
+              '}'
+          )
+          assert text.count(old_block) == 1, 'unexpected Unicode fallback implementation'
+          text = text.replace(old_block, new_block)
+          assert 'load_secondary_fallback_font' not in text
+          unicode.write_text(text)
+          PY
+          cargo fmt --all
+          cargo test -p ratex-unicode-font
+          cargo test -p ratex-font-loader
+          cargo test -p ratex-render
+          git diff --check
+      - name: Commit and push P2 fixes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- crates/ratex-render/src/renderer.rs crates/ratex-unicode-font/src/lib.rs
+          git diff --cached --quiet && exit 1
+          git commit -m 'fix: address performance review findings'
+          git push origin HEAD:feat-improve
