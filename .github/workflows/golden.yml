@@ -66,6 +66,18 @@ jobs:
           else
             echo "::notice::The target commit is unavailable; running absolute gates only."
           fi
+      - name: Check blank-output geometry against target commit
+        run: |
+          if [[ -d "$RUNNER_TEMP/golden-base/tests/golden/output" ]]; then
+            python3 tools/golden_compare/check_blank_geometry.py \
+              --baseline-cases "$RUNNER_TEMP/golden-base/tests/golden/test_cases.txt" \
+              --baseline-output "$RUNNER_TEMP/golden-base/tests/golden/output" \
+              --current-cases tests/golden/test_cases.txt \
+              --current-output tests/golden/output \
+              --max-size-regression 0.05
+          else
+            echo "::notice::The target commit output is unavailable; skipping blank geometry regression gate."
+          fi
       - name: Score with the authoritative Python comparator
         run: |
           mkdir -p artifacts/golden
