@@ -23,6 +23,7 @@ jobs:
       - name: Apply compatibility patch
         run: |
           python3 .github/scripts/fix_pr152.py
+          python3 .github/scripts/fix_pr152_extra.py
           cargo fmt --all
       - name: Verify focused Rust checks
         run: |
@@ -35,9 +36,11 @@ jobs:
           git rm .github/workflows/pr152-compat-fix.yml
           git rm .github/workflows/pr152-compat-fix-pr.yml
           git rm .github/scripts/fix_pr152.py
+          git rm .github/scripts/fix_pr152_extra.py
           git add crates/ratex-font-loader/src/lib.rs \
                   crates/ratex-render/src/renderer.rs \
                   crates/ratex-pdf/src/renderer.rs \
+                  crates/ratex-pdf/src/fonts.rs \
                   crates/ratex-cairo/src/lib.rs
           git commit -m "fix: preserve font loader compatibility"
           git push origin HEAD:feat-improve
