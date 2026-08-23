@@ -81,7 +81,7 @@ pub fn render_to_pdf(
 
     // Load raw font data (lazy: only fonts referenced by this display list).
     let mut font_data =
-        ratex_font_loader::load_fonts_for_items(&options.font_dir, &display_list.items)
+        ratex_font_loader::load_fonts_for_items_lazy(&options.font_dir, &display_list.items)
             .map_err(PdfError::Font)?;
 
     // Pass 1: collect glyph usage (emoji → raster XObjects; other faces → subset fonts).

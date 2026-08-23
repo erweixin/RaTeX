@@ -63,7 +63,7 @@ pub fn render_to_cairo(
         .as_deref()
         .and_then(Path::to_str)
         .unwrap_or("");
-    let fonts = ratex_font_loader::load_fonts_for_items(font_dir, &display_list.items)
+    let fonts = ratex_font_loader::load_fonts_for_items_lazy(font_dir, &display_list.items)
         .map_err(CairoError::Font)?;
     let font_refs = build_font_refs(&fonts).map_err(CairoError::Font)?;
     let system_fonts = SystemFontResolver::new();
