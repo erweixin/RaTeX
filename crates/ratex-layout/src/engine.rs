@@ -483,6 +483,7 @@ fn layout_node(node: &ParseNode, options: &LayoutOptions) -> LayoutBox {
             let box_height = (raise + ink_h).max(0.0);
             let box_depth = (-raise).max(0.0);
             LayoutBox::new_rule(width, box_height, box_depth, ink_h, raise)
+                .with_color(options.color)
         }
 
         ParseNode::Phantom { body, .. } => {
@@ -3781,7 +3782,7 @@ fn layout_enclose(
     let bg = background_color.and_then(|c| Color::from_name(c).or_else(|| Color::from_hex(c)));
     let border = border_color
         .and_then(|c| Color::from_name(c).or_else(|| Color::from_hex(c)))
-        .unwrap_or(Color::BLACK);
+        .unwrap_or(options.color);
 
     let inner = layout_node(body, options);
     let outer_pad = padding + if has_border { border_thickness } else { 0.0 };
@@ -4949,7 +4950,7 @@ fn layout_imageof_origof(imageof: bool, options: &LayoutOptions) -> LayoutBox {
     let bar_th: f64 = 0.04;
     let bar_raise: f64 = cy.abs() - bar_th / 2.0; // 0.2625 − 0.02 = 0.2425
 
-    let bar = LayoutBox::new_rule(bar_len, h, d, bar_th, bar_raise);
+    let bar = LayoutBox::new_rule(bar_len, h, d, bar_th, bar_raise).with_color(options.color);
 
     let children = if imageof {
         vec![disk, bar, ring]
