@@ -434,6 +434,60 @@ mod tests {
         assert!(json.contains("\"r\":1.0"));
     }
 
+    #[test]
+    fn implicit_geometry_inherits_formula_color() {
+        let input = CString::new(r"\boxed{x}\quad\rule{1em}{0.1em}\quad\imageof").unwrap();
+        let formula_color = RatexColor {
+            r: 0.25,
+            g: 0.5,
+            b: 0.75,
+            a: 1.0,
+        };
+        let opts = RatexOptions {
+            struct_size: std::mem::size_of::<RatexOptions>(),
+            display_mode: 1,
+            color: &formula_color,
+        };
+        let result = unsafe { ratex_parse_and_layout(input.as_ptr(), &opts) };
+        assert_eq!(result.error_code, 0);
+        let json = unsafe { CStr::from_ptr(result.data) }
+            .to_str()
+            .unwrap()
+            .to_owned();
+        unsafe { ratex_free_display_list(result.data) };
+
+        let value: Value = serde_json::from_str(&json).expect("valid display list JSON");
+        let items = value["items"]
+            .as_array()
+            .expect("display list must have items array");
+        let expected = (Some(0.25), Some(0.5), Some(0.75), Some(1.0));
+
+        for item_type in ["GlyphPath", "Line", "Rect", "Path"] {
+            let matching: Vec<_> = items
+                .iter()
+                .filter(|item| item["type"].as_str() == Some(item_type))
+                .collect();
+            assert!(
+                !matching.is_empty(),
+                "expected at least one {item_type} item"
+            );
+
+            for item in matching {
+                let color = &item["color"];
+                let actual = (
+                    color["r"].as_f64(),
+                    color["g"].as_f64(),
+                    color["b"].as_f64(),
+                    color["a"].as_f64(),
+                );
+                assert_eq!(
+                    actual, expected,
+                    "{item_type} should inherit the formula color"
+                );
+            }
+        }
+    }
+
     #[repr(C)]
     struct LegacyRatexOptions {
         struct_size: usize,
