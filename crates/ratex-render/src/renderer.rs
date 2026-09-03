@@ -1310,7 +1310,7 @@ fn blit_cached_emoji_raster(
     true
 }
 
-#[allow(clippy::chunks_exact_to_as_chunks)]
+#[allow(unknown_lints, clippy::chunks_exact_to_as_chunks)]
 fn raster_glyph_image_to_pixmap(img: &ttf_parser::RasterGlyphImage<'_>) -> Option<Pixmap> {
     use ttf_parser::RasterImageFormat;
     let w = u32::from(img.width);
@@ -1537,7 +1537,7 @@ fn render_path_segment(
 ///
 /// This mirrors `tiny_skia::Pixmap::encode_png`, which demultiplies with the
 /// same `value / alpha + 0.5` rounding before encoding.
-#[allow(clippy::chunks_exact_to_as_chunks)]
+#[allow(unknown_lints, clippy::chunks_exact_to_as_chunks)]
 fn demultiply_rgba(data: &[u8]) -> Vec<u8> {
     let mut out = data.to_vec();
     for px in out.chunks_exact_mut(4) {

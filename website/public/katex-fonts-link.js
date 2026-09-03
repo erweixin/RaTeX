@@ -1,5 +1,6 @@
 /**
- * Injects KaTeX font stylesheet. Same rules as gallery.js wasmEntryUrl (base → /RaTeX/ → flat /demo|/zh → legacy getSiteDirUrl).
+ * Injects the KaTeX font stylesheet and publishes a promise that resolves only
+ * after its @font-face rules are available. Same URL rules as gallery.js.
  */
 (function () {
   function getSiteDirUrl() {
@@ -38,5 +39,24 @@
   var link = document.createElement("link");
   link.rel = "stylesheet";
   link.href = href;
+  link.setAttribute("data-ratex-fonts-stylesheet", "");
+
+  g.__RATEX_FONTS_STYLESHEET_READY__ = new Promise(function (resolve) {
+    link.addEventListener(
+      "load",
+      function () {
+        resolve({ ok: true, href: href });
+      },
+      { once: true }
+    );
+    link.addEventListener(
+      "error",
+      function () {
+        resolve({ ok: false, href: href });
+      },
+      { once: true }
+    );
+  });
+
   document.head.insertBefore(link, document.head.firstChild);
 })();

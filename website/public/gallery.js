@@ -58,6 +58,27 @@
 
   const EM = 18;
   const PAD = 4;
+  const FONT_QUERIES = [
+    `${EM}px KaTeX_Main`,
+    `italic ${EM}px KaTeX_Main`,
+    `bold ${EM}px KaTeX_Main`,
+    `italic bold ${EM}px KaTeX_Main`,
+    `italic ${EM}px KaTeX_Math`,
+    `italic bold ${EM}px KaTeX_Math`,
+    `${EM}px KaTeX_AMS`,
+    `${EM}px KaTeX_Caligraphic`,
+    `${EM}px KaTeX_Fraktur`,
+    `bold ${EM}px KaTeX_Fraktur`,
+    `${EM}px KaTeX_SansSerif`,
+    `italic ${EM}px KaTeX_SansSerif`,
+    `bold ${EM}px KaTeX_SansSerif`,
+    `${EM}px KaTeX_Script`,
+    `${EM}px KaTeX_Typewriter`,
+    `${EM}px KaTeX_Size1`,
+    `${EM}px KaTeX_Size2`,
+    `${EM}px KaTeX_Size3`,
+    `${EM}px KaTeX_Size4`,
+  ];
 
   function fontIdToCss(fontId, sizePx) {
     switch (fontId) {
@@ -170,28 +191,47 @@
     ctx.restore();
   }
 
-  async function loadFonts() {
-    await Promise.all([
-      document.fonts.load(`${EM}px KaTeX_Main`),
-      document.fonts.load(`italic ${EM}px KaTeX_Main`),
-      document.fonts.load(`bold ${EM}px KaTeX_Main`),
-      document.fonts.load(`italic bold ${EM}px KaTeX_Main`),
-      document.fonts.load(`italic ${EM}px KaTeX_Math`),
-      document.fonts.load(`italic bold ${EM}px KaTeX_Math`),
-      document.fonts.load(`${EM}px KaTeX_AMS`),
-      document.fonts.load(`${EM}px KaTeX_Caligraphic`),
-      document.fonts.load(`${EM}px KaTeX_Fraktur`),
-      document.fonts.load(`bold ${EM}px KaTeX_Fraktur`),
-      document.fonts.load(`${EM}px KaTeX_SansSerif`),
-      document.fonts.load(`italic ${EM}px KaTeX_SansSerif`),
-      document.fonts.load(`bold ${EM}px KaTeX_SansSerif`),
-      document.fonts.load(`${EM}px KaTeX_Script`),
-      document.fonts.load(`${EM}px KaTeX_Typewriter`),
-      document.fonts.load(`${EM}px KaTeX_Size1`),
-      document.fonts.load(`${EM}px KaTeX_Size2`),
-      document.fonts.load(`${EM}px KaTeX_Size3`),
-      document.fonts.load(`${EM}px KaTeX_Size4`),
-    ]).catch(() => {});
+  function waitForFontStylesheet() {
+    const g = typeof globalThis !== "undefined" ? globalThis : global;
+    const injectedStylesheetReady = g.__RATEX_FONTS_STYLESHEET_READY__;
+    if (injectedStylesheetReady && typeof injectedStylesheetReady.then === "function") {
+      return injectedStylesheetReady;
+    }
+
+    const link = document.querySelector("link[data-ratex-fonts-stylesheet]");
+    if (!link || link.sheet) return Promise.resolve({ ok: true, href: link && link.href });
+
+    return new Promise((resolve) => {
+      link.addEventListener("load", () => resolve({ ok: true, href: link.href }), { once: true });
+      link.addEventListener("error", () => resolve({ ok: false, href: link.href }), { once: true });
+    });
+  }
+
+  var fontsPromise = null;
+  function loadFonts() {
+    if (!fontsPromise) {
+      fontsPromise = (async function () {
+        const stylesheet = await waitForFontStylesheet();
+        if (stylesheet && stylesheet.ok === false) {
+          throw new Error("Failed to load the RaTeX font stylesheet: " + stylesheet.href);
+        }
+        if (!document.fonts || typeof document.fonts.load !== "function") {
+          throw new Error("This browser does not support the CSS Font Loading API.");
+        }
+
+        const loadedFaces = await Promise.all(
+          FONT_QUERIES.map((font) => document.fonts.load(font))
+        );
+        const missingFonts = FONT_QUERIES.filter((_, index) => loadedFaces[index].length === 0);
+        if (missingFonts.length > 0) {
+          throw new Error("RaTeX fonts were not registered: " + missingFonts.join(", "));
+        }
+      })().catch((error) => {
+        fontsPromise = null;
+        throw error;
+      });
+    }
+    return fontsPromise;
   }
 
   async function loadWasm() {
