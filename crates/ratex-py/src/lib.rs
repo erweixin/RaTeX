@@ -63,7 +63,12 @@ fn parse_color(s: &str) -> PyResult<Color> {
                     .map_err(|e| PyValueError::new_err(e.to_string()))?;
                 let b = u8::from_str_radix(&hex[2..3].repeat(2), 16)
                     .map_err(|e| PyValueError::new_err(e.to_string()))?;
-                return Ok(Color::new(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, 1.0));
+                return Ok(Color::new(
+                    r as f32 / 255.0,
+                    g as f32 / 255.0,
+                    b as f32 / 255.0,
+                    1.0,
+                ));
             }
             _ => {
                 return Err(PyValueError::new_err(format!(
@@ -74,13 +79,28 @@ fn parse_color(s: &str) -> PyResult<Color> {
         let r = u8::from_str_radix(rs, 16).map_err(|e| PyValueError::new_err(e.to_string()))?;
         let g = u8::from_str_radix(gs, 16).map_err(|e| PyValueError::new_err(e.to_string()))?;
         let b = u8::from_str_radix(bs, 16).map_err(|e| PyValueError::new_err(e.to_string()))?;
-        return Ok(Color::new(r as f32 / 255.0, g as f32 / 255.0, b as f32 / 255.0, 1.0));
+        return Ok(Color::new(
+            r as f32 / 255.0,
+            g as f32 / 255.0,
+            b as f32 / 255.0,
+            1.0,
+        ));
     }
     Err(PyValueError::new_err(format!(
         "unsupported color format (use #rrggbb, #rgb, 'black', 'white', or 'transparent'): {s}"
     )))
 }
 
+/// Build layout options from the public rendering parameters.
+///
+/// # Arguments
+///
+/// * `display_mode` - Select display or text math style.
+/// * `color` - Foreground color accepted by [`parse_color`].
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` when `color` is not supported.
 fn make_layout_options(display_mode: bool, color: &str) -> PyResult<LayoutOptions> {
     let style = if display_mode {
         MathStyle::Display
@@ -94,7 +114,18 @@ fn make_layout_options(display_mode: bool, color: &str) -> PyResult<LayoutOption
     })
 }
 
-/// Parse and layout LaTeX → DisplayList (the core pipeline).
+/// Parse and lay out LaTeX into the internal [`DisplayList`] representation.
+///
+/// # Arguments
+///
+/// * `latex` - LaTeX math source without surrounding dollar delimiters.
+/// * `display_mode` - Select display or text math style.
+/// * `color` - Foreground color for layout.
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` when the source cannot be parsed or the color
+/// is invalid.
 fn pipeline(latex: &str, display_mode: bool, color: &str) -> PyResult<DisplayList> {
     let opts = make_layout_options(display_mode, color)?;
     let nodes = parse(latex).map_err(|e| PyValueError::new_err(format!("parse error: {e}")))?;
@@ -102,12 +133,22 @@ fn pipeline(latex: &str, display_mode: bool, color: &str) -> PyResult<DisplayLis
     Ok(to_display_list(&box_))
 }
 
-/// Deserialize a JSON DisplayList string back into a DisplayList struct.
+/// Deserialize a JSON DisplayList string into a [`DisplayList`].
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` when the JSON does not match the DisplayList
+/// protocol.
 fn deserialize_display_list(json_str: &str) -> PyResult<DisplayList> {
     serde_json::from_str(json_str)
         .map_err(|e| PyValueError::new_err(format!("failed to deserialize DisplayList JSON: {e}")))
 }
 
+/// Normalize, validate, and deduplicate requested output format names.
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` for an empty list or an unsupported format.
 fn normalize_formats(formats: &[String]) -> PyResult<Vec<String>> {
     if formats.is_empty() {
         return Err(PyValueError::new_err(
@@ -134,16 +175,32 @@ fn normalize_formats(formats: &[String]) -> PyResult<Vec<String>> {
     Ok(normalized)
 }
 
+/// Rendering options shared by the multi-format and [`Expr`] APIs.
 #[derive(Clone, Copy)]
 struct RenderParams<'a> {
+    /// Em size in user units.
     font_size: f64,
+    /// Whether to use display math style.
     display_mode: bool,
+    /// Foreground color.
     color: &'a str,
+    /// Whether SVG glyphs should be embedded as paths.
     embed_glyphs: bool,
+    /// PNG background color.
     background_color: &'a str,
+    /// PNG device-pixel-ratio multiplier.
     dpr: f64,
 }
 
+/// Render one formula in one or more requested output formats.
+///
+/// Rendering the display list once and caching intermediate representations
+/// avoids reparsing and relayout when multiple formats are requested.
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` for invalid LaTeX, colors, formats, or output
+/// serialization/rendering failures.
 fn render_formats_impl(
     py: Python<'_>,
     latex: &str,
@@ -185,8 +242,8 @@ fn render_formats_impl(
                 out.set_item("png", PyBytes::new(py, &png))?;
             }
             "pdf" => {
-                let pdf =
-                    render_to_pdf(&display_list, &pdf_opts).map_err(|e| PyValueError::new_err(e.to_string()))?;
+                let pdf = render_to_pdf(&display_list, &pdf_opts)
+                    .map_err(|e| PyValueError::new_err(e.to_string()))?;
                 out.set_item("pdf", PyBytes::new(py, &pdf))?;
             }
             "display_list" => {
@@ -204,9 +261,7 @@ fn render_formats_impl(
                     cached_display_list_json = Some(serialized.clone());
                     serialized
                 };
-                let parsed_json = py
-                    .import("json")?
-                    .call_method1("loads", (json,))?;
+                let parsed_json = py.import("json")?.call_method1("loads", (json,))?;
                 out.set_item("json", parsed_json)?;
             }
             "html" => {
@@ -217,10 +272,12 @@ fn render_formats_impl(
                     cached_svg = Some(rendered.clone());
                     rendered
                 };
-                let mode = if params.display_mode { "display" } else { "inline" };
-                let html = format!(
-                    "<span class=\"ratex-math ratex-{mode}\">{svg}</span>",
-                );
+                let mode = if params.display_mode {
+                    "display"
+                } else {
+                    "inline"
+                };
+                let html = format!("<span class=\"ratex-math ratex-{mode}\">{svg}</span>",);
                 out.set_item("html", html)?;
             }
             _ => unreachable!("format already validated"),
@@ -230,6 +287,11 @@ fn render_formats_impl(
     Ok(out.into())
 }
 
+/// A reusable LaTeX expression with configurable output formats.
+///
+/// `Expr` supports notebook display hooks such as `_repr_svg_`, `_repr_png_`,
+/// `_repr_html_`, and `_repr_mimebundle_`. The class is also exported as
+/// `ratex_py.Math` for compatibility with existing callers.
 #[pyclass(skip_from_py_object)]
 #[derive(Clone)]
 struct Expr {
@@ -245,6 +307,27 @@ struct Expr {
 
 #[pymethods]
 impl Expr {
+    /// Create a reusable expression with notebook and format-rendering options.
+    ///
+    /// The default format is `svg`. The expression validates every requested
+    /// format name before storing it.
+    ///
+    /// # Arguments
+    ///
+    /// * `latex` - LaTeX math source without surrounding dollar delimiters.
+    /// * `font_size` - Em size in user units; defaults to `40.0`.
+    /// * `display_mode` - Use display math style when `true`; defaults to `true`.
+    /// * `color` - Foreground color; defaults to `"black"`.
+    /// * `embed_glyphs` - Embed SVG glyphs as paths; defaults to `true`.
+    /// * `background_color` - PNG background color; defaults to `"white"`.
+    /// * `dpr` - PNG device-pixel-ratio multiplier; defaults to `1.0`.
+    /// * `formats` - Output formats used by `render` and notebook hooks; defaults
+    ///   to `["svg"]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a Python `ValueError` when `formats` contains an unsupported name
+    /// or is empty.
     #[new]
     #[pyo3(signature = (latex, *, font_size=40.0, display_mode=true, color="black", embed_glyphs=true, background_color="white", dpr=1.0, formats=None))]
     fn new(
@@ -271,6 +354,7 @@ impl Expr {
         })
     }
 
+    /// Return this expression as SVG for notebook display.
     fn _repr_svg_(&self) -> PyResult<String> {
         render_svg(
             &self.latex,
@@ -281,6 +365,7 @@ impl Expr {
         )
     }
 
+    /// Return this expression as PNG bytes for notebook display.
     fn _repr_png_(&self) -> PyResult<Vec<u8>> {
         render_png(
             &self.latex,
@@ -292,14 +377,20 @@ impl Expr {
         )
     }
 
+    /// Return this expression wrapped in the module's HTML display span.
     fn _repr_html_(&self) -> PyResult<String> {
         let svg = self._repr_svg_()?;
-        let mode = if self.display_mode { "display" } else { "inline" };
+        let mode = if self.display_mode {
+            "display"
+        } else {
+            "inline"
+        };
         Ok(format!(
             "<span class=\"ratex-math ratex-{mode}\">{svg}</span>",
         ))
     }
 
+    /// Return this expression's DisplayList as a Python dictionary.
     fn _repr_json_(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         let json = render_display_list(&self.latex, self.display_mode)?;
         Ok(py
@@ -309,6 +400,7 @@ impl Expr {
             .into())
     }
 
+    /// Return the MIME representations requested when constructing the expression.
     #[pyo3(signature = (_include=None, _exclude=None))]
     fn _repr_mimebundle_(
         &self,
@@ -341,12 +433,14 @@ impl Expr {
         Ok(bundle.into())
     }
 
+    /// Render this expression to the requested formats.
     #[pyo3(signature = (formats=None))]
     fn render(&self, py: Python<'_>, formats: Option<Vec<String>>) -> PyResult<Py<PyDict>> {
         let formats = formats.unwrap_or_else(|| self.formats.clone());
         render_formats_impl(py, &self.latex, &formats, self.params())
     }
 
+    /// Return a diagnostic representation containing the expression settings.
     fn __repr__(&self) -> String {
         format!(
             "Expr({:?}, font_size={}, display_mode={}, color={:?}, formats={:?})",
@@ -372,18 +466,15 @@ impl Expr {
 // Public Python API
 // ---------------------------------------------------------------------------
 
-/// Parse a LaTeX math string and return ``True``, or raise an exception on parse error.
-/// Useful for validation without rendering.
+/// Validate a LaTeX math string without rendering it.
 ///
-/// Parameters
-/// ----------
-/// latex : str
-///     The LaTeX math input.
+/// # Arguments
 ///
-/// Raises
-/// ------
-/// ValueError
-///     If the LaTeX cannot be parsed.
+/// * `latex` - LaTeX math source without surrounding dollar delimiters.
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` when the LaTeX cannot be parsed.
 #[pyfunction]
 fn check(latex: &str) -> PyResult<()> {
     parse(latex).map_err(|e| PyValueError::new_err(format!("parse error: {e}")))?;
@@ -392,38 +483,35 @@ fn check(latex: &str) -> PyResult<()> {
 
 /// Return the current DisplayList JSON protocol version.
 ///
-/// Returns
-/// -------
-/// int
-///     Protocol version (currently ``1``).
+/// The version is currently `1` and should be checked by consumers that cache
+/// serialized display lists.
+///
+/// # Returns
+///
+/// The current DisplayList protocol version.
 #[pyfunction]
 fn display_list_version() -> i32 {
     1
 }
 
-/// Render a LaTeX math string to a self-contained SVG string.
+/// Render LaTeX math to an SVG document.
 ///
-/// Parameters
-/// ----------
-/// latex : str
-///     The LaTeX math input (no surrounding `$…$` delimiters).
-/// font_size : float, optional
-///     Em size in user units (default 40.0).
-/// display_mode : bool, optional
-///     ``True`` for block/display math (default), ``False`` for inline.
-/// color : str, optional
-///     Foreground color as ``#rrggbb``, ``#rgb``, or a named color
-///     (``"black"`` / ``"white"``).  Default ``"black"``.
-/// embed_glyphs : bool, optional
-///     When ``True`` (default) glyphs are emitted as ``<path>`` elements so
-///     the SVG is fully self-contained.  When ``False``, ``<text>`` elements
-///     with KaTeX CSS class names are emitted instead (needs KaTeX stylesheets
-///     in the host page).
+/// # Arguments
 ///
-/// Returns
-/// -------
-/// str
-///     SVG document as a string.
+/// * `latex` - LaTeX math source without surrounding dollar delimiters.
+/// * `font_size` - Em size in user units; defaults to `40.0`.
+/// * `display_mode` - Use block/display math when `true`; defaults to `true`.
+/// * `color` - `#rrggbb`, `#rgb`, `black`, or `white`; defaults to `"black"`.
+/// * `embed_glyphs` - Emit self-contained path glyphs when `true`; defaults to
+///   `true`. When `false`, the result depends on KaTeX CSS in the host page.
+///
+/// # Returns
+///
+/// The rendered SVG document.
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` when parsing fails or `color` is invalid.
 #[pyfunction]
 #[pyo3(signature = (latex, *, font_size=40.0, display_mode=true, color="black", embed_glyphs=true))]
 fn render_svg(
@@ -442,51 +530,50 @@ fn render_svg(
     Ok(render_to_svg(&display_list, &opts))
 }
 
-/// Convenience: render a LaTeX string as inline (text-mode) SVG.
+/// Render LaTeX math as inline, text-mode SVG.
 ///
-/// Equivalent to ``render_svg(latex, display_mode=False, embed_glyphs=True)``.
+/// This is equivalent to [`render_svg`] with `display_mode = false` and
+/// `embed_glyphs = true`.
 ///
-/// Parameters
-/// ----------
-/// latex : str
-///     The LaTeX math input.
-/// font_size : float, optional
-///     Em size in user units (default 40.0).
-/// color : str, optional
-///     Foreground color.  Default ``"black"``.
+/// # Arguments
 ///
-/// Returns
-/// -------
-/// str
-///     SVG document as a string.
+/// * `latex` - LaTeX math source without surrounding dollar delimiters.
+/// * `font_size` - Em size in user units; defaults to `40.0`.
+/// * `color` - Foreground color; defaults to `"black"`.
+///
+/// # Returns
+///
+/// The rendered inline SVG document.
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` when parsing fails or `color` is invalid.
 #[pyfunction]
 #[pyo3(signature = (latex, *, font_size=40.0, color="black"))]
 fn render_svg_inline(latex: &str, font_size: f64, color: &str) -> PyResult<String> {
     render_svg(latex, font_size, false, color, true)
 }
 
-/// Render a LaTeX math string to PNG bytes.
+/// Render LaTeX math to PNG bytes.
 ///
-/// Parameters
-/// ----------
-/// latex : str
-///     The LaTeX math input.
-/// font_size : float, optional
-///     Em size in pixels at DPR 1 (default 40.0).
-/// display_mode : bool, optional
-///     ``True`` for block/display math (default), ``False`` for inline.
-/// color : str, optional
-///     Foreground color.  Default ``"black"``.
-/// background_color : str, optional
-///     Background fill.  Use ``"transparent"`` for a transparent PNG.
-///     Default ``"white"``.
-/// dpr : float, optional
-///     Device pixel ratio multiplier (default 1.0).
+/// # Arguments
 ///
-/// Returns
-/// -------
-/// bytes
-///     Raw PNG bytes.
+/// * `latex` - LaTeX math source without surrounding dollar delimiters.
+/// * `font_size` - Em size in pixels at DPR 1; defaults to `40.0`.
+/// * `display_mode` - Use block/display math when `true`; defaults to `true`.
+/// * `color` - Foreground color; defaults to `"black"`.
+/// * `background_color` - Background color, or `"transparent"`; defaults to
+///   `"white"`.
+/// * `dpr` - Device-pixel-ratio multiplier; defaults to `1.0`.
+///
+/// # Returns
+///
+/// Raw PNG bytes.
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` when parsing, color conversion, or PNG
+/// rendering fails.
 #[pyfunction]
 #[pyo3(signature = (latex, *, font_size=40.0, display_mode=true, color="black", background_color="white", dpr=1.0))]
 fn render_png(
@@ -507,31 +594,26 @@ fn render_png(
     render_to_png(&display_list, &opts).map_err(PyValueError::new_err)
 }
 
-/// Render a LaTeX math string to PDF bytes.
+/// Render LaTeX math to PDF bytes.
 ///
-/// Parameters
-/// ----------
-/// latex : str
-///     The LaTeX math input.
-/// font_size : float, optional
-///     Em size in user units (default 40.0).
-/// display_mode : bool, optional
-///     ``True`` for block/display math (default), ``False`` for inline.
-/// color : str, optional
-///     Foreground color.  Default ``"black"``.
+/// # Arguments
 ///
-/// Returns
-/// -------
-/// bytes
-///     Raw PDF bytes with embedded KaTeX fonts.
+/// * `latex` - LaTeX math source without surrounding dollar delimiters.
+/// * `font_size` - Em size in user units; defaults to `40.0`.
+/// * `display_mode` - Use block/display math when `true`; defaults to `true`.
+/// * `color` - Foreground color; defaults to `"black"`.
+///
+/// # Returns
+///
+/// Raw PDF bytes with embedded KaTeX fonts.
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` when parsing, color conversion, or PDF
+/// rendering fails.
 #[pyfunction]
 #[pyo3(signature = (latex, *, font_size=40.0, display_mode=true, color="black"))]
-fn render_pdf(
-    latex: &str,
-    font_size: f64,
-    display_mode: bool,
-    color: &str,
-) -> PyResult<Vec<u8>> {
+fn render_pdf(latex: &str, font_size: f64, display_mode: bool, color: &str) -> PyResult<Vec<u8>> {
     let display_list = pipeline(latex, display_mode, color)?;
     let opts = PdfOptions {
         font_size,
@@ -540,22 +622,24 @@ fn render_pdf(
     render_to_pdf(&display_list, &opts).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
-/// Parse and lay out a LaTeX math string, returning the DisplayList as a JSON string.
+/// Parse and lay out LaTeX math, returning the DisplayList as JSON.
 ///
-/// The JSON schema is documented in ``docs/DISPLAYLIST_JSON_PROTOCOL.md``.
-/// Useful for caching / custom renderers (Canvas 2D, PDF, platform-native drawing).
+/// The JSON schema is documented in `docs/DISPLAYLIST_JSON_PROTOCOL.md`.
+/// The serialized value can be cached and passed to the
+/// `render_*_from_display_list` functions without reparsing or relayout.
 ///
-/// Parameters
-/// ----------
-/// latex : str
-///     The LaTeX math input.
-/// display_mode : bool, optional
-///     ``True`` for block/display math (default), ``False`` for inline.
+/// # Arguments
 ///
-/// Returns
-/// -------
-/// str
-///     DisplayList serialized as JSON (protocol version 1).
+/// * `latex` - LaTeX math source without surrounding dollar delimiters.
+/// * `display_mode` - Use block/display math when `true`; defaults to `true`.
+///
+/// # Returns
+///
+/// DisplayList JSON using protocol version `1`.
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` when parsing or serialization fails.
 #[pyfunction]
 #[pyo3(signature = (latex, *, display_mode=true))]
 fn render_display_list(latex: &str, display_mode: bool) -> PyResult<String> {
@@ -564,48 +648,50 @@ fn render_display_list(latex: &str, display_mode: bool) -> PyResult<String> {
         .map_err(|e| PyValueError::new_err(format!("serialization error: {e}")))
 }
 
-/// Parse and lay out a LaTeX math string, returning the DisplayList as a JSON string.
+/// Parse and lay out LaTeX math, returning DisplayList JSON.
 ///
-/// Equivalent to ``render_display_list()``. Call ``json.loads()`` in Python to convert to a dict.
+/// This is an alias for [`render_display_list`]. Call `json.loads()` in Python
+/// to convert the returned string to a dictionary.
 ///
-/// Parameters
-/// ----------
-/// latex : str
-///     The LaTeX math input.
-/// display_mode : bool, optional
-///     ``True`` for block/display math (default), ``False`` for inline.
+/// # Arguments
 ///
-/// Returns
-/// -------
-/// str
-///     DisplayList JSON string (protocol version 1).
+/// * `latex` - LaTeX math source without surrounding dollar delimiters.
+/// * `display_mode` - Use block/display math when `true`; defaults to `true`.
+///
+/// # Returns
+///
+/// DisplayList JSON using protocol version `1`.
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` when parsing or serialization fails.
 #[pyfunction]
 #[pyo3(signature = (latex, *, display_mode=true))]
 fn parse_display_list(latex: &str, display_mode: bool) -> PyResult<String> {
     let display_list = pipeline(latex, display_mode, "black")?;
     serde_json::to_string(&display_list)
-        .map_err(|e| PyValueError::new_err(format!("serialization error: {e}"))
-    )
+        .map_err(|e| PyValueError::new_err(format!("serialization error: {e}")))
 }
 
-/// Render a DisplayList JSON string to SVG.
+/// Render a cached DisplayList JSON string to SVG.
 ///
-/// Accepts a cached JSON string from ``render_display_list()`` and renders it to SVG
-/// without reparsing / relayouting. Useful for generating multiple formats from a single formula.
+/// This avoids reparsing and relayout, which is useful when generating several
+/// output formats from one formula.
 ///
-/// Parameters
-/// ----------
-/// display_list_json : str
-///     The JSON DisplayList string (protocol version 1).
-/// font_size : float, optional
-///     Em size in user units (default 40.0).
-/// embed_glyphs : bool, optional
-///     When ``True`` (default) glyphs are emitted as ``<path>`` elements.
+/// # Arguments
 ///
-/// Returns
-/// -------
-/// str
-///     SVG document as a string.
+/// * `display_list_json` - DisplayList JSON produced by [`render_display_list`].
+/// * `font_size` - Em size in user units; defaults to `40.0`.
+/// * `embed_glyphs` - Emit glyphs as self-contained paths when `true`; defaults
+///   to `true`.
+///
+/// # Returns
+///
+/// The rendered SVG document.
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` when the DisplayList JSON is invalid.
 #[pyfunction]
 #[pyo3(signature = (display_list_json, *, font_size=40.0, embed_glyphs=true))]
 fn render_svg_from_display_list(
@@ -622,25 +708,24 @@ fn render_svg_from_display_list(
     Ok(render_to_svg(&display_list, &opts))
 }
 
-/// Render a DisplayList JSON string to PNG.
+/// Render a cached DisplayList JSON string to PNG bytes.
 ///
-/// Accepts a cached JSON string from ``render_display_list()`` and renders it to PNG.
+/// # Arguments
 ///
-/// Parameters
-/// ----------
-/// display_list_json : str
-///     The JSON DisplayList string.
-/// font_size : float, optional
-///     Em size in pixels at DPR 1 (default 40.0).
-/// background_color : str, optional
-///     Background fill (default ``"white"``).
-/// dpr : float, optional
-///     Device pixel ratio multiplier (default 1.0).
+/// * `display_list_json` - DisplayList JSON produced by [`render_display_list`].
+/// * `font_size` - Em size in pixels at DPR 1; defaults to `40.0`.
+/// * `background_color` - Background color, or `"transparent"`; defaults to
+///   `"white"`.
+/// * `dpr` - Device-pixel-ratio multiplier; defaults to `1.0`.
 ///
-/// Returns
-/// -------
-/// bytes
-///     Raw PNG bytes.
+/// # Returns
+///
+/// Raw PNG bytes.
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` when the DisplayList JSON, color, or PNG
+/// rendering fails.
 #[pyfunction]
 #[pyo3(signature = (display_list_json, *, font_size=40.0, background_color="white", dpr=1.0))]
 fn render_png_from_display_list(
@@ -659,27 +744,24 @@ fn render_png_from_display_list(
     render_to_png(&display_list, &opts).map_err(PyValueError::new_err)
 }
 
-/// Render a DisplayList JSON string to PDF.
+/// Render a cached DisplayList JSON string to PDF bytes.
 ///
-/// Accepts a cached JSON string from ``render_display_list()`` and renders it to PDF.
+/// # Arguments
 ///
-/// Parameters
-/// ----------
-/// display_list_json : str
-///     The JSON DisplayList string.
-/// font_size : float, optional
-///     Em size in user units (default 40.0).
+/// * `display_list_json` - DisplayList JSON produced by [`render_display_list`].
+/// * `font_size` - Em size in user units; defaults to `40.0`.
 ///
-/// Returns
-/// -------
-/// bytes
-///     Raw PDF bytes with embedded KaTeX fonts.
+/// # Returns
+///
+/// Raw PDF bytes with embedded KaTeX fonts.
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` when the DisplayList JSON or PDF rendering
+/// fails.
 #[pyfunction]
 #[pyo3(signature = (display_list_json, *, font_size=40.0))]
-fn render_pdf_from_display_list(
-    display_list_json: &str,
-    font_size: f64,
-) -> PyResult<Vec<u8>> {
+fn render_pdf_from_display_list(display_list_json: &str, font_size: f64) -> PyResult<Vec<u8>> {
     let display_list = deserialize_display_list(display_list_json)?;
     let opts = PdfOptions {
         font_size,
@@ -688,32 +770,25 @@ fn render_pdf_from_display_list(
     render_to_pdf(&display_list, &opts).map_err(|e| PyValueError::new_err(e.to_string()))
 }
 
-/// Render a list of LaTeX math strings to SVG (batch mode).
+/// Render a list of LaTeX math strings to SVG.
 ///
-/// Amortises Python FFI overhead when rendering many formulas in a single pass.
+/// Batch rendering amortizes Python FFI overhead while preserving input order.
 ///
-/// Parameters
-/// ----------
-/// latexes : list[str]
-///     List of LaTeX math inputs.
-/// font_size : float, optional
-///     Em size in user units (default 40.0).
-/// display_mode : bool, optional
-///     ``True`` for block/display math (default), ``False`` for inline.
-/// color : str, optional
-///     Foreground color.  Default ``"black"``.
-/// embed_glyphs : bool, optional
-///     When ``True`` (default) glyphs are emitted as ``<path>`` elements.
+/// # Arguments
 ///
-/// Returns
-/// -------
-/// list[str]
-///     SVG strings in the same order as input.
+/// * `latexes` - LaTeX math sources without surrounding dollar delimiters.
+/// * `font_size` - Em size in user units; defaults to `40.0`.
+/// * `display_mode` - Use block/display math when `true`; defaults to `true`.
+/// * `color` - Foreground color; defaults to `"black"`.
+/// * `embed_glyphs` - Embed SVG glyphs as paths; defaults to `true`.
 ///
-/// Raises
-/// ------
-/// ValueError
-///     If any formula fails to parse or render.
+/// # Returns
+///
+/// SVG documents in the same order as `latexes`.
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` if any formula fails to parse or render.
 #[pyfunction]
 #[pyo3(signature = (latexes, *, font_size=40.0, display_mode=true, color="black", embed_glyphs=true))]
 fn render_svg_batch(
@@ -731,32 +806,27 @@ fn render_svg_batch(
     Ok(results)
 }
 
-/// Render a list of LaTeX math strings to PNG (batch mode).
+/// Render a list of LaTeX math strings to PNG bytes.
 ///
-/// Parameters
-/// ----------
-/// latexes : list[str]
-///     List of LaTeX math inputs.
-/// font_size : float, optional
-///     Em size in pixels at DPR 1 (default 40.0).
-/// display_mode : bool, optional
-///     ``True`` for block/display math (default), ``False`` for inline.
-/// color : str, optional
-///     Foreground color.  Default ``"black"``.
-/// background_color : str, optional
-///     Background fill.  Default ``"white"``.
-/// dpr : float, optional
-///     Device pixel ratio multiplier (default 1.0).
+/// Batch rendering amortizes Python FFI overhead while preserving input order.
 ///
-/// Returns
-/// -------
-/// list[bytes]
-///     PNG bytes in the same order as input.
+/// # Arguments
 ///
-/// Raises
-/// ------
-/// ValueError
-///     If any formula fails to parse or render.
+/// * `latexes` - LaTeX math sources without surrounding dollar delimiters.
+/// * `font_size` - Em size in pixels at DPR 1; defaults to `40.0`.
+/// * `display_mode` - Use block/display math when `true`; defaults to `true`.
+/// * `color` - Foreground color; defaults to `"black"`.
+/// * `background_color` - Background color, or `"transparent"`; defaults to
+///   `"white"`.
+/// * `dpr` - Device-pixel-ratio multiplier; defaults to `1.0`.
+///
+/// # Returns
+///
+/// PNG byte strings in the same order as `latexes`.
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` if any formula fails to parse or render.
 #[pyfunction]
 #[pyo3(signature = (latexes, *, font_size=40.0, display_mode=true, color="black", background_color="white", dpr=1.0))]
 fn render_png_batch(
@@ -769,39 +839,46 @@ fn render_png_batch(
 ) -> PyResult<Vec<Vec<u8>>> {
     let mut results = Vec::with_capacity(latexes.len());
     for latex in latexes {
-        let png = render_png(&latex, font_size, display_mode, color, background_color, dpr)?;
+        let png = render_png(
+            &latex,
+            font_size,
+            display_mode,
+            color,
+            background_color,
+            dpr,
+        )?;
         results.push(png);
     }
     Ok(results)
 }
 
-/// Render one LaTeX input to one or more formats in a single call.
+/// Render one LaTeX input to one or more output formats.
 ///
-/// Parameters
-/// ----------
-/// latex : str
-///     LaTeX math input.
-/// formats : list[str], optional
-///     One or more output formats: ``"svg"``, ``"png"``, ``"pdf"``,
-///     ``"html"``, ``"json"``, ``"display_list"``.
-///     Defaults to ``["svg"]``.
-/// font_size : float, optional
-///     Em size in user units (default 40.0).
-/// display_mode : bool, optional
-///     ``True`` for display math (default), ``False`` for inline.
-/// color : str, optional
-///     Foreground color (default ``"black"``).
-/// embed_glyphs : bool, optional
-///     SVG glyph embedding behavior (default ``True``).
-/// background_color : str, optional
-///     PNG background color (default ``"white"``).
-/// dpr : float, optional
-///     PNG device pixel ratio (default ``1.0``).
+/// The DisplayList is parsed and laid out once, then reused for each requested
+/// format. Duplicate format names are ignored after normalization.
 ///
-/// Returns
-/// -------
-/// dict
-///     Mapping of format name to rendered payload.
+/// # Arguments
+///
+/// * `latex` - LaTeX math source without surrounding dollar delimiters.
+/// * `formats` - Output formats from `svg`, `png`, `pdf`, `html`, `json`, and
+///   `display_list`; defaults to `["svg"]`.
+/// * `font_size` - Em size in user units; defaults to `40.0`.
+/// * `display_mode` - Use block/display math when `true`; defaults to `true`.
+/// * `color` - Foreground color; defaults to `"black"`.
+/// * `embed_glyphs` - Embed SVG glyphs as paths; defaults to `true`.
+/// * `background_color` - PNG background color; defaults to `"white"`.
+/// * `dpr` - PNG device-pixel-ratio multiplier; defaults to `1.0`.
+///
+/// # Returns
+///
+/// A Python dictionary mapping each requested format to its rendered payload.
+/// SVG, HTML, JSON, and DisplayList values are strings; PNG and PDF values are
+/// byte strings.
+///
+/// # Errors
+///
+/// Returns a Python `ValueError` for invalid LaTeX, colors, formats, or output
+/// serialization/rendering failures.
 #[pyfunction]
 #[pyo3(signature = (latex, formats=None, *, font_size=40.0, display_mode=true, color="black", embed_glyphs=true, background_color="white", dpr=1.0))]
 fn render_formats(
@@ -1010,12 +1087,8 @@ mod tests {
 
     #[test]
     fn test_normalize_formats_dedup_and_casefold() {
-        let out = normalize_formats(&[
-            "SVG".to_string(),
-            "png".to_string(),
-            "svg".to_string(),
-        ])
-        .unwrap();
+        let out =
+            normalize_formats(&["SVG".to_string(), "png".to_string(), "svg".to_string()]).unwrap();
         assert_eq!(out, vec!["svg".to_string(), "png".to_string()]);
     }
 
