@@ -2,6 +2,9 @@
 
 Current layout as of the codebase. RA (Rust) + TeX.
 
+For private layout/parser/font module responsibilities and same-machine refactor
+acceptance, see [Core implementation boundaries](CORE_INTERNALS.md).
+
 ---
 
 ## Root Layout

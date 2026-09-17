@@ -2,6 +2,9 @@
 
 Thanks for helping improve RaTeX. Keep changes focused and consistent with surrounding code.
 
+When restructuring core logic, follow the module boundaries and compatibility
+capture workflow in [`docs/CORE_INTERNALS.md`](docs/CORE_INTERNALS.md).
+
 ## Prerequisites
 
 - **Rust**: stable toolchain ([rustup](https://rustup.rs)); see README for minimum version.
