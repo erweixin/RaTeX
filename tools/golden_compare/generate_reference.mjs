@@ -5,7 +5,7 @@
  * and saves screenshots to the fixtures directory.
  *
  * Usage:
- *   node generate_reference.mjs [test_cases.txt] [fixtures_dir] [--mhchem]
+ *   node generate_reference.mjs [test_cases.txt] [fixtures_dir] [--mhchem] [--centernot]
  *
  * --mhchem: use 40px font (for tests/golden/test_case_ce.txt → fixtures_ce).
  * mhchem (\\ce, \\pu, …) is loaded after KaTeX via Puppeteer addScriptTag so file://
@@ -83,6 +83,14 @@ function resolveKatexDist() {
 async function main() {
     const rawArgs = process.argv.slice(2);
     const withMhchem = rawArgs.includes('--mhchem');
+    const withCenternot = rawArgs.includes('--centernot');
+    // KaTeX 0.16.45 has no centernot. This independent box construction
+    // implements centernot.sty v1.4: shift zero-advance \not by (W - E)/2,
+    // where W is the argument width and E the equals-sign width. The clap
+    // shifts by -(W + E)/2, then the first phantom advances by W.
+    const referenceMacros = withCenternot ? {
+        '\\centernot': String.raw`\mathrel{\mathclap{{\phantom{#1}}{\not}{\phantom{=}}}{#1}}`,
+    } : {};
     const manifestArg = rawArgs.indexOf('--manifest-out');
     const manifestOutArg = manifestArg >= 0 ? rawArgs[manifestArg + 1] : null;
     if (manifestArg >= 0 && !manifestOutArg) {
@@ -90,7 +98,7 @@ async function main() {
     }
     const args = rawArgs.filter(
         (arg, index) =>
-            arg !== '--mhchem' &&
+            arg !== '--mhchem' && arg !== '--centernot' &&
             (manifestArg < 0 ||
                 (index !== manifestArg && index !== manifestArg + 1))
     );
@@ -208,6 +216,12 @@ body { margin: 0; padding: 0; background: white; }
     await page.addScriptTag({
         path: join(KATEX_DIST, 'contrib', 'mhchem.min.js'),
     });
+
+    await page.evaluate((macros) => {
+        for (const [name, expansion] of Object.entries(macros)) {
+            katex.__defineMacro(name, expansion);
+        }
+    }, referenceMacros);
 
     let ok = 0;
     let errors = 0;
@@ -426,6 +440,7 @@ body { margin: 0; padding: 0; background: white; }
         dpr: VIEWPORT_DPR,
         font_px: fontPx,
         font_file_hashes: fontHashes(join(KATEX_DIST, 'fonts')),
+        ...(withCenternot ? { reference_macros: referenceMacros } : {}),
         cases: records,
     };
     writeFileSync(manifestOut, JSON.stringify(manifest, null, 2) + '\n');

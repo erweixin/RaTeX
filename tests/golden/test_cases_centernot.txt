@@ -1,0 +1,20 @@
+# centernot.sty v1.4 semantics; see docs/GOLDEN_BASELINE.md for the reference macro.
+a\centernot\implies b
+a\centernot{\impliedby}b
+a\centernot{\iff}b
+\centernot\Longrightarrow\quad\centernot\Longleftarrow\quad\centernot\Longleftrightarrow
+\centernot{\rightarrow}\quad\centernot{=}\quad\centernot{\parallel}\quad\centernot{\mid}
+A\centernot{\xrightarrow{long label}}B
+A\centernot{\xleftrightarrow[below]{above}}B
+A\centernot{\rightarrow\rightarrow}B
+a\centernot{=}b
+\textstyle a\centernot{\implies}b
+\scriptstyle a\centernot{\implies}b
+\scriptscriptstyle a\centernot{\implies}b
+x_{a\centernot{\implies}b}
+a\centernot{\Longrightarrow}_i^2 b
+\textcolor{red}{a\centernot{\iff}b}
+\centernot{\mathbf{A}}\quad\centernot{\mathit{ab}}
+\centernot{\frac{a}{b}}\quad\centernot{\sum_{i=1}^n x_i}
+\centernot{}\quad\centernot{\centernot{\implies}}
+\centernot{\textcolor{blue}{\implies}}

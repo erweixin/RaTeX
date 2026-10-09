@@ -53,6 +53,8 @@ RaTeX is the same KaTeX-compatible math engine compiled to a portable Rust core,
 
 **Physics units** — `\pu` for value + unit expressions following IUPAC conventions.
 
+**Centered relation negation** — `\centernot\implies`, `\centernot{\impliedby}`, and `\centernot{\iff}` center the negation slash over the entire argument and retain relation spacing (centernot package semantics).
+
 **Feynman slash notation** — `\slashed{p}` and `\slashed{\partial}`, with scripts and font commands.
 
 **Proof trees** — bussproofs-style `prooftree` for inference rules and sequent calculi:
