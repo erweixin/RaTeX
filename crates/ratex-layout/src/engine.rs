@@ -3761,6 +3761,10 @@ fn layout_enclose(
         return layout_slashed(body, options, None);
     }
 
+    if label == "\\centernot" {
+        return layout_centernot(body, options, None);
+    }
+
     // \phase: angle mark (diagonal line) below the body with underline
     if label == "\\phase" {
         return layout_phase(body, options);
@@ -3807,6 +3811,37 @@ fn layout_enclose(
             bg_color: bg,
             border_color: border,
         },
+        color: options.color,
+    }
+}
+
+/// Centered relation negation, following centernot.sty v1.4.
+/// The zero-advance \not glyph is designed to overlay `=`. Shift it by
+/// half the difference between the argument and equals-sign widths, keeping
+/// its baseline and the argument's advance unchanged (including narrow bodies).
+fn layout_centernot(
+    body: &ParseNode,
+    options: &LayoutOptions,
+    body_font: Option<FontId>,
+) -> LayoutBox {
+    let inner = match body_font {
+        Some(font_id) => layout_with_font(body, font_id, options),
+        None => layout_node(body, options),
+    };
+    let overlay = layout_symbol("\\@not", Mode::Math, options);
+    let equals = layout_symbol("=", Mode::Math, options);
+    let overlay_x = (inner.width - equals.width) / 2.0;
+    let overlay_end = overlay_x + overlay.width;
+    LayoutBox {
+        width: inner.width,
+        height: inner.height.max(overlay.height),
+        depth: inner.depth.max(overlay.depth),
+        content: BoxContent::HBox(vec![
+            LayoutBox::new_kern(overlay_x),
+            overlay,
+            LayoutBox::new_kern(-overlay_end),
+            inner,
+        ]),
         color: options.color,
     }
 }
@@ -4196,6 +4231,9 @@ fn layout_with_font(node: &ParseNode, font_id: FontId, options: &LayoutOptions) 
         }
         ParseNode::Enclose { label, body, .. } if label == "\\slashed" => {
             layout_slashed(body, options, Some(font_id))
+        }
+        ParseNode::Enclose { label, body, .. } if label == "\\centernot" => {
+            layout_centernot(body, options, Some(font_id))
         }
         ParseNode::MathOrd { text, mode, .. }
         | ParseNode::TextOrd { text, mode, .. }
@@ -4587,6 +4625,9 @@ fn node_math_class(node: &ParseNode) -> Option<MathClass> {
                 return Some(mclass_str_to_math_class(mclass));
             }
             ParseNode::Middle { .. } => return Some(MathClass::Ord),
+            ParseNode::Enclose { label, .. } if label == "\\centernot" => {
+                return Some(MathClass::Rel);
+            }
             _ => return Some(MathClass::Ord),
         }
     }

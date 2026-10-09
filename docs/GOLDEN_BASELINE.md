@@ -135,3 +135,46 @@ inconsistent.
 `website/src/pages/demo/support-table.astro` combines
 `tests/golden/test_cases.txt` with `tests/golden/baseline.json`. Do not add a
 second embedded formula list or score map.
+
+
+## Centered negation (`\centernot`)
+
+Run `./scripts/update_golden_centernot.sh` to render
+`tests/golden/test_cases_centernot.txt`, regenerate its independent references,
+and score every case with the authoritative Python comparator. The script
+requires complete coverage and every case to pass the comparator's existing
+0.30 per-case threshold. The main suite's 0.85 mean and 0.05 regression gates
+remain unchanged. The script writes all diff images to
+`tests/golden/diffs_centernot/` and the report to
+`tests/golden/reports/centernot/report.json`.
+
+KaTeX 0.16.45 does **not** implement `\centernot`. The dedicated generator's
+`--centernot` flag installs a reference-only macro; it does not change the
+main suite or replace RaTeX's native implementation. The reference follows
+[centernot.sty v1.4, implementation lines 8–18](https://ctan.math.utah.edu/ctan/tex-archive/macros/latex/contrib/oberdiek/centernot.pdf):
+place zero-advance `\not` at `(W - E) / 2`, where `W` is the entire argument's
+width and `E` is the width of `=`, using the current math style. Keep the
+baseline, argument advance, and outer relation class.
+
+The independent KaTeX box construction is:
+
+```latex
+\mathrel{\mathclap{{\phantom{#1}}{\not}{\phantom{=}}}{#1}}
+```
+
+Inside `\mathclap`, the phantoms have combined width `W + E`, so the clap
+begins at `-(W + E)/2`.
+The first phantom advances by `W`, placing `\not` at `(W - E)/2`.
+The final argument supplies its original advance and is painted after the
+slash, matching the package's compositing order. Braced groups make each
+phantom and the zero-width negation an ordinary atom inside the construction,
+preventing accidental inter-atom relation glue during measurement. Phantom
+contents remain invisible, and the argument is painted only once. The manifest records the
+exact reference macro. This oracle validates the original package semantics
+using KaTeX's independent layout; it is not a comparison against a native
+KaTeX centernot implementation or a TeX rasterizer.
+
+The suite covers all three issue #159 examples, narrow/plain/long/extensible
+relations, compound arguments, scripts, math styles, color, font commands,
+tall/empty arguments, and nesting. Rust geometry tests additionally distinguish
+`\centernot` from left-aligned `\not` and check spacing and exact positioning.

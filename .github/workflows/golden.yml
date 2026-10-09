@@ -97,9 +97,14 @@ jobs:
             --min-coverage 1.0 \
             --min-mean 0.85 \
             "${baseline_args[@]}"
+      - name: Verify centered negation against the package-semantics oracle
+        run: ./scripts/update_golden_centernot.sh
       - name: Upload machine-readable golden report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: golden-report
-          path: artifacts/golden/
+          path: |
+            artifacts/golden/
+            tests/golden/reports/centernot/
+            tests/golden/diffs_centernot/
