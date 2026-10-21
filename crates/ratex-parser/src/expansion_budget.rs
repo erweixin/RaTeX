@@ -68,6 +68,7 @@ impl From<ResourceExceeded> for crate::ParseError {
         Self::msg(e.to_string())
     }
 }
+#[cfg(feature = "mhchem")]
 impl From<ResourceExceeded> for crate::mhchem::MhchemError {
     fn from(e: ResourceExceeded) -> Self {
         Self::msg(e.to_string())
@@ -128,6 +129,7 @@ impl ExpansionBudget {
         )?;
         Ok(text.to_owned())
     }
+    #[cfg(feature = "mhchem")]
     pub(crate) fn append(&self, out: &mut String, text: &str) -> Result<(), ResourceExceeded> {
         self.charge(
             Some(Cost {

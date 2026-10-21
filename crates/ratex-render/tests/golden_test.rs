@@ -434,6 +434,7 @@ fn cjk_smoke_non_blank_rendering() {
 
 /// mhchem (`\\ce` / `\\pu`): uses [tests/golden/test_case_ce.txt](../../tests/golden/test_case_ce.txt) and `fixtures_ce/`.
 #[test]
+#[cfg(feature = "mhchem")]
 fn golden_mhchem_smoke() {
     let root = project_root();
     // 2.0 matches legacy fixtures_ce (Puppeteer DPR 2); use 1.0 if refs were regenerated with DPR 1.

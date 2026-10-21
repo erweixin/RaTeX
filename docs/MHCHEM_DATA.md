@@ -74,4 +74,4 @@ node tools/extract_mhchem_manual_examples.mjs path/to/index.html
 
 ## 体积说明
 
-`machines.json` 较大时，`include_str!` 会增大 `ratex-parser` 及依赖它的二进制 / wasm 体积。若需优化，可再评估压缩表、`build.rs` 内嵌压缩字节码或 feature 裁剪等方案（超出本文日常更新范围）。
+`machines.json` 较大时，`include_str!` 会增大 `ratex-parser` 及依赖它的二进制 / wasm 体积。不需要化学公式的使用方可关闭默认开启的 `mhchem` feature（见 README“不含 mhchem 的构建”），这样数据表和 regex 依赖都不会被编译进来。若需进一步优化，可再评估压缩表或 `build.rs` 内嵌压缩字节码等方案（超出本文日常更新范围）。

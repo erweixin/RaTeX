@@ -11,6 +11,12 @@ section.
 
 ## [Unreleased]
 
+### Added
+
+- Optional `mhchem` cargo feature (default on) for `ratex-parser`, forwarded by every crate that
+  depends on it. Disable default features to build without `\ce` / `\pu` and the `regex` /
+  `fancy-regex` dependencies. See *Building without mhchem* in the README.
+
 ## [0.1.15] - 2026-10-16
 
 ### Compatibility

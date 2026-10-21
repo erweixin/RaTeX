@@ -11,6 +11,11 @@ description = "GTK4 widget for native RaTeX rendering"
 [lib]
 crate-type = ["rlib", "cdylib"]
 
+[features]
+default = ["mhchem"]
+## mhchem chemistry extension (`\ce`, `\pu`); forwards to `ratex-parser/mhchem`.
+mhchem = ["ratex-layout/mhchem", "ratex-parser/mhchem"]
+
 [dependencies]
 ratex-cairo = { workspace = true }
 ratex-layout = { workspace = true }

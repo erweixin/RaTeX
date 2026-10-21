@@ -8,6 +8,12 @@ homepage.workspace = true
 documentation.workspace = true
 description = "LaTeX parser for RaTeX"
 
+[features]
+default = ["mhchem"]
+## mhchem chemistry extension (`\ce`, `\pu`, `\tripledash`), a port of KaTeX's
+## mhchem 3.3.0. Disable it to drop the extension and its regex dependencies.
+mhchem = ["dep:fancy-regex", "dep:regex"]
+
 [[bin]]
 name = "parse"
 path = "src/bin/parse.rs"
@@ -19,7 +25,12 @@ ratex-lexer = { workspace = true }
 thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-fancy-regex = "0.14"
-regex = "1.11"
+fancy-regex = { version = "0.14", optional = true }
+regex = { version = "1.11", optional = true }
 regex-lite = "0.1"
 unicode-normalization = "0.1.25"
+
+[[test]]
+name = "ce_line91_brace"
+path = "tests/ce_line91_brace.rs"
+required-features = ["mhchem"]

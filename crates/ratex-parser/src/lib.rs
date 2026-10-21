@@ -3,6 +3,7 @@ pub mod error;
 pub(crate) mod expansion_budget;
 pub mod functions;
 pub mod macro_expander;
+#[cfg(feature = "mhchem")]
 pub mod mhchem;
 pub mod parse_node;
 pub mod parser;

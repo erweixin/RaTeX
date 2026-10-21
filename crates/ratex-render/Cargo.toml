@@ -27,6 +27,9 @@ ratex-katex-fonts = { workspace = true, optional = true }
 ratex-unicode-font = { workspace = true }
 
 [features]
+default = ["mhchem"]
+## mhchem chemistry extension (`\ce`, `\pu`); forwards to `ratex-parser/mhchem`.
+mhchem = ["ratex-layout/mhchem", "ratex-parser/mhchem"]
 ## Embed font source files in binary. No need for font directory with this feature.
 embed-fonts = ["dep:ratex-katex-fonts", "ratex-font-loader/embed-fonts"]
 

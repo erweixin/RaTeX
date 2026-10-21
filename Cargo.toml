@@ -31,8 +31,9 @@ documentation = "https://github.com/erweixin/RaTeX#readme"
 ratex-types  = { path = "crates/ratex-types", version = "0.1.15" }
 ratex-font   = { path = "crates/ratex-font", version = "0.1.15" }
 ratex-lexer  = { path = "crates/ratex-lexer", version = "0.1.15" }
-ratex-parser = { path = "crates/ratex-parser", version = "0.1.15" }
-ratex-layout = { path = "crates/ratex-layout", version = "0.1.15" }
+# `default-features = false` so each member can forward `mhchem` (see the crates' `[features]`).
+ratex-parser = { path = "crates/ratex-parser", version = "0.1.15", default-features = false }
+ratex-layout = { path = "crates/ratex-layout", version = "0.1.15", default-features = false }
 ratex-katex-fonts = { path = "crates/ratex-katex-fonts", version = "0.1.15" }
 ratex-font-loader = { path = "crates/ratex-font-loader", version = "0.1.15" }
 ratex-cairo  = { path = "crates/ratex-cairo", version = "0.1.15" }

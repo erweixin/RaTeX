@@ -27,6 +27,7 @@ const CASES: &[(&str, usize, &str)] = &[
     ("recursive_bmod_1k", 1041, RESOURCE_LIMIT),
     ("recursive_amp_1k", 1037, RESOURCE_LIMIT),
     ("recursive_rows_1k", 1039, RESOURCE_LIMIT),
+    #[cfg(feature = "mhchem")]
     ("mhchem", 20906, RESOURCE_LIMIT),
 ];
 
@@ -123,7 +124,10 @@ fn bounded_expansion_allocations() {
             .find(|(name, _, _)| *name == case)
             .expect("unknown child case");
         // Exclude one-time lazy initialization from the parse-window measurement.
+        #[cfg(feature = "mhchem")]
         ratex_parser::parse(r"\ce{H2O}+x").unwrap();
+        #[cfg(not(feature = "mhchem"))]
+        ratex_parser::parse("x").unwrap();
         let input = payload(&case);
         assert_eq!(input.len(), input_bytes, "payload changed: {case}");
         let baseline = LIVE.load(Ordering::Relaxed);

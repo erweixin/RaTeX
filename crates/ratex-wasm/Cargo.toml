@@ -15,6 +15,11 @@ wasm-opt = ["--enable-bulk-memory", "--enable-nontrapping-float-to-int"]
 [lib]
 crate-type = ["cdylib"]
 
+[features]
+default = ["mhchem"]
+## mhchem chemistry extension (`\ce`, `\pu`); forwards to `ratex-parser/mhchem`.
+mhchem = ["ratex-layout/mhchem", "ratex-parser/mhchem"]
+
 [dependencies]
 ratex-layout = { workspace = true }
 ratex-parser = { workspace = true }

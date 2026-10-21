@@ -25,7 +25,9 @@ ratex-parser      = { workspace = true, optional = true }
 ratex-katex-fonts = { workspace = true, optional = true }
 
 [features]
-default = []
+default = ["mhchem"]
+## mhchem chemistry extension (`\ce`, `\pu`) for the `cli` binary; forwards to `ratex-parser/mhchem`.
+mhchem = ["ratex-layout?/mhchem", "ratex-parser?/mhchem"]
 embed-fonts = ["dep:ratex-katex-fonts", "ratex-font-loader/embed-fonts"]
 cli = ["dep:ratex-layout", "dep:ratex-parser"]
 
@@ -35,8 +37,8 @@ path = "src/bin/render_pdf.rs"
 required-features = ["cli"]
 
 [dev-dependencies]
-ratex-layout = { workspace = true }
-ratex-parser = { workspace = true }
+ratex-layout = { workspace = true, features = ["mhchem"] }
+ratex-parser = { workspace = true, features = ["mhchem"] }
 
 [[test]]
 name = "render_pdf_cli"

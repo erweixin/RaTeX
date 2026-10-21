@@ -11,6 +11,11 @@ description = "C ABI FFI exports for RaTeX"
 [lib]
 crate-type = ["cdylib", "staticlib"]
 
+[features]
+default = ["mhchem"]
+## mhchem chemistry extension (`\ce`, `\pu`); forwards to `ratex-parser/mhchem`.
+mhchem = ["ratex-layout/mhchem", "ratex-parser/mhchem"]
+
 [dependencies]
 ratex-types  = { workspace = true }
 ratex-parser = { workspace = true }

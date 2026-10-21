@@ -1324,6 +1324,7 @@ mod recursion_limit {
         format!("{}x{}", "{".repeat(depth), "}".repeat(depth))
     }
 
+    #[cfg(feature = "mhchem")]
     fn nested_ce(depth: usize) -> String {
         format!("{}H{}", r"\ce{".repeat(depth), "}".repeat(depth))
     }
@@ -1379,6 +1380,7 @@ mod recursion_limit {
         )
     }
 
+    #[cfg(feature = "mhchem")]
     fn macro_expanded_nested_ce(enclosing_depth: usize, ce_depth: usize) -> String {
         format!(
             r"\def\foo{{{}}}{}{}{}",
@@ -1456,12 +1458,14 @@ mod recursion_limit {
     }
 
     #[test]
+    #[cfg(feature = "mhchem")]
     fn mhchem_depth_matches_the_public_boundary() {
         assert!(parse(&nested_ce(31)).is_ok());
         assert_recursion_limit_err(&nested_ce(32));
     }
 
     #[test]
+    #[cfg(feature = "mhchem")]
     fn mhchem_depth_accounts_for_macro_expanded_enclosing_groups() {
         assert!(parse(&macro_expanded_nested_ce(10, 10)).is_ok());
         assert_recursion_limit_err(&macro_expanded_nested_ce(20, 20));
@@ -1485,5 +1489,40 @@ mod recursion_limit {
         assert!(parse(&format!(r"\url{{{deep_body}}}")).is_ok());
         assert!(parse(&format!(r"\href{{{deep_body}}}{{x}}")).is_ok());
         assert!(parse(&format!(r"\htmlStyle{{{deep_body}}}{{x}}")).is_ok());
+    }
+}
+
+#[cfg(test)]
+mod mhchem_feature {
+    use crate::parser::parse;
+
+    const MHCHEM_INPUTS: [(&str, &str); 3] = [
+        (r"\ce{H2O}", r"\ce"),
+        (r"\pu{123 kJ//mol}", r"\pu"),
+        (r"\tripledash", r"\tripledash"),
+    ];
+
+    /// The default `mhchem` feature defines the extension's commands.
+    #[test]
+    #[cfg(feature = "mhchem")]
+    fn mhchem_commands_are_defined() {
+        for (input, _) in MHCHEM_INPUTS {
+            assert!(parse(input).is_ok(), "{input}");
+        }
+    }
+
+    /// Without `mhchem` the extension's commands are ordinary undefined control
+    /// sequences, as in KaTeX without `contrib/mhchem`.
+    #[test]
+    #[cfg(not(feature = "mhchem"))]
+    fn mhchem_commands_are_undefined_without_the_feature() {
+        for (input, name) in MHCHEM_INPUTS {
+            let err = parse(input).unwrap_err();
+            assert_eq!(
+                err.message,
+                format!("Undefined control sequence: {name}"),
+                "{input}"
+            );
+        }
     }
 }

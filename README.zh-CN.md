@@ -292,6 +292,18 @@ npm install ratex-wasm
 | Compose Multiplatform | [`RaTeX-CMP`](https://github.com/darriousliu/RaTeX-CMP) |
 | Web | [`platforms/web/README.md`](platforms/web/README.md) |
 
+### 不含 mhchem 的构建
+
+mhchem 支持是 `ratex-parser` 默认开启的 cargo feature `mhchem`。所有依赖解析器的 crate（`ratex-layout`、`ratex-render`、`ratex-svg`、`ratex-pdf`、`ratex-ffi`、`ratex-wasm`、`ratex-gtk4`）都转发同名的 `mhchem` feature，因此需要对直接依赖的每个 RaTeX crate 关闭默认 feature：
+
+```toml
+[dependencies]
+ratex-parser = { version = "0.1", default-features = false }
+ratex-layout = { version = "0.1", default-features = false }
+```
+
+关闭后，`\ce`、`\pu` 和 `\tripledash` 是未定义的控制序列（与未加载 mhchem 扩展的 KaTeX 一致），mhchem 数据表以及 `regex` / `fancy-regex` 依赖不会被编译进来（在 aarch64 macOS 上，一个解析并排版单个公式的 strip 后 release 二进制从 2.8 MB 降到 1.2 MB）。
+
 ### 运行测试
 
 ```bash

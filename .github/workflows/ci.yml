@@ -30,6 +30,10 @@ jobs:
         run: cargo clippy --workspace -- -D warnings
       - name: Test
         run: cargo test --workspace
+      - name: Test without mhchem (parser + layout, default features off)
+        run: |
+          cargo clippy -p ratex-parser -p ratex-layout --no-default-features -- -D warnings
+          cargo test -p ratex-parser -p ratex-layout --no-default-features
       - name: Test PNG directory-font errors (without embedded fonts)
         run: cargo test -p ratex-render --test font_parse_errors -- --ignored
       - name: Test release stack-safety boundary

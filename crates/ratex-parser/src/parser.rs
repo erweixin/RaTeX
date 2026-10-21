@@ -1382,6 +1382,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "mhchem")]
     fn test_parse_strips_outer_dollar_inline_math() {
         let inner = r"C_p[\ce{H2O(l)}] = \pu{75.3 J // mol K}";
         let wrapped = format!("${inner}$");

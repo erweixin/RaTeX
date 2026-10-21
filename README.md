@@ -294,6 +294,18 @@ See [`platforms/web/README.md`](platforms/web/README.md) for the full setup.
 | Compose Multiplatform | [`RaTeX-CMP`](https://github.com/darriousliu/RaTeX-CMP) |
 | Web | [`platforms/web/README.md`](platforms/web/README.md) |
 
+### Building without mhchem
+
+mhchem support is the default-on `mhchem` cargo feature of `ratex-parser`. Every crate that depends on the parser (`ratex-layout`, `ratex-render`, `ratex-svg`, `ratex-pdf`, `ratex-ffi`, `ratex-wasm`, `ratex-gtk4`) forwards a `mhchem` feature of its own, so disable default features on each RaTeX crate you depend on directly:
+
+```toml
+[dependencies]
+ratex-parser = { version = "0.1", default-features = false }
+ratex-layout = { version = "0.1", default-features = false }
+```
+
+Without it, `\ce`, `\pu` and `\tripledash` are undefined control sequences, as in KaTeX without its mhchem extension, and the mhchem tables and the `regex` / `fancy-regex` dependencies are left out of the build (a stripped release binary that parses and lays out one formula drops from 2.8 MB to 1.2 MB on aarch64 macOS).
+
 ### Run tests
 
 ```bash

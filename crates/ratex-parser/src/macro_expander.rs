@@ -649,12 +649,6 @@ impl<'a> MacroExpander<'a> {
             // ── set/Set (braket notation, simplified) ──
             ("\\set", "\\bra@set{\\{\\,}{\\mid}{}{\\,\\}}"),
             ("\\Set", "\\bra@set{\\left\\{\\:}{\\;\\middle\\vert\\;}{\\;\\middle\\Vert\\;}{\\:\\right\\}}"),
-
-            // ── KaTeX mhchem (\\tripledash for \\bond ~ forms) ──
-            (
-                "\\tripledash",
-                "{\\vphantom{-}\\raisebox{2.56mu}{$\\mkern2mu\\tiny\\text{-}\\mkern1mu\\text{-}\\mkern1mu\\text{-}\\mkern2mu$}}",
-            ),
         ];
 
         for &(name, expansion) in builtins {
@@ -665,6 +659,8 @@ impl<'a> MacroExpander<'a> {
         }
 
         self.load_function_macros();
+        #[cfg(feature = "mhchem")]
+        self.load_mhchem_macros();
     }
 
     fn load_function_macros(&mut self) {
@@ -943,6 +939,20 @@ impl<'a> MacroExpander<'a> {
         self.macros.set(
             "\\bra@set".to_string(),
             MacroDefinition::Function(|me| me.expand_braket(true)),
+        );
+    }
+
+    /// mhchem extension macros (`\ce`, `\pu`, `\tripledash`), as registered by
+    /// KaTeX's `contrib/mhchem`. Without the `mhchem` feature they are undefined.
+    #[cfg(feature = "mhchem")]
+    fn load_mhchem_macros(&mut self) {
+        // \\tripledash: used by the `\\bond{~...}` forms
+        self.macros.set(
+            "\\tripledash".to_string(),
+            MacroDefinition::Text(
+                "{\\vphantom{-}\\raisebox{2.56mu}{$\\mkern2mu\\tiny\\text{-}\\mkern1mu\\text{-}\\mkern1mu\\text{-}\\mkern2mu$}}"
+                    .to_string(),
+            ),
         );
 
         // \\ce / \\pu: KaTeX mhchem 3.3.0 (Rust port in `crate::mhchem`)

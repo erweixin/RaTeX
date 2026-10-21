@@ -80,6 +80,7 @@ fn escaped_hash_preserves_source_location_and_allocation_cost() {
 }
 
 #[test]
+#[cfg(feature = "mhchem")]
 fn escaped_hash_in_macro_preserves_mhchem_bond_spacing() {
     for (body, expected) in [("C ##N", "C #N"), ("C ## N", "C # N"), ("##N", "#N")] {
         let input = format!(r"\def\foo#1{{\ce{{{body}}}}}\foo{{x}}");

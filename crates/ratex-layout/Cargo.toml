@@ -8,6 +8,11 @@ homepage.workspace = true
 documentation.workspace = true
 description = "Layout engine for RaTeX"
 
+[features]
+default = ["mhchem"]
+## mhchem chemistry extension (`\ce`, `\pu`); forwards to `ratex-parser/mhchem`.
+mhchem = ["ratex-parser/mhchem"]
+
 [dependencies]
 ratex-types  = { workspace = true }
 ratex-font   = { workspace = true }
@@ -17,3 +22,8 @@ serde_json   = { workspace = true }
 [[bin]]
 name = "ratex-layout"
 path = "src/bin/layout.rs"
+
+[[test]]
+name = "ce_co2_cjk_glyphs"
+path = "tests/ce_co2_cjk_glyphs.rs"
+required-features = ["mhchem"]

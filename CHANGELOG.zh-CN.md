@@ -10,6 +10,12 @@
 
 ## [Unreleased]
 
+### 新增
+
+- `ratex-parser` 新增可选的 `mhchem` cargo feature（默认开启），所有依赖它的 crate 均转发该 feature。
+  关闭默认 feature 即可构建不含 `\ce` / `\pu` 及 `regex` / `fancy-regex` 依赖的版本。
+  详见 README 的“不含 mhchem 的构建”。
+
 ## [0.1.15] - 2026-10-16
 
 ### 兼容性

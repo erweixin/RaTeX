@@ -137,7 +137,7 @@ serde_json = "1.0"
 | **ratex-types** | `DisplayList`, `DisplayItem` (GlyphPath, Line, Rect, Path), `Color`, `PathCommand`, `MathStyle` |
 | **ratex-font** | KaTeX font metrics, symbol tables; `data/metrics_data.rs`, `data/symbols_data.rs` (generated) |
 | **ratex-lexer** | LaTeX string → token stream |
-| **ratex-parser** | Token stream → ParseNode AST (macro expansion, functions); mhchem `\ce` / `\pu`; bussproofs `prooftree`; auto-numbering for `equation` / `align` / `gather` / `alignat` (non-starred) and trailing-row `\tag` / `\nonumber` / `\notag` |
+| **ratex-parser** | Token stream → ParseNode AST (macro expansion, functions); mhchem `\ce` / `\pu` (`mhchem` feature, default on); bussproofs `prooftree`; auto-numbering for `equation` / `align` / `gather` / `alignat` (non-starred) and trailing-row `\tag` / `\nonumber` / `\notag` |
 | **ratex-layout** | AST → LayoutBox tree → `to_display_list` → DisplayList |
 | **ratex-katex-fonts** | Bundled KaTeX `.ttf` files + embed API; optional dep for `ratex-svg` / `ratex-render` / `ratex-pdf` `embed-fonts` |
 | **ratex-font-loader** | Shared lazy font source/cache planner for PNG/SVG/PDF; cache entries are keyed by embedded/directory/system source |
@@ -267,6 +267,7 @@ crates/ratex-pdf/
 | Feature | Description |
 |---------|-------------|
 | `embed-fonts` | Load TTFs from `ratex-katex-fonts` (no on-disk `font_dir` required). |
+| `mhchem` | Default on. Enables `\ce` / `\pu` in the `render-pdf` binary (forwards to `ratex-parser/mhchem`). |
 | `cli` | Enables the `render-pdf` binary (implies `embed-fonts` + `ratex-layout` / `ratex-parser`). The CLI’s `--font-dir` flag does not affect embedding (same as any `embed-fonts` build). |
 
 **`PdfOptions` fields:** `font_size`, `padding`, `stroke_width`, `font_dir` (KaTeX TTF directory when **`embed-fonts` is off**; must be set — `PdfOptions::default` uses an empty `font_dir`. When `embed-fonts` is on, `font_dir` is ignored.)
