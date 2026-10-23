@@ -2,6 +2,9 @@
   "name": "ratex-website",
   "type": "module",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "test": "node --test tests/*.test.mjs",
     "dev": "astro dev",
@@ -13,6 +16,10 @@
   "dependencies": {
     "@astrojs/tailwind": "^5.1.4",
     "astro": "^4.16.18",
+    "sharp": "0.35.5",
     "tailwindcss": "^3.4.17"
+  },
+  "overrides": {
+    "sharp": "0.35.5"
   }
 }

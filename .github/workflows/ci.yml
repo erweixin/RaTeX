@@ -99,6 +99,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+      - name: Install website dependencies
+        run: npm --prefix website ci
       - name: Test website font loading and retry behavior
         working-directory: website
         run: npm test
@@ -113,6 +115,47 @@ jobs:
           cd platforms/web
           npm ci
           npm test
+
+  website-build:
+    name: website-build (${{ matrix.package-manager }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package-manager: npm
+            node: "20"
+          - package-manager: pnpm
+            node: "24"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: pnpm/action-setup@v6
+        if: matrix.package-manager == 'pnpm'
+        with:
+          version: "11.25.0"
+          package_json_file: website/package.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Install website dependencies with npm
+        if: matrix.package-manager == 'npm'
+        run: npm --prefix website ci
+      - name: Install website dependencies with pnpm
+        if: matrix.package-manager == 'pnpm'
+        working-directory: website
+        run: pnpm install --frozen-lockfile
+      - name: Test the website image service
+        run: npm --prefix website test
+      - name: Build the website and verify bundled WASM
+        run: |
+          node tools/generate_website_formulas.mjs
+          npm --prefix website run build
 
   gtk-gobject-smoke:
     runs-on: ubuntu-latest

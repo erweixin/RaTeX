@@ -39,8 +39,7 @@ jobs:
       - name: Prepare site
         run: |
           node tools/generate_website_formulas.mjs
-          rm -f website/package-lock.json
-          npm --prefix website install
+          npm --prefix website ci
           npm --prefix website run build
           mkdir -p _site/platforms/web
           cp -r website/dist/* _site/
