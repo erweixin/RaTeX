@@ -10,4 +10,3 @@ description = "Font metrics and symbol tables for RaTeX"
 
 [dependencies]
 ratex-types = { workspace = true }
-phf = { workspace = true }
