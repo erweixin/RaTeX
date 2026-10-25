@@ -16,10 +16,17 @@ path = "src/bin/parse.rs"
 ratex-types = { workspace = true }
 ratex-font  = { workspace = true }
 ratex-lexer = { workspace = true }
-thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-fancy-regex = "0.14"
-regex = "1.11"
 regex-lite = "0.1"
 unicode-normalization = "0.1.25"
+# mhchem (`\ce`, `\pu`) only.
+thiserror = { workspace = true, optional = true }
+fancy-regex = { version = "0.14", optional = true }
+regex = { version = "1.11", optional = true }
+
+[features]
+default = ["mhchem"]
+# `\ce` and `\pu` (KaTeX mhchem). Without it both are undefined control sequences, and the
+# parser links no `regex`, `fancy-regex` or `thiserror`.
+mhchem = ["dep:thiserror", "dep:fancy-regex", "dep:regex"]

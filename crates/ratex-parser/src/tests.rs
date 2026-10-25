@@ -1324,6 +1324,7 @@ mod recursion_limit {
         format!("{}x{}", "{".repeat(depth), "}".repeat(depth))
     }
 
+    #[cfg(feature = "mhchem")]
     fn nested_ce(depth: usize) -> String {
         format!("{}H{}", r"\ce{".repeat(depth), "}".repeat(depth))
     }
@@ -1379,6 +1380,7 @@ mod recursion_limit {
         )
     }
 
+    #[cfg(feature = "mhchem")]
     fn macro_expanded_nested_ce(enclosing_depth: usize, ce_depth: usize) -> String {
         format!(
             r"\def\foo{{{}}}{}{}{}",
@@ -1455,12 +1457,14 @@ mod recursion_limit {
         assert!(parse(&input).is_ok());
     }
 
+    #[cfg(feature = "mhchem")]
     #[test]
     fn mhchem_depth_matches_the_public_boundary() {
         assert!(parse(&nested_ce(31)).is_ok());
         assert_recursion_limit_err(&nested_ce(32));
     }
 
+    #[cfg(feature = "mhchem")]
     #[test]
     fn mhchem_depth_accounts_for_macro_expanded_enclosing_groups() {
         assert!(parse(&macro_expanded_nested_ce(10, 10)).is_ok());

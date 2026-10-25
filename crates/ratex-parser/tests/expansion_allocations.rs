@@ -123,7 +123,12 @@ fn bounded_expansion_allocations() {
             .find(|(name, _, _)| *name == case)
             .expect("unknown child case");
         // Exclude one-time lazy initialization from the parse-window measurement.
-        ratex_parser::parse(r"\ce{H2O}+x").unwrap();
+        let warm = if cfg!(feature = "mhchem") {
+            r"\ce{H2O}+x"
+        } else {
+            "x^2"
+        };
+        ratex_parser::parse(warm).unwrap();
         let input = payload(&case);
         assert_eq!(input.len(), input_bytes, "payload changed: {case}");
         let baseline = LIVE.load(Ordering::Relaxed);
@@ -147,6 +152,9 @@ fn bounded_expansion_allocations() {
         return;
     }
     for &(case, _, _) in CASES {
+        if case == "mhchem" && !cfg!(feature = "mhchem") {
+            continue;
+        }
         let mut child = Command::new(std::env::current_exe().unwrap())
             .args(["--exact", "bounded_expansion_allocations", "--nocapture"])
             .env(ENV, case)

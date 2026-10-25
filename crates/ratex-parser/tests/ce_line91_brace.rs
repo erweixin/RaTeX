@@ -1,3 +1,4 @@
+#![cfg(feature = "mhchem")]
 //! Debug: lexer brace balance for nested \\ce in \\underset (golden case 0091).
 
 use ratex_lexer::Lexer;

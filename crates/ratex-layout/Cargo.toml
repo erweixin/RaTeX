@@ -14,6 +14,11 @@ ratex-font   = { workspace = true }
 ratex-parser = { workspace = true }
 serde_json   = { workspace = true }
 
+[features]
+default = ["mhchem"]
+# `\ce` and `\pu` in the parser.
+mhchem = ["ratex-parser/mhchem"]
+
 [[bin]]
 name = "ratex-layout"
 path = "src/bin/layout.rs"

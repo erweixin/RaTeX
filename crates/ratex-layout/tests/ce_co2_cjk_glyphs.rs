@@ -1,3 +1,5 @@
+#![cfg(feature = "mhchem")]
+
 use ratex_layout::{layout, to_display_list, LayoutOptions};
 use ratex_parser::parser::parse;
 use ratex_types::display_item::DisplayItem;

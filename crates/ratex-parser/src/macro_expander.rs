@@ -945,7 +945,13 @@ impl<'a> MacroExpander<'a> {
             MacroDefinition::Function(|me| me.expand_braket(true)),
         );
 
-        // \\ce / \\pu: KaTeX mhchem 3.3.0 (Rust port in `crate::mhchem`)
+        #[cfg(feature = "mhchem")]
+        self.set_mhchem_macros();
+    }
+
+    /// `\\ce` and `\\pu`: KaTeX mhchem 3.3.0 (Rust port in `crate::mhchem`).
+    #[cfg(feature = "mhchem")]
+    fn set_mhchem_macros(&mut self) {
         self.macros.set(
             "\\ce".to_string(),
             MacroDefinition::Function(|me: &mut MacroExpander| -> ParseResult<Vec<Token>> {
