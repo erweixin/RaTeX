@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 将根目录 VERSION 文件中的版本号同步到所有平台的版本声明文件：
 #   Cargo.toml（含 [workspace.package].version 与以 ratex- 开头的 path 依赖版本，如 ratex-katex-fonts / ratex-font-loader）,
+#   Cargo.lock（通过 Cargo 同步 workspace crate 版本，保留兼容的已锁定第三方依赖）,
 #   platforms/flutter/pubspec.yaml,
 #   platforms/flutter/ios/ratex_flutter.podspec,
 #   platforms/flutter/android/build.gradle,
@@ -139,4 +140,8 @@ PY
 printf '%s\n' "$CHANGELOG_STATUS"
 CHANGELOG_SUMMARY=$(printf '%s\n' "$CHANGELOG_STATUS" | tail -n 1 | sed 's/^CHANGELOG\.md: //')
 
-echo "Done. Updated: Cargo.toml (workspace + ratex-* 依赖版本), platforms/flutter/pubspec.yaml, platforms/flutter/ios/ratex_flutter.podspec, platforms/flutter/macos/ratex_flutter.podspec, platforms/flutter/android/build.gradle, platforms/flutter/README.md, platforms/flutter/README.zh-CN.md, platforms/android/README.md, platforms/android/README.zh-CN.md, demo/android/README.md, platforms/jvm/README.md, platforms/jvm/README.zh-CN.md, demo/flutter/pubspec.yaml, platforms/web/package.json, platforms/react-native/package.json; CHANGELOG.md: ${CHANGELOG_SUMMARY:-未修改}。Android/JVM Maven 使用根目录 VERSION。各 Rust 子 crate 使用 version.workspace = true，无需单独改文件。"
+# 同步 Cargo.lock 中的 workspace 版本；不使用 cargo update / generate-lockfile，
+# 避免仅升项目版本时顺带升级第三方依赖。解析失败时由 set -e 终止发布准备。
+cargo metadata --format-version 1 > /dev/null
+
+echo "Done. Updated: Cargo.toml (workspace + ratex-* 依赖版本), Cargo.lock, platforms/flutter/pubspec.yaml, platforms/flutter/ios/ratex_flutter.podspec, platforms/flutter/macos/ratex_flutter.podspec, platforms/flutter/android/build.gradle, platforms/flutter/README.md, platforms/flutter/README.zh-CN.md, platforms/android/README.md, platforms/android/README.zh-CN.md, demo/android/README.md, platforms/jvm/README.md, platforms/jvm/README.zh-CN.md, demo/flutter/pubspec.yaml, platforms/web/package.json, platforms/react-native/package.json; CHANGELOG.md: ${CHANGELOG_SUMMARY:-未修改}。Android/JVM Maven 使用根目录 VERSION。各 Rust 子 crate 使用 version.workspace = true，无需单独改文件。"

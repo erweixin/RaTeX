@@ -8,6 +8,7 @@
 |------|------|
 | `VERSION` | 单一来源，供脚本和人工对齐用 |
 | `Cargo.toml` `[workspace.package].version` | Rust 所有 crate 的版本 |
+| `Cargo.lock` | workspace crate 版本及锁定的依赖解析结果 |
 | `platforms/flutter/pubspec.yaml` `version` | pub.dev 发布 |
 | `platforms/web/package.json` `version` | npm 发布 `ratex-wasm` |
 | `platforms/react-native/package.json` `version` | npm 发布 `ratex-react-native` |
@@ -17,6 +18,8 @@ Android / iOS / JVM 的 Maven 或 Xcode 产物版本在各自 **release workflow
 发布 **Flutter** 至 pub.dev 前，建议在 [`platforms/flutter/CHANGELOG.md`](platforms/flutter/CHANGELOG.md) 写入本版本变更摘要（pub.dev 展示用）。
 
 根目录 [`CHANGELOG.md`](CHANGELOG.md) 记录仓库级变更：日常改动落在 `[Unreleased]`，发布时由 [`scripts/set-version.sh`](scripts/set-version.sh)（需要 `python3`）自动把 `[Unreleased]` 段改名为新版本号 + 日期并新建空的 `[Unreleased]`。执行脚本前请先人工检查、补全该段内容。
+
+`set-version.sh` 还会运行 `cargo metadata --format-version 1` 同步 `Cargo.lock`，因此需要可用的 Cargo；依赖未缓存时可能需要联网。仅升项目版本时会保留兼容的已锁定第三方依赖，依赖升级应单独进行。命令失败时脚本会退出；解决错误并重新运行成功后再提交。
 
 ## 发布前：统一版本
 
@@ -29,10 +32,13 @@ Android / iOS / JVM 的 Maven 或 Xcode 产物版本在各自 **release workflow
      ```bash
      ./scripts/set-version.sh 0.0.10
      ```
-2. **检查 `CHANGELOG.md`**：`set-version.sh` 已把 `[Unreleased]` 改名为 `[0.0.10] - 2026-xx-xx` 并新建空的 `[Unreleased]` 段；确认该版本段落内容完整、无误。
+2. **检查变更**：`set-version.sh` 已把 `[Unreleased]` 改名为 `[0.0.10] - 2026-xx-xx` 并新建空的 `[Unreleased]` 段；确认该版本段落内容完整、无误，并检查 `Cargo.lock` 中的 workspace 版本已同步。提交前可运行与 CI 相同的校验：
+   ```bash
+   cargo metadata --locked --format-version 1 > /dev/null
+   ```
 3. **提交**（路径与 [`scripts/set-version.sh`](scripts/set-version.sh) 实际修改的文件一致；若只改部分平台可酌情 `git add` 子集）
    ```bash
-   git add VERSION Cargo.toml CHANGELOG.md \
+   git add VERSION Cargo.toml Cargo.lock CHANGELOG.md \
      platforms/flutter/pubspec.yaml \
      platforms/flutter/ios/ratex_flutter.podspec \
      platforms/flutter/android/build.gradle \
