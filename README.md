@@ -319,7 +319,7 @@ cargo test --all
 RaTeX follows KaTeX-style layout for numbered display environments.
 
 - **Auto-numbering** applies to non-starred `equation`, `align`, `alignat`, and `gather`: each logical row gets a sequential tag such as `(1)`, `(2)`, … . Starred forms (`equation*`, `align*`, …) and inner environments **`aligned`**, **`alignedat`**, **`split`**, and **`gathered`** do **not** auto-number (same idea as LaTeX: only the outer display is numbered).
-- **`\tag{...}`** / **`\tag*{...}`** at the **end** of a row replace the auto number for that row (amsmath-style). Empty `\tag{}` suppresses the number for that row.
+- **`\tag{...}`** / **`\tag*{...}`** at the **end** of a row replace the auto number for that row (amsmath-style). Empty `\tag{}` suppresses the number for that row. As in KaTeX, the label is text (`\tag{...}` is `\text{(...)}`); write math in it as `$...$`.
 - **`\nonumber`** and **`\notag`** at the **end** of a row suppress the number for that row when auto-numbering is active. They cannot be combined with `\tag` on the same row.
 - **`\notag`** is implemented as an alias of **`\nonumber`** (same as above).
 

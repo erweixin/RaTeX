@@ -27,6 +27,8 @@ section.
 
 ### Fixed
 
+- `\tag{...}` sets its label in text mode, as KaTeX does (`\text{(...)}`): `\tag{A}` is upright,
+  math needs `$...$`, and `\tag` can no longer be nested in its own argument.
 - Automatic equation numbers of two or more digits draw every digit, `(10)` instead of `(1)`.
 
 ## [0.1.15] - 2026-10-16

@@ -911,6 +911,29 @@ mod environments {
     }
 
     #[test]
+    fn tag_argument_is_parsed_in_text_mode() {
+        // KaTeX defines `\tag{...}` as `\text{(...)}`: the label is upright text,
+        // math needs `$...$`, and math-only syntax is rejected.
+        for (source, star) in [("\\tag{A}", false), ("\\tag*{A}", true)] {
+            let ast = parse(source).unwrap();
+            let Some(ParseNode::Tag { tag, .. }) = ast.first() else {
+                panic!("Expected Tag node for {source}");
+            };
+            let inner = if star {
+                &tag[..]
+            } else {
+                &tag[1..tag.len() - 1]
+            };
+            assert!(
+                matches!(inner, [ParseNode::TextOrd { mode: crate::Mode::Text, text, .. }] if text == "A"),
+                "{source}: {inner:?}"
+            );
+        }
+        assert!(parse("\\tag{$x$}").is_ok());
+        assert!(parse("\\tag{x^2}").is_err());
+    }
+
+    #[test]
     fn align_with_tag_strips_tag_and_sets_array_tags() {
         use crate::parse_node::ArrayTag;
         let ast = parse("\\begin{aligned} x &= 1 \\tag{1} \\\\ y &= 2 \\end{aligned}").unwrap();
@@ -1359,6 +1382,10 @@ mod recursion_limit {
         format!("{}{{x}}", r"\tag".repeat(depth))
     }
 
+    fn tag_with_braced_body(depth: usize) -> String {
+        format!(r"\tag{{{}}}", braced_body(depth))
+    }
+
     fn unbraced_sqrt(depth: usize) -> String {
         format!("{}x", r"\sqrt".repeat(depth))
     }
@@ -1453,9 +1480,13 @@ mod recursion_limit {
     fn unbraced_structural_arguments_are_bounded() {
         assert!(parse(&unbraced_sqrt(4_200)).is_err());
 
-        assert!(parse(&nested_tag(32)).is_ok());
-        assert_recursion_limit_err(&nested_tag(33));
-        assert_recursion_limit_err(&nested_tag(4_200));
+        // A `\tag` argument is text, where `\tag` is not allowed (as in KaTeX),
+        // so a `\tag\tag...` chain stops at its second link without recursing.
+        assert!(parse(&nested_tag(2)).is_err());
+        assert!(parse(&nested_tag(4_200)).is_err());
+        assert!(parse(&tag_with_braced_body(31)).is_ok());
+        assert_recursion_limit_err(&tag_with_braced_body(32));
+        assert_recursion_limit_err(&tag_with_braced_body(300));
     }
 
     #[test]

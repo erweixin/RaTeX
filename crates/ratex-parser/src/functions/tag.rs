@@ -34,10 +34,12 @@ fn handle_tag(
         false
     };
 
-    let arg = ctx
-        .parser
-        .parse_structural_group("\\tag", None)?
-        .ok_or_else(|| ParseError::msg("\\tag requires an argument"))?;
+    // KaTeX defines `\\tag{...}` as `\\text{(...)}`: the label is text-mode content.
+    let outer_mode = ctx.parser.mode;
+    ctx.parser.switch_mode(Mode::Text);
+    let arg = ctx.parser.parse_structural_group("\\tag", None);
+    ctx.parser.switch_mode(outer_mode);
+    let arg = arg?.ok_or_else(|| ParseError::msg("\\tag requires an argument"))?;
 
     let inner = match arg {
         ParseNode::OrdGroup { body, .. } => body,

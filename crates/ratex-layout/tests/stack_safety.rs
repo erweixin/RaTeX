@@ -27,6 +27,10 @@ fn nested_tag(depth: usize) -> String {
     format!("{}{{x}}", r"\tag".repeat(depth))
 }
 
+fn tag_with_braced_body(depth: usize) -> String {
+    format!(r"\tag{{{}}}", braced_body(depth))
+}
+
 fn nested_braket(depth: usize) -> String {
     let mut input = "x".to_string();
     for _ in 0..depth {
@@ -122,6 +126,7 @@ fn run_small_stack_cases() {
         ("left-right-33", nested(r"\left(", r"\right)", 33)),
         ("superscript-33", nested_superscript(33)),
         ("dots-33", r"\dots".repeat(33)),
+        ("tag-group-32", tag_with_braced_body(32)),
     ];
     for (name, input) in &over_limit_cases {
         eprintln!("stack-safety over-limit case: {name}");
@@ -137,7 +142,7 @@ fn run_small_stack_cases() {
         ("left-right-300", nested(r"\left(", r"\right)", 300)),
         ("superscript-300", nested_superscript(300)),
         ("dots-300", r"\dots".repeat(300)),
-        ("tag-4200", nested_tag(4_200)),
+        ("tag-group-300", tag_with_braced_body(300)),
         ("braket-300", nested_braket(300)),
         ("prooftree-axiom-payload-32", prooftree_axiom_payload(32)),
         (
@@ -173,6 +178,11 @@ fn run_small_stack_cases() {
     assert_parse_error(&unbraced_command_chain(r"\slashed", 300));
     assert_parse_error(&unbraced_command_chain(r"\centernot", 300));
 
+    // `\tag` is not allowed in its own (text-mode) argument, so the chain fails
+    // at its second link.
+    eprintln!("stack-safety parse-error case: tag-4200");
+    assert_parse_error(&nested_tag(4_200));
+
     eprintln!("stack-safety parse-error case: unbraced-bigl-4200");
     assert_parse_error(&format!("{}(", r"\bigl".repeat(4_200)));
 
@@ -207,7 +217,7 @@ fn run_boundary_cases() {
     assert_pipeline_ok(&format!(r"\text{{x{accents_31}}}"));
 
     assert_pipeline_ok(&unary_prooftree(31));
-    assert_pipeline_ok(&nested_tag(32));
+    assert_pipeline_ok(&tag_with_braced_body(31));
     assert_pipeline_ok(&nested_braket(16));
     assert_pipeline_ok(&prooftree_axiom_payload(31));
     assert_pipeline_ok(&prooftree_left_label_payload(31));

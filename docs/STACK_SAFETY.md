@@ -19,7 +19,7 @@ The budget covers:
 
 - recursively nested parser expressions, including groups, radicals,
   fractions, `\left...\right`, and scripts;
-- unbraced structural arguments such as nested `\tag` chains;
+- unbraced structural arguments;
 - nested macro expansion paths that synchronously re-enter expansion;
 - Unicode combining-accent chains;
 - `prooftree` branches, conclusions, and labels;
