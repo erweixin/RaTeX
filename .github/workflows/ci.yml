@@ -20,6 +20,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Format
         run: cargo fmt --all -- --check
+      - name: Verify Cargo.lock matches workspace manifests
+        run: cargo metadata --locked --format-version 1 > /dev/null
       - name: Install system dependencies
         run: |
           sudo apt-get update
