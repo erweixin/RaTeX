@@ -934,6 +934,61 @@ mod environments {
     }
 
     #[test]
+    fn tag_macro_arguments_expand_completely_in_text_mode() {
+        for (argument, star) in [
+            (r"\tag\mytag", false),
+            (r"\tag{\mytag}", false),
+            (r"\tag*\mytag", true),
+            (r"\tag*{\mytag}", true),
+            (r"\tag * \mytag", true),
+        ] {
+            let source = format!(
+                r"\gdef\mytag{{\TextOrMath{{AB}}{{\alpha}}}}{argument}\TextOrMath{{\alpha}}{{x}}"
+            );
+            let ast = parse(&source).unwrap_or_else(|error| panic!("{source}: {error}"));
+            let [ParseNode::Tag { tag, .. }, ParseNode::MathOrd { mode, text, .. }] =
+                ast.as_slice()
+            else {
+                panic!("Expected a tag followed by math, got {ast:?}");
+            };
+            assert_eq!(*mode, crate::Mode::Math);
+            assert_eq!(text, "x");
+            let inner = if star {
+                &tag[..]
+            } else {
+                &tag[1..tag.len() - 1]
+            };
+            assert!(
+                matches!(inner, [
+                    ParseNode::TextOrd { mode: crate::Mode::Text, text: a, .. },
+                    ParseNode::TextOrd { mode: crate::Mode::Text, text: b, .. },
+                ] if a == "A" && b == "B"),
+                "{source}: {inner:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn tag_star_detection_does_not_expand_the_argument() {
+        let ast = parse(r"\gdef\mytag{*A}\tag\mytag").unwrap();
+        let [ParseNode::Tag { tag, .. }] = ast.as_slice() else {
+            panic!("Expected one tag, got {ast:?}");
+        };
+        let text: String = tag.iter().filter_map(ParseNode::symbol_text).collect();
+        assert_eq!(text, "(*A)");
+    }
+
+    #[test]
+    fn tag_argument_errors_restore_both_parser_and_expander_modes() {
+        for source in [r"\tag{x^2}", r"\tag{$x}", r"\tag*{\unknown}"] {
+            let mut parser = crate::Parser::new(source);
+            assert!(parser.parse().is_err(), "{source}");
+            assert_eq!(parser.mode, crate::Mode::Math, "{source}");
+            assert_eq!(parser.gullet.mode, crate::Mode::Math, "{source}");
+        }
+    }
+
+    #[test]
     fn align_with_tag_strips_tag_and_sets_array_tags() {
         use crate::parse_node::ArrayTag;
         let ast = parse("\\begin{aligned} x &= 1 \\tag{1} \\\\ y &= 2 \\end{aligned}").unwrap();
@@ -1493,6 +1548,14 @@ mod recursion_limit {
     fn unbraced_delimiter_function_chains_fail_without_recursing() {
         assert!(parse(&unbraced_delimiter_chain(r"\bigl", 4_200)).is_err());
         assert!(parse(&unbraced_delimiter_chain(r"\left", 4_200)).is_err());
+    }
+
+    #[test]
+    fn tag_macro_arguments_share_the_structural_depth_budget() {
+        let source = |depth| format!(r"\gdef\mytag{{{}}}\tag\mytag", braced_body(depth));
+        assert!(parse(&source(31)).is_ok());
+        assert_recursion_limit_err(&source(32));
+        assert_recursion_limit_err(&source(300));
     }
 
     #[test]

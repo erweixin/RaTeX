@@ -26,20 +26,22 @@ fn handle_tag(
     _args: Vec<ParseNode>,
     _opt_args: Vec<Option<ParseNode>>,
 ) -> ParseResult<ParseNode> {
-    ctx.parser.consume_spaces()?;
-    let star = if ctx.parser.fetch()?.text == "*" {
-        ctx.parser.consume();
+    // Inspect raw tokens: fetching through the parser would expand an unbraced
+    // label macro in math mode before we can parse it as text.
+    ctx.parser.gullet.consume_spaces();
+    let star = if ctx.parser.gullet.future().text == "*" {
+        ctx.parser.gullet.pop_token();
         true
     } else {
         false
     };
 
-    // KaTeX defines `\\tag{...}` as `\\text{(...)}`: the label is text-mode content.
-    let outer_mode = ctx.parser.mode;
-    ctx.parser.switch_mode(Mode::Text);
-    let arg = ctx.parser.parse_structural_group("\\tag", None);
-    ctx.parser.switch_mode(outer_mode);
-    let arg = arg?.ok_or_else(|| ParseError::msg("\\tag requires an argument"))?;
+    // Scan the unexpanded argument, then expand all of it in text mode, as for
+    // `\text`. This also restores the outer mode on both success and error.
+    let arg = ctx
+        .parser
+        .parse_argument_group(false, Some(Mode::Text))?
+        .ok_or_else(|| ParseError::msg("\\tag requires an argument"))?;
 
     let inner = match arg {
         ParseNode::OrdGroup { body, .. } => body,

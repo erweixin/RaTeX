@@ -31,6 +31,10 @@ fn tag_with_braced_body(depth: usize) -> String {
     format!(r"\tag{{{}}}", braced_body(depth))
 }
 
+fn tag_with_macro_body(depth: usize) -> String {
+    format!(r"\gdef\mytag{{{}}}\tag\mytag", braced_body(depth))
+}
+
 fn nested_braket(depth: usize) -> String {
     let mut input = "x".to_string();
     for _ in 0..depth {
@@ -127,6 +131,7 @@ fn run_small_stack_cases() {
         ("superscript-33", nested_superscript(33)),
         ("dots-33", r"\dots".repeat(33)),
         ("tag-group-32", tag_with_braced_body(32)),
+        ("tag-macro-32", tag_with_macro_body(32)),
     ];
     for (name, input) in &over_limit_cases {
         eprintln!("stack-safety over-limit case: {name}");
@@ -143,6 +148,7 @@ fn run_small_stack_cases() {
         ("superscript-300", nested_superscript(300)),
         ("dots-300", r"\dots".repeat(300)),
         ("tag-group-300", tag_with_braced_body(300)),
+        ("tag-macro-300", tag_with_macro_body(300)),
         ("braket-300", nested_braket(300)),
         ("prooftree-axiom-payload-32", prooftree_axiom_payload(32)),
         (
@@ -218,6 +224,7 @@ fn run_boundary_cases() {
 
     assert_pipeline_ok(&unary_prooftree(31));
     assert_pipeline_ok(&tag_with_braced_body(31));
+    assert_pipeline_ok(&tag_with_macro_body(31));
     assert_pipeline_ok(&nested_braket(16));
     assert_pipeline_ok(&prooftree_axiom_payload(31));
     assert_pipeline_ok(&prooftree_left_label_payload(31));
