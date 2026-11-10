@@ -1,6 +1,6 @@
 # RaTeX
 
-**简体中文** | [English](README.md)
+**简体中文** | [繁體中文](README.zh-TW.md) | [English](README.md)
 
 **纯 Rust 实现的 KaTeX 兼容数学渲染引擎 — 无 JavaScript、无 WebView、无 DOM。**
 
