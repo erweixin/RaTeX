@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+      - 'flutter-v*'  # Flutter-only recovery tags; do not rerun other platform releases
   workflow_dispatch:
 
 permissions:
@@ -26,17 +27,22 @@ jobs:
             exit 1
           fi
 
-          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-            if [ "$GITHUB_REF" != "refs/heads/main" ]; then
-              echo "::error::Manual publishing is only allowed from main"
-              exit 1
-            fi
-          else
-            TAG_VERSION=${GITHUB_REF_NAME#v}
-            if [ "$PUB_VERSION" != "$TAG_VERSION" ]; then
-              echo "::error::pubspec version '$PUB_VERSION' does not match tag '$GITHUB_REF_NAME'"
-              exit 1
-            fi
+          # pub.dev Trusted Publishing requires a tag ref matching the package version,
+          # including when workflow_dispatch publishing is enabled in pub.dev.
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            echo "::error::Publishing requires a version tag (v<version> or flutter-v<version>), not '$GITHUB_REF'"
+            exit 1
+          fi
+
+          case "$GITHUB_REF_NAME" in
+            flutter-v*) TAG_VERSION=${GITHUB_REF_NAME#flutter-v} ;;
+            v*)         TAG_VERSION=${GITHUB_REF_NAME#v} ;;
+            *)          echo "::error::Unsupported release tag '$GITHUB_REF_NAME'"; exit 1 ;;
+          esac
+
+          if [ -z "$TAG_VERSION" ] || [ "$PUB_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::pubspec version '$PUB_VERSION' does not match tag '$GITHUB_REF_NAME'"
+            exit 1
           fi
 
           echo "Publishing Flutter package version: $PUB_VERSION"
