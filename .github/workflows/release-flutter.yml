@@ -18,21 +18,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Read version from tag
-        id: version
+      - name: Verify release ref and version
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Pub version in tag: $VERSION"
-
-      - name: Verify pubspec version matches tag
-        run: |
-          PUB_VERSION=$(grep '^version:' platforms/flutter/pubspec.yaml | sed 's/version: *//; s/ *$//')
-          if [ "$PUB_VERSION" != "${{ steps.version.outputs.version }}" ]; then
-            echo "::error::pubspec version '$PUB_VERSION' does not match tag ${{ steps.version.outputs.version }}"
+          PUB_VERSION=$(sed -n 's/^version: *//p' platforms/flutter/pubspec.yaml | head -n 1 | sed 's/ *$//')
+          if [ -z "$PUB_VERSION" ]; then
+            echo "::error::Missing version in platforms/flutter/pubspec.yaml"
             exit 1
           fi
-          echo "Version OK: $PUB_VERSION"
+
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+              echo "::error::Manual publishing is only allowed from main"
+              exit 1
+            fi
+          else
+            TAG_VERSION=${GITHUB_REF_NAME#v}
+            if [ "$PUB_VERSION" != "$TAG_VERSION" ]; then
+              echo "::error::pubspec version '$PUB_VERSION' does not match tag '$GITHUB_REF_NAME'"
+              exit 1
+            fi
+          fi
+
+          echo "Publishing Flutter package version: $PUB_VERSION"
 
       - name: Install Rust (Android + iOS + Desktop targets)
         uses: dtolnay/rust-toolchain@stable
