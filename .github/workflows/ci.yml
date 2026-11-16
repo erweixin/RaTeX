@@ -258,6 +258,20 @@ jobs:
           cache: true
       - name: Build iOS XCFramework
         run: bash platforms/ios/build-ios.sh
+      - name: Install real XCFramework into Flutter plugin
+        run: |
+          # The checked-in path is a symlink to the shared iOS artifact.
+          # SwiftPM resolves the plugin from Flutter's ephemeral package path
+          # and needs an actual XCFramework directory at the binaryTarget path.
+          source=platforms/ios/RaTeX.xcframework
+          destination=platforms/flutter/ios/ratex_flutter/RaTeX.xcframework
+          test -f "$source/Info.plist"
+          test -L "$destination"
+          unlink "$destination"
+          cp -R "$source" "$destination"
+          test -d "$destination"
+          test ! -L "$destination"
+          test -f "$destination/Info.plist"
       - name: Verify Flutter CocoaPods and SwiftPM release linkage
         run: bash platforms/flutter/tool/verify-ios-integration.sh
 
