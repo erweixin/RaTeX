@@ -11,6 +11,8 @@ section.
 
 ## [Unreleased]
 
+## [0.1.16] - 2026-11-16
+
 ### Changed
 
 - Dependencies: `phf` 0.13 and `fancy-regex` 0.20, the versions current
@@ -18,9 +20,15 @@ section.
 - `ratex-katex-fonts` embeds its fonts with `include_bytes!` instead of
   `rust-embed`, dropping `rust-embed` and its `sha2` 0.11 tree. `ttf_bytes`
   keeps its signature.
+- Track `Cargo.lock` and synchronize workspace package versions during release
+  preparation, with CI checking that the lockfile matches the manifests.
 
 ### Added
 
+- C ABI `ratex_parse_and_layout_with_fallback_metrics` and
+  `RatexFallbackGlyphMetrics` let native hosts supply measurements for glyphs
+  missing from KaTeX fonts. Existing entry points and DisplayList JSON remain
+  compatible; an empty metrics table behaves like the original layout API.
 - Optional `mhchem` cargo feature (default on) for `ratex-parser`, forwarded by every crate that
   depends on it. Disable default features to build without `\ce` / `\pu` and the `regex` /
   `fancy-regex` dependencies. See *Building without mhchem* in the README.
@@ -30,8 +38,15 @@ section.
 - `\tag` scans its argument before expanding macros, so unbraced label macros
   expand fully in text mode; spaces after `\tag*` are skipped before the argument.
 - `\tag{...}` sets its label in text mode, as KaTeX does (`\text{(...)}`): `\tag{A}` is upright,
-  math needs `$...$`, and `\tag` can no longer be nested in its own argument.
+  math needs `$...$` (replace `\tag{x^2}` with `\tag{$x^2$}`), and `\tag` can no
+  longer be nested in its own argument.
 - Automatic equation numbers of two or more digits draw every digit, `(10)` instead of `(1)`.
+
+### Security
+
+- Update Pillow to 13.0.0 in the golden comparison tooling and pin sharp to
+  0.35.5 for website image processing to address image-tooling vulnerabilities.
+  Website tooling now requires Node.js 20.9.0 or newer.
 
 ## [0.1.15] - 2026-10-16
 

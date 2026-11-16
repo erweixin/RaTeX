@@ -1,3 +1,12 @@
+## 0.1.16
+
+- Update the bundled RaTeX engine and platform package versions to 0.1.16.
+- Render every digit in automatic equation numbers such as `(10)`.
+- Parse `\tag` labels as upright text and expand label macros in text mode.
+  Math in labels now needs `$...$`: replace `\tag{x^2}` with `\tag{$x^2$}`.
+  Nested `\tag` commands in labels are no longer accepted.
+- Reduce duplicate native dependencies and embed KaTeX fonts without `rust-embed`.
+
 ## 0.1.2
 
 - Add desktop platform support: macOS (universal `.dylib` via CocoaPods), Windows (`.dll` via CMake), Linux (`.so` via CMake, per-arch directories)

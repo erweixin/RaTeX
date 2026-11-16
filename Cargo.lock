@@ -1026,7 +1026,7 @@ dependencies = [
 
 [[package]]
 name = "ratex-cairo"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "ab_glyph",
  "cairo-rs",
@@ -1042,7 +1042,7 @@ dependencies = [
 
 [[package]]
 name = "ratex-ffi"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "jni",
  "ratex-layout",
@@ -1053,7 +1053,7 @@ dependencies = [
 
 [[package]]
 name = "ratex-font"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "phf",
  "ratex-types",
@@ -1061,7 +1061,7 @@ dependencies = [
 
 [[package]]
 name = "ratex-font-loader"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "ab_glyph",
  "ratex-font",
@@ -1072,7 +1072,7 @@ dependencies = [
 
 [[package]]
 name = "ratex-gtk4"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "gtk4",
  "libadwaita",
@@ -1084,11 +1084,11 @@ dependencies = [
 
 [[package]]
 name = "ratex-katex-fonts"
-version = "0.1.15"
+version = "0.1.16"
 
 [[package]]
 name = "ratex-layout"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "ratex-font",
  "ratex-parser",
@@ -1098,7 +1098,7 @@ dependencies = [
 
 [[package]]
 name = "ratex-lexer"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "ratex-types",
  "serde",
@@ -1107,7 +1107,7 @@ dependencies = [
 
 [[package]]
 name = "ratex-parser"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "fancy-regex",
  "ratex-font",
@@ -1123,7 +1123,7 @@ dependencies = [
 
 [[package]]
 name = "ratex-pdf"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "ab_glyph",
  "miniz_oxide 0.9.1",
@@ -1142,7 +1142,7 @@ dependencies = [
 
 [[package]]
 name = "ratex-render"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "ab_glyph",
  "png 0.17.16",
@@ -1162,7 +1162,7 @@ dependencies = [
 
 [[package]]
 name = "ratex-svg"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "ab_glyph",
  "base64",
@@ -1179,7 +1179,7 @@ dependencies = [
 
 [[package]]
 name = "ratex-types"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "serde",
  "serde_json",
@@ -1187,7 +1187,7 @@ dependencies = [
 
 [[package]]
 name = "ratex-unicode-font"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "fontdb",
  "system-fonts",
@@ -1196,7 +1196,7 @@ dependencies = [
 
 [[package]]
 name = "ratex-wasm"
-version = "0.1.15"
+version = "0.1.16"
 dependencies = [
  "js-sys",
  "ratex-layout",
