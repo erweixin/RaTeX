@@ -49,10 +49,15 @@ impl<'a> Parser<'a> {
 
     /// Return the current lookahead token (fetching from gullet if needed).
     pub fn fetch(&mut self) -> ParseResult<Token> {
+        self.fetch_ref().cloned()
+    }
+
+    /// Borrow the lookahead token instead of cloning it.
+    fn fetch_ref(&mut self) -> ParseResult<&Token> {
         if self.next_token.is_none() {
             self.next_token = Some(self.gullet.expand_next_token()?);
         }
-        Ok(self.next_token.clone().unwrap())
+        Ok(self.next_token.as_ref().unwrap())
     }
 
     /// Discard the current lookahead token.
@@ -62,11 +67,11 @@ impl<'a> Parser<'a> {
 
     /// Expect the next token to have the given text, consuming it.
     pub fn expect(&mut self, text: &str, do_consume: bool) -> ParseResult<()> {
-        let tok = self.fetch()?;
+        let tok = self.fetch_ref()?;
         if tok.text != text {
             return Err(ParseError::new(
                 format!("Expected '{}', got '{}'", text, tok.text),
-                Some(&tok),
+                Some(tok),
             ));
         }
         if do_consume {
@@ -78,7 +83,7 @@ impl<'a> Parser<'a> {
     /// Consume spaces in math mode.
     pub fn consume_spaces(&mut self) -> ParseResult<()> {
         loop {
-            let tok = self.fetch()?;
+            let tok = self.fetch_ref()?;
             if tok.text == " " {
                 self.consume();
             } else {
@@ -151,7 +156,7 @@ impl<'a> Parser<'a> {
                 self.consume_spaces()?;
             }
 
-            let lex = self.fetch()?;
+            let lex = self.fetch_ref()?;
 
             if END_OF_EXPRESSION.contains(&lex.text.as_str()) {
                 break;
@@ -328,7 +333,7 @@ impl<'a> Parser<'a> {
 
         loop {
             self.consume_spaces()?;
-            let lex = self.fetch()?;
+            let lex = self.fetch_ref()?;
 
             if lex.text == "\\limits" || lex.text == "\\nolimits" {
                 let is_limits = lex.text == "\\limits";
@@ -356,17 +361,17 @@ impl<'a> Parser<'a> {
                 }
             } else if lex.text == "^" {
                 if superscript.is_some() {
-                    return Err(ParseError::new("Double superscript", Some(&lex)));
+                    return Err(ParseError::new("Double superscript", Some(lex)));
                 }
                 superscript = Some(self.handle_sup_subscript("superscript")?);
             } else if lex.text == "_" {
                 if subscript.is_some() {
-                    return Err(ParseError::new("Double subscript", Some(&lex)));
+                    return Err(ParseError::new("Double subscript", Some(lex)));
                 }
                 subscript = Some(self.handle_sup_subscript("subscript")?);
             } else if lex.text == "'" {
                 if superscript.is_some() {
-                    return Err(ParseError::new("Double superscript", Some(&lex)));
+                    return Err(ParseError::new("Double superscript", Some(lex)));
                 }
                 let prime = ParseNode::TextOrd {
                     mode: self.mode,
@@ -375,11 +380,11 @@ impl<'a> Parser<'a> {
                 };
                 let mut primes = vec![prime.clone()];
                 self.consume();
-                while self.fetch()?.text == "'" {
+                while self.fetch_ref()?.text == "'" {
                     primes.push(prime.clone());
                     self.consume();
                 }
-                if self.fetch()?.text == "^" {
+                if self.fetch_ref()?.text == "^" {
                     primes.push(self.handle_sup_subscript("superscript")?);
                 }
                 superscript = Some(ParseNode::OrdGroup {
@@ -395,16 +400,16 @@ impl<'a> Parser<'a> {
                 .and_then(crate::unicode_sup_sub::unicode_sub_sup)
             {
                 if is_sub && subscript.is_some() {
-                    return Err(ParseError::new("Double subscript", Some(&lex)));
+                    return Err(ParseError::new("Double subscript", Some(lex)));
                 }
                 if !is_sub && superscript.is_some() {
-                    return Err(ParseError::new("Double superscript", Some(&lex)));
+                    return Err(ParseError::new("Double superscript", Some(lex)));
                 }
                 // Collect consecutive Unicode sup/sub chars of the same kind
                 let mut subsup_tokens = vec![Token::new(mapped, 0, 0)];
                 self.consume();
                 loop {
-                    let tok = self.fetch()?;
+                    let tok = self.fetch_ref()?;
                     match tok
                         .text
                         .chars()
@@ -588,14 +593,13 @@ impl<'a> Parser<'a> {
         break_on_token_text: Option<&str>,
         name: Option<&str>,
     ) -> ParseResult<Option<ParseNode>> {
-        let token = self.fetch()?;
-        let func = token.text.clone();
-
-        let func_data = match FUNCTIONS.get(func.as_str()) {
+        let func_data = match FUNCTIONS.get(self.fetch_ref()?.text.as_str()) {
             Some(f) => f,
             None => return Ok(None),
         };
 
+        let token = self.fetch()?;
+        let func = token.text.clone();
         self.consume();
 
         if let Some(n) = name {
@@ -899,7 +903,7 @@ impl<'a> Parser<'a> {
 
         let mut s = String::new();
         loop {
-            let next = self.fetch()?;
+            let next = self.fetch_ref()?;
             if next.text == "EOF" {
                 break;
             }
@@ -924,13 +928,13 @@ impl<'a> Parser<'a> {
         let mut s = String::new();
 
         loop {
-            let next = self.fetch()?;
+            let next = self.fetch_ref()?;
             if next.text == "EOF" {
                 break;
             }
             let candidate = format!("{}{}", s, next.text);
             if regex.is_match(&candidate) {
-                last_token = next;
+                last_token = next.clone();
                 s = candidate;
                 self.consume();
             } else {
