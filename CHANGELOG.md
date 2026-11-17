@@ -11,6 +11,11 @@ section.
 
 ## [Unreleased]
 
+### Fixed
+
+- A parse tree holding a `prooftree` reads back from its own JSON: `rootAtTop`, left out
+  when false, now deserializes as false instead of failing with ``missing field `rootAtTop` ``.
+
 ## [0.1.16] - 2026-11-16
 
 ### Changed
