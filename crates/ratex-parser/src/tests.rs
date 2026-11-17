@@ -1254,6 +1254,33 @@ mod environments {
     }
 
     #[test]
+    fn prooftree_json_round_trip() {
+        // `rootAtTop` is left out of the JSON when false, so it must read back
+        // as false rather than fail as a missing field. Axioms are never root
+        // at top, so even a `\rootAtTop` tree carries branches without the key.
+        for (input, root_at_top) in [
+            (
+                "\\begin{prooftree}\\AxiomC{P}\\UIC{Q}\\end{prooftree}",
+                false,
+            ),
+            (
+                "\\begin{prooftree}\\AxiomC{P}\\rootAtTop\\UIC{Q}\\end{prooftree}",
+                true,
+            ),
+        ] {
+            let json = serde_json::to_value(parse(input).unwrap()).unwrap();
+            assert_eq!(json[0]["tree"].get("rootAtTop").is_some(), root_at_top);
+            let ast: Vec<ParseNode> = serde_json::from_value(json.clone()).unwrap();
+            let ParseNode::ProofTree { tree, .. } = &ast[0] else {
+                panic!("Expected ProofTree node");
+            };
+            assert_eq!(tree.root_at_top, root_at_top);
+            assert!(!tree.premises[0].root_at_top);
+            assert_eq!(serde_json::to_value(&ast).unwrap(), json);
+        }
+    }
+
+    #[test]
     fn prooftree_orphan_label_errors() {
         let result = parse("\\begin{prooftree}\\AxiomC{P}\\LeftLabel{L}\\end{prooftree}");
         assert!(

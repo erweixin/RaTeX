@@ -10,6 +10,11 @@
 
 ## [Unreleased]
 
+### 修复
+
+- 含 `prooftree` 的解析树可以从其自身的 JSON 反序列化：值为 false 时省略的 `rootAtTop`
+  现按 false 读取，不再报错 ``missing field `rootAtTop` ``。
+
 ## [0.1.16] - 2026-11-16
 
 ### 变更
