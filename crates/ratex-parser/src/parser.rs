@@ -1,4 +1,5 @@
 use ratex_lexer::token::{SourceLocation, Token};
+use std::sync::LazyLock;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::error::{ParseError, ParseResult};
@@ -9,6 +10,22 @@ use crate::stack_safety::{validate_parse_nodes, DepthBudget, MAX_INPUT_DEPTH};
 
 /// End-of-expression tokens.
 static END_OF_EXPRESSION: &[&str] = &["}", "\\endgroup", "\\end", "\\right", "&"];
+
+// Compile color and size patterns once, then reuse them across parser calls.
+static COLOR_RE: LazyLock<regex_lite::Regex> = LazyLock::new(|| {
+    regex_lite::Regex::new(
+        r"^(#[a-fA-F0-9]{3,4}|#[a-fA-F0-9]{6}|#[a-fA-F0-9]{8}|[a-fA-F0-9]{6}|[a-zA-Z]+|\d+(\.\d+)?(,\d+(\.\d+)?)*)$",
+    )
+    .unwrap()
+});
+static HEX_COLOR_RE: LazyLock<regex_lite::Regex> =
+    LazyLock::new(|| regex_lite::Regex::new(r"^[0-9a-fA-F]{6}$").unwrap());
+static SIZE_PREFIX_RE: LazyLock<regex_lite::Regex> = LazyLock::new(|| {
+    regex_lite::Regex::new(r"^[-+]? *(?:$|\d+|\d+\.\d*|\.\d*) *[a-z]{0,2} *$").unwrap()
+});
+static SIZE_RE: LazyLock<regex_lite::Regex> = LazyLock::new(|| {
+    regex_lite::Regex::new(r"([-+]?) *(\d+(?:\.\d*)?|\.\d+) *([a-z]{2})").unwrap()
+});
 
 /// Maximum supported nesting for input-controlled recursive structures.
 ///
@@ -777,22 +794,14 @@ impl<'a> Parser<'a> {
             None => Ok(None),
             Some(token) => {
                 let text = token.text.trim().to_string();
-                let re = regex_lite::Regex::new(
-                    r"^(#[a-fA-F0-9]{3,4}|#[a-fA-F0-9]{6}|#[a-fA-F0-9]{8}|[a-fA-F0-9]{6}|[a-zA-Z]+|\d+(\.\d+)?(,\d+(\.\d+)?)*)$",
-                )
-                .unwrap();
-
-                if !re.is_match(&text) {
+                if !COLOR_RE.is_match(&text) {
                     return Err(ParseError::new(
                         format!("Invalid color: '{}'", text),
                         Some(&token),
                     ));
                 }
                 let mut color = text;
-                if regex_lite::Regex::new(r"^[0-9a-fA-F]{6}$")
-                    .unwrap()
-                    .is_match(&color)
-                {
+                if HEX_COLOR_RE.is_match(&color) {
                     color = format!("#{}", color);
                 }
 
@@ -811,13 +820,7 @@ impl<'a> Parser<'a> {
 
         self.gullet.consume_spaces();
         let res = if !optional && self.gullet.future().text != "{" {
-            Some(
-                self.parse_regex_group(
-                    &regex_lite::Regex::new(r"^[-+]? *(?:$|\d+|\d+\.\d*|\.\d*) *[a-z]{0,2} *$")
-                        .unwrap(),
-                    "size",
-                )?,
-            )
+            Some(self.parse_regex_group(&SIZE_PREFIX_RE, "size")?)
         } else {
             self.parse_string_group("size", optional)?
         };
@@ -833,9 +836,7 @@ impl<'a> Parser<'a> {
             is_blank = true;
         }
 
-        let size_re =
-            regex_lite::Regex::new(r"([-+]?) *(\d+(?:\.\d*)?|\.\d+) *([a-z]{2})").unwrap();
-        let m = size_re
+        let m = SIZE_RE
             .captures(&text)
             .ok_or_else(|| ParseError::new(format!("Invalid size: '{}'", text), Some(&res)))?;
 
