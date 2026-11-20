@@ -885,3 +885,30 @@ fn vec_arrow_matches_katex_position() {
         "arrow right {hi:.4}em, KaTeX 0.5230em"
     );
 }
+
+#[test]
+fn operator_name_letters_keep_italic_correction() {
+    // KaTeX builds each letter of `\log` as a math symbol with `margin-right: italic`, so `g`
+    // (italic 0.01389em) pushes what follows. KaTeX 0.19.0 in Chromium: `\log n` is 2.0597em wide
+    // and its `n` starts at 1.4592em.
+    let lbox = layout_with_style(r"\log n", MathStyle::Text);
+    assert!(
+        (lbox.width - 2.0597).abs() < 0.002,
+        "width {:.4}em, KaTeX 2.0597em",
+        lbox.width
+    );
+    let display = to_display_list(&lbox);
+    let n_x = display
+        .items
+        .iter()
+        .rev()
+        .find_map(|item| match item {
+            DisplayItem::GlyphPath { x, .. } => Some(*x),
+            _ => None,
+        })
+        .unwrap();
+    assert!(
+        (n_x - 1.4592).abs() < 0.002,
+        "n at {n_x:.4}em, KaTeX 1.4592em"
+    );
+}

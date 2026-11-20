@@ -1579,6 +1579,9 @@ fn build_op_base(
 }
 
 /// Render a text operator name like \sin, \cos, \lim.
+///
+/// KaTeX builds each letter as a math symbol, so each advances by its width plus its italic
+/// correction (`SymbolNode.toNode`'s `margin-right`): `g`'s 0.0139 em in `\log`.
 fn layout_op_text(name: &str, options: &LayoutOptions) -> LayoutBox {
     let text = name.strip_prefix('\\').unwrap_or(name);
     let mut children = Vec::new();
@@ -1586,7 +1589,7 @@ fn layout_op_text(name: &str, options: &LayoutOptions) -> LayoutBox {
         let char_code = ch as u32;
         let metrics = get_char_metrics(FontId::MainRegular, char_code);
         let (width, height, depth) = match metrics {
-            Some(m) => (m.width, m.height, m.depth),
+            Some(m) => (math_glyph_advance_em(&m, Mode::Math), m.height, m.depth),
             None => (0.5, 0.43, 0.0),
         };
         children.push(LayoutBox {
