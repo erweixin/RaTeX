@@ -912,3 +912,23 @@ fn operator_name_letters_keep_italic_correction() {
         "n at {n_x:.4}em, KaTeX 1.4592em"
     );
 }
+
+#[test]
+fn sqrt_bar_is_a_filled_rect_at_rule_thickness() {
+    // KaTeX draws the surd and its bar in one SVG at 0.04em, never thickened as its CSS-border
+    // rules are; the bar comes out as a filled rect so renderers can tell it from a rule.
+    let display = to_display_list(&layout_with_style(r"\sqrt{x}", MathStyle::Text));
+    assert!(!display
+        .items
+        .iter()
+        .any(|item| matches!(item, DisplayItem::Line { .. })));
+    let bar = display
+        .items
+        .iter()
+        .find_map(|item| match item {
+            DisplayItem::Rect { height, .. } => Some(*height),
+            _ => None,
+        })
+        .expect("sqrt bar");
+    assert!((bar - 0.04).abs() < 1e-9, "bar {bar}em");
+}
