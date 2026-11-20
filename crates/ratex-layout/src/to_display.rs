@@ -378,16 +378,15 @@ fn emit_box(
                     color: lbox.color,
                 });
 
-                // Vinculum: a horizontal rule extending the glyph's top bar over the body.
-                // Center it on the glyph's top bar position.
-                let line_center_y = surd_y - gh * scale + (rule_thickness * scale) / 2.0;
-                let line_action = EmitAction::Item(DisplayItem::Line {
+                // Vinculum: the glyph's top bar extended over the body, from the bar's top down.
+                // A filled rect, not a `Line`: KaTeX draws it in the surd's SVG, at its thickness,
+                // where a renderer may thicken a rule (KaTeX's rules are CSS borders, at least 1px).
+                let line_action = EmitAction::Item(DisplayItem::Rect {
                     x: surd_x + radical_width * scale,
-                    y: line_center_y,
+                    y: surd_y - gh * scale,
                     width: body.width * scale,
-                    thickness: rule_thickness * scale,
+                    height: rule_thickness * scale,
                     color: lbox.color,
-                    dashed: false,
                 });
 
                 pending.push(EmitAction::Box {

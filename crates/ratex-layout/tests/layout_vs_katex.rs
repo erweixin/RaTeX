@@ -847,3 +847,88 @@ fn subscript_italic_kern_only_applies_to_symbol_nodes() {
         );
     }
 }
+
+/// Horizontal extent of every `Path` item (arrows, surds), in em.
+fn path_x_range(display: &DisplayList) -> (f64, f64) {
+    let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+    for item in &display.items {
+        let DisplayItem::Path { x, commands, .. } = item else {
+            continue;
+        };
+        for command in commands {
+            let cx = match command {
+                PathCommand::MoveTo { x: cx, .. }
+                | PathCommand::LineTo { x: cx, .. }
+                | PathCommand::QuadTo { x: cx, .. }
+                | PathCommand::CubicTo { x: cx, .. } => *cx,
+                PathCommand::Close => continue,
+            };
+            lo = lo.min(*x + cx);
+            hi = hi.max(*x + cx);
+        }
+    }
+    (lo, hi)
+}
+
+#[test]
+fn vec_arrow_matches_katex_position() {
+    // KaTeX 0.19.0 in Chromium, fonts loaded: the arrow's ink spans 0.0814em to 0.5230em from
+    // the left of `\vec{v}`.
+    let lbox = layout_with_style(r"\vec{v}", MathStyle::Text);
+    let (lo, hi) = path_x_range(&to_display_list(&lbox));
+    assert!(
+        (lo - 0.0814).abs() < 0.003,
+        "arrow left {lo:.4}em, KaTeX 0.0814em"
+    );
+    assert!(
+        (hi - 0.5230).abs() < 0.003,
+        "arrow right {hi:.4}em, KaTeX 0.5230em"
+    );
+}
+
+#[test]
+fn operator_name_letters_keep_italic_correction() {
+    // KaTeX builds each letter of `\log` as a math symbol with `margin-right: italic`, so `g`
+    // (italic 0.01389em) pushes what follows. KaTeX 0.19.0 in Chromium: `\log n` is 2.0597em wide
+    // and its `n` starts at 1.4592em.
+    let lbox = layout_with_style(r"\log n", MathStyle::Text);
+    assert!(
+        (lbox.width - 2.0597).abs() < 0.002,
+        "width {:.4}em, KaTeX 2.0597em",
+        lbox.width
+    );
+    let display = to_display_list(&lbox);
+    let n_x = display
+        .items
+        .iter()
+        .rev()
+        .find_map(|item| match item {
+            DisplayItem::GlyphPath { x, .. } => Some(*x),
+            _ => None,
+        })
+        .unwrap();
+    assert!(
+        (n_x - 1.4592).abs() < 0.002,
+        "n at {n_x:.4}em, KaTeX 1.4592em"
+    );
+}
+
+#[test]
+fn sqrt_bar_is_a_filled_rect_at_rule_thickness() {
+    // KaTeX draws the surd and its bar in one SVG at 0.04em, never thickened as its CSS-border
+    // rules are; the bar comes out as a filled rect so renderers can tell it from a rule.
+    let display = to_display_list(&layout_with_style(r"\sqrt{x}", MathStyle::Text));
+    assert!(!display
+        .items
+        .iter()
+        .any(|item| matches!(item, DisplayItem::Line { .. })));
+    let bar = display
+        .items
+        .iter()
+        .find_map(|item| match item {
+            DisplayItem::Rect { height, .. } => Some(*height),
+            _ => None,
+        })
+        .expect("sqrt bar");
+    assert!((bar - 0.04).abs() < 1e-9, "bar {bar}em");
+}

@@ -1579,6 +1579,9 @@ fn build_op_base(
 }
 
 /// Render a text operator name like \sin, \cos, \lim.
+///
+/// KaTeX builds each letter as a math symbol, so each advances by its width plus its italic
+/// correction (`SymbolNode.toNode`'s `margin-right`): `g`'s 0.0139 em in `\log`.
 fn layout_op_text(name: &str, options: &LayoutOptions) -> LayoutBox {
     let text = name.strip_prefix('\\').unwrap_or(name);
     let mut children = Vec::new();
@@ -1586,7 +1589,7 @@ fn layout_op_text(name: &str, options: &LayoutOptions) -> LayoutBox {
         let char_code = ch as u32;
         let metrics = get_char_metrics(FontId::MainRegular, char_code);
         let (width, height, depth) = match metrics {
-            Some(m) => (m.width, m.height, m.depth),
+            Some(m) => (math_glyph_advance_em(&m, Mode::Math), m.height, m.depth),
             None => (0.5, 0.43, 0.0),
         };
         children.push(LayoutBox {
@@ -1835,9 +1838,6 @@ fn layout_operatorname(body: &[ParseNode], options: &LayoutOptions) -> LayoutBox
 // ============================================================================
 // Accent layout
 // ============================================================================
-
-/// `\vec` KaTeX SVG: nudge slightly right to match KaTeX reference.
-const VEC_SKEW_EXTRA_RIGHT_EM: f64 = 0.018;
 
 /// Extract the italic correction only when this box itself is a glyph.
 ///
@@ -2140,11 +2140,11 @@ fn layout_accent(
         // Equivalent RaTeX position: vec bottom = body.height - overlap.
         let clearance = (body_box.height - options.metrics().x_height).max(0.0);
         let (height, depth) = (clearance + h, body_box.depth);
-        let vec_skew = (if is_shifty {
+        let vec_skew = if is_shifty {
             glyph_skew(&body_box)
         } else {
             0.0
-        }) + VEC_SKEW_EXTRA_RIGHT_EM;
+        };
         return LayoutBox {
             width: body_box.width,
             height,
