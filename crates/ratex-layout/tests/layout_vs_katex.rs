@@ -847,3 +847,41 @@ fn subscript_italic_kern_only_applies_to_symbol_nodes() {
         );
     }
 }
+
+/// Horizontal extent of every `Path` item (arrows, surds), in em.
+fn path_x_range(display: &DisplayList) -> (f64, f64) {
+    let (mut lo, mut hi) = (f64::INFINITY, f64::NEG_INFINITY);
+    for item in &display.items {
+        let DisplayItem::Path { x, commands, .. } = item else {
+            continue;
+        };
+        for command in commands {
+            let cx = match command {
+                PathCommand::MoveTo { x: cx, .. }
+                | PathCommand::LineTo { x: cx, .. }
+                | PathCommand::QuadTo { x: cx, .. }
+                | PathCommand::CubicTo { x: cx, .. } => *cx,
+                PathCommand::Close => continue,
+            };
+            lo = lo.min(*x + cx);
+            hi = hi.max(*x + cx);
+        }
+    }
+    (lo, hi)
+}
+
+#[test]
+fn vec_arrow_matches_katex_position() {
+    // KaTeX 0.19.0 in Chromium, fonts loaded: the arrow's ink spans 0.0814em to 0.5230em from
+    // the left of `\vec{v}`.
+    let lbox = layout_with_style(r"\vec{v}", MathStyle::Text);
+    let (lo, hi) = path_x_range(&to_display_list(&lbox));
+    assert!(
+        (lo - 0.0814).abs() < 0.003,
+        "arrow left {lo:.4}em, KaTeX 0.0814em"
+    );
+    assert!(
+        (hi - 0.5230).abs() < 0.003,
+        "arrow right {hi:.4}em, KaTeX 0.5230em"
+    );
+}

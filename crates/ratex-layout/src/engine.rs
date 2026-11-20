@@ -1836,9 +1836,6 @@ fn layout_operatorname(body: &[ParseNode], options: &LayoutOptions) -> LayoutBox
 // Accent layout
 // ============================================================================
 
-/// `\vec` KaTeX SVG: nudge slightly right to match KaTeX reference.
-const VEC_SKEW_EXTRA_RIGHT_EM: f64 = 0.018;
-
 /// Extract the italic correction only when this box itself is a glyph.
 ///
 /// This distinction mirrors KaTeX's `base instanceof SymbolNode` check.  Recursing through an
@@ -2140,11 +2137,11 @@ fn layout_accent(
         // Equivalent RaTeX position: vec bottom = body.height - overlap.
         let clearance = (body_box.height - options.metrics().x_height).max(0.0);
         let (height, depth) = (clearance + h, body_box.depth);
-        let vec_skew = (if is_shifty {
+        let vec_skew = if is_shifty {
             glyph_skew(&body_box)
         } else {
             0.0
-        }) + VEC_SKEW_EXTRA_RIGHT_EM;
+        };
         return LayoutBox {
             width: body_box.width,
             height,
