@@ -115,7 +115,7 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        run: bash scripts/install-wasm-pack.sh
       - name: Build and test ratex-wasm npm package (platforms/web)
         run: |
           cd platforms/web
@@ -148,7 +148,7 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        run: bash scripts/install-wasm-pack.sh
       - name: Install website dependencies with npm
         if: matrix.package-manager == 'npm'
         run: npm --prefix website ci
