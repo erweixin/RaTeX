@@ -35,9 +35,10 @@ jobs:
           java-version: 17
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update \
+            --target aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+          rustup default stable
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2

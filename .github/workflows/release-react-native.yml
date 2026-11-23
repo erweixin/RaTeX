@@ -40,17 +40,12 @@ jobs:
           echo "Version OK: $PKG_VERSION"
 
       - name: Install Rust (Android + iOS targets)
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: >
-            aarch64-linux-android,
-            armv7-linux-androideabi,
-            x86_64-linux-android,
-            aarch64-apple-ios,
-            aarch64-apple-ios-sim,
-            x86_64-apple-ios,
-            aarch64-apple-darwin,
-            x86_64-apple-darwin
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update \
+            --target aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android \
+            --target aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios \
+            --target aarch64-apple-darwin,x86_64-apple-darwin
+          rustup default stable
 
       - name: Install Apple Rust toolchain
         run: |

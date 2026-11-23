@@ -14,9 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update --component clippy,rustfmt
+          rustup default stable
       - uses: Swatinem/rust-cache@v2
       - name: Format
         run: cargo fmt --all -- --check
@@ -74,9 +75,11 @@ jobs:
         with:
           # Override the default package list, which includes the unavailable legacy "tools" package.
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update \
+            --target aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+          rustup default stable
       - uses: Swatinem/rust-cache@v2
         with:
           key: android-${{ matrix.ndk }}
@@ -110,9 +113,10 @@ jobs:
       - name: Test website font loading and retry behavior
         working-directory: website
         run: npm test
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update --target wasm32-unknown-unknown
+          rustup default stable
       - uses: Swatinem/rust-cache@v2
       - name: Install wasm-pack
         run: bash scripts/install-wasm-pack.sh
@@ -143,9 +147,10 @@ jobs:
         with:
           version: "11.25.0"
           package_json_file: website/package.json
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update --target wasm32-unknown-unknown
+          rustup default stable
       - uses: Swatinem/rust-cache@v2
       - name: Install wasm-pack
         run: bash scripts/install-wasm-pack.sh
@@ -167,7 +172,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
       - uses: Swatinem/rust-cache@v2
       - name: Install GTK/GI tooling
         run: |
@@ -233,7 +241,10 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
       - uses: Swatinem/rust-cache@v2
       - name: Build ratex-ffi (release, host)
         run: cargo build --release -p ratex-ffi
@@ -283,9 +294,11 @@ jobs:
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update \
+            --target aarch64-apple-darwin,x86_64-apple-darwin
+          rustup default stable
       - uses: Swatinem/rust-cache@v2
       - name: Build macOS XCFramework slice
         run: bash scripts/build-apple-xcframework.sh --macos

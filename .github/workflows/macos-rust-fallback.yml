@@ -14,7 +14,10 @@ jobs:
       CARGO_TERM_COLOR: always
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
       - uses: Swatinem/rust-cache@v2
       - name: Test system-font and renderer fallback paths
         run: |

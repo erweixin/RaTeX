@@ -41,9 +41,9 @@ jobs:
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install Rust (wasm32 target)
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update --target wasm32-unknown-unknown
+          rustup default stable
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2

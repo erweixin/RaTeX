@@ -24,7 +24,10 @@ jobs:
           python-version: "3.12.10"
           cache: pip
           cache-dependency-path: tools/golden_compare/requirements.txt
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - name: Install Rust
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal --no-self-update
+          rustup default 1.95.0
       - uses: Swatinem/rust-cache@v2
       - name: Install fixed comparator and reference dependencies
         run: |

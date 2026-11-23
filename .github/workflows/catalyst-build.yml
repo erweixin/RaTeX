@@ -42,11 +42,12 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: >-
-            aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios,
-            aarch64-apple-darwin,x86_64-apple-darwin
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update \
+            --target aarch64-apple-ios,aarch64-apple-ios-sim,x86_64-apple-ios \
+            --target aarch64-apple-darwin,x86_64-apple-darwin
+          rustup default stable
       - name: Install Apple Rust toolchain
         run: |
           rustup toolchain install nightly-2026-08-16 --profile minimal --component rust-src
