@@ -41,7 +41,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           persist-credentials: false
       - name: Install Rust
@@ -56,7 +56,7 @@ jobs:
           rustup target add --toolchain nightly-2026-08-16 \
             aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios \
             aarch64-apple-ios-macabi x86_64-apple-ios-macabi
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.9.3
       - name: Build all Apple slices
         run: bash scripts/build-apple-xcframework.sh
       - name: Verify device, simulator, macOS and Catalyst slices
@@ -67,7 +67,7 @@ jobs:
         run: |
           mkdir -p artifacts
           ditto -c -k --keepParent platforms/ios/RaTeX.xcframework artifacts/RaTeX.xcframework.zip
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4.6.2
         with:
           name: ratex-apple-xcframework
           path: artifacts/RaTeX.xcframework.zip

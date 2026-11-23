@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
         with:
           persist-credentials: false
 
@@ -37,7 +37,7 @@ jobs:
           echo "Version OK: $PKG_VERSION"
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v4.4.0
         with:
           node-version: 20
           registry-url: 'https://registry.npmjs.org'
@@ -48,7 +48,7 @@ jobs:
           rustup default stable
 
       - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.3
 
       - name: Install wasm-pack
         run: bash scripts/install-wasm-pack.sh

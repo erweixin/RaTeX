@@ -16,15 +16,15 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4.4.0
         with:
           node-version: "22.17.1"
           cache: npm
           cache-dependency-path: tools/golden_compare/package-lock.json
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5.6.0
         with:
           python-version: "3.12.10"
           cache: pip
@@ -33,7 +33,7 @@ jobs:
         run: |
           rustup toolchain install 1.95.0 --profile minimal --no-self-update
           rustup default 1.95.0
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.9.3
       - name: Install fixed comparator and reference dependencies
         run: |
           python3 -m pip install -r tools/golden_compare/requirements.txt
@@ -109,7 +109,7 @@ jobs:
         run: ./scripts/update_golden_centernot.sh
       - name: Upload machine-readable golden report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: golden-report
           path: |

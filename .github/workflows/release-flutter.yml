@@ -17,7 +17,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
         with:
           persist-credentials: false
 
@@ -65,13 +65,13 @@ jobs:
             aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
 
       - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.3
 
       - name: Install cargo-ndk
         run: cargo install cargo-ndk
 
       - name: Install zig
-        uses: goto-bus-stop/setup-zig@v2
+        uses: goto-bus-stop/setup-zig@v2.2.1
         with:
           version: 0.13.0
 
@@ -79,7 +79,7 @@ jobs:
         run: cargo install cargo-zigbuild
 
       - name: Install Android NDK
-        uses: nttld/setup-ndk@v1
+        uses: nttld/setup-ndk@v1.6.0
         id: ndk
         with:
           ndk-version: r27
@@ -122,10 +122,10 @@ jobs:
         run: python3 scripts/verify_android_elf.py platforms/flutter/android/src/main/jniLibs
 
       - name: Setup Dart (with pub.dev OIDC credentials)
-        uses: dart-lang/setup-dart@v1
+        uses: dart-lang/setup-dart@v1.8.2
 
       - name: Setup Flutter
-        uses: subosito/flutter-action@v2
+        uses: subosito/flutter-action@v2.23.0
         with:
           channel: stable
           cache: true

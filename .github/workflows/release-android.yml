@@ -20,7 +20,7 @@ jobs:
     steps:
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
         with:
           persist-credentials: false
 
@@ -31,7 +31,7 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Setup JDK
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v4.9.1
         with:
           distribution: temurin
           java-version: 17
@@ -43,13 +43,13 @@ jobs:
           rustup default stable
 
       - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.3
 
       - name: Install cargo-ndk
         run: cargo install cargo-ndk
 
       - name: Install Android NDK
-        uses: nttld/setup-ndk@v1
+        uses: nttld/setup-ndk@v1.6.0
         id: ndk
         with:
           ndk-version: r27
@@ -79,12 +79,12 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.GPG_PASSPHRASE }}
 
       - name: Upload AAR artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v4.6.2
         with:
           name: ratex-android-aar
           path: platforms/android/build/outputs/aar/*.aar
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.6.2
         with:
           files: platforms/android/build/outputs/aar/*.aar

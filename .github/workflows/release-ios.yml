@@ -13,7 +13,7 @@ jobs:
       contents: write   # 允许 GITHUB_TOKEN 推送 tag 和创建 Release
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
 
       - name: Install Rust
         run: |
@@ -30,7 +30,7 @@ jobs:
             aarch64-apple-ios-macabi x86_64-apple-ios-macabi
 
       - name: Cache Rust build
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.3
 
       - name: Build XCFramework
         run: bash scripts/build-apple-xcframework.sh
@@ -87,6 +87,6 @@ jobs:
           git push origin "refs/tags/${TAG}" --force
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v2.6.2
         with:
           files: platforms/ios/RaTeX.xcframework.zip

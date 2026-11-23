@@ -16,14 +16,14 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           persist-credentials: false
       - name: Install Rust
         run: |
           rustup toolchain install stable --profile minimal --no-self-update --component clippy,rustfmt
           rustup default stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.9.3
       - name: Format
         run: cargo fmt --all -- --check
       - name: Verify Cargo.lock matches workspace manifests
@@ -71,14 +71,14 @@ jobs:
       matrix:
         ndk: [r27, r28c]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           persist-credentials: false
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v4.9.1
         with:
           distribution: temurin
           java-version: 17
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v3.2.2
         with:
           # Override the default package list, which includes the unavailable legacy "tools" package.
           packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
@@ -87,14 +87,14 @@ jobs:
           rustup toolchain install stable --profile minimal --no-self-update \
             --target aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
           rustup default stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.9.3
         with:
           key: android-${{ matrix.ndk }}
       - name: Test ELF verifier
         run: python3 -m unittest discover -s scripts -p 'test_verify_android_elf.py'
       - name: Install cargo-ndk
         run: cargo install cargo-ndk --locked
-      - uses: nttld/setup-ndk@v1
+      - uses: nttld/setup-ndk@v1.6.0
         id: ndk
         with:
           ndk-version: ${{ matrix.ndk }}
@@ -111,10 +111,10 @@ jobs:
   web-wasm-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4.4.0
         with:
           node-version: "20"
       - name: Install website dependencies
@@ -126,7 +126,7 @@ jobs:
         run: |
           rustup toolchain install stable --profile minimal --no-self-update --target wasm32-unknown-unknown
           rustup default stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.9.3
       - name: Install wasm-pack
         run: bash scripts/install-wasm-pack.sh
       - name: Build and test ratex-wasm npm package (platforms/web)
@@ -147,13 +147,13 @@ jobs:
           - package-manager: pnpm
             node: "24"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4.4.0
         with:
           node-version: ${{ matrix.node }}
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v6.1.1
         if: matrix.package-manager == 'pnpm'
         with:
           version: "11.25.0"
@@ -162,7 +162,7 @@ jobs:
         run: |
           rustup toolchain install stable --profile minimal --no-self-update --target wasm32-unknown-unknown
           rustup default stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.9.3
       - name: Install wasm-pack
         run: bash scripts/install-wasm-pack.sh
       - name: Install website dependencies with npm
@@ -182,14 +182,14 @@ jobs:
   gtk-gobject-smoke:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           persist-credentials: false
       - name: Install Rust
         run: |
           rustup toolchain install stable --profile minimal --no-self-update
           rustup default stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.9.3
       - name: Install GTK/GI tooling
         run: |
           sudo apt-get update
@@ -253,14 +253,14 @@ jobs:
   ios-swift-smoke:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           persist-credentials: false
       - name: Install Rust
         run: |
           rustup toolchain install stable --profile minimal --no-self-update
           rustup default stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.9.3
       - name: Build ratex-ffi (release, host)
         run: cargo build --release -p ratex-ffi
       - name: Swift binding tests (macOS)
@@ -271,7 +271,7 @@ jobs:
   flutter-ios-linkage:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           persist-credentials: false
       - name: Install iOS Rust toolchain
@@ -279,8 +279,8 @@ jobs:
           rustup toolchain install nightly-2026-08-16 --profile minimal --component rust-src
           rustup target add --toolchain nightly-2026-08-16 \
             aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
-      - uses: Swatinem/rust-cache@v2
-      - uses: subosito/flutter-action@v2
+      - uses: Swatinem/rust-cache@v2.9.3
+      - uses: subosito/flutter-action@v2.23.0
         with:
           channel: stable
           cache: true
@@ -310,7 +310,7 @@ jobs:
   macos-spm-build:
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
         with:
           persist-credentials: false
       - name: Install Rust
@@ -318,7 +318,7 @@ jobs:
           rustup toolchain install stable --profile minimal --no-self-update \
             --target aarch64-apple-darwin,x86_64-apple-darwin
           rustup default stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.9.3
       - name: Build macOS XCFramework slice
         run: bash scripts/build-apple-xcframework.sh --macos
       - name: Verify macOS slice

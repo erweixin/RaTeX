@@ -16,7 +16,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
         with:
           persist-credentials: false
 
@@ -57,13 +57,13 @@ jobs:
             aarch64-apple-ios-macabi x86_64-apple-ios-macabi
 
       - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.3
 
       - name: Install cargo-ndk
         run: cargo install cargo-ndk
 
       - name: Install Android NDK
-        uses: nttld/setup-ndk@v1
+        uses: nttld/setup-ndk@v1.6.0
         id: ndk
         with:
           ndk-version: r27
@@ -91,7 +91,7 @@ jobs:
         run: python3 scripts/verify_android_elf.py platforms/react-native/android/src/main/jniLibs
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v4.4.0
         with:
           node-version: 20
           registry-url: 'https://registry.npmjs.org'
