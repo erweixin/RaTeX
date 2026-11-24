@@ -22,7 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Read version from tag
         id: version
@@ -41,10 +43,12 @@ jobs:
           echo "Version OK: $CARGO_VERSION"
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
 
       - name: Cache Rust
-        uses: Swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2.9.3
 
       - name: Publish core crates (dependency order)
         env:

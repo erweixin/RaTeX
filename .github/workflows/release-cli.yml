@@ -5,7 +5,7 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -35,13 +35,17 @@ jobs:
             archive: zip
 
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v4.4.0
         with:
-          targets: ${{ matrix.target }}
+          persist-credentials: false
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Install Rust
+        shell: bash
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update --target ${{ matrix.target }}
+          rustup default stable
+
+      - uses: Swatinem/rust-cache@v2.9.3
         with:
           key: ${{ matrix.target }}
 
@@ -83,7 +87,7 @@ jobs:
           Copy-Item "target/${{ matrix.target }}/release/render-pdf.exe" "ratex-cli-${{ github.ref_name }}-${{ matrix.target }}/"
           Compress-Archive -Path "ratex-cli-${{ github.ref_name }}-${{ matrix.target }}" -DestinationPath "ratex-cli-${{ github.ref_name }}-${{ matrix.target }}.zip"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4.6.2
         with:
           name: ratex-cli-${{ matrix.target }}
           path: ratex-cli-${{ github.ref_name }}-${{ matrix.target }}.*
@@ -92,12 +96,14 @@ jobs:
     name: Create GitHub Release
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # softprops/action-gh-release creates the release and uploads the archives
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4.3.0
         with:
           path: artifacts
           merge-multiple: true
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v2.6.2
         with:
           files: artifacts/*

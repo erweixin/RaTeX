@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 jobs:
   fallback-tests:
     runs-on: macos-15
@@ -13,9 +16,14 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@v4.4.0
+        with:
+          persist-credentials: false
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          rustup default stable
+      - uses: Swatinem/rust-cache@v2.9.3
       - name: Test system-font and renderer fallback paths
         run: |
           cargo test -p ratex-unicode-font

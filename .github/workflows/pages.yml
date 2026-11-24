@@ -18,20 +18,23 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@v4.4.0
         with:
-          targets: wasm32-unknown-unknown
+          persist-credentials: false
 
-      - uses: Swatinem/rust-cache@v2
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update --target wasm32-unknown-unknown
+          rustup default stable
 
-      - uses: actions/setup-node@v4
+      - uses: Swatinem/rust-cache@v2.9.3
+
+      - uses: actions/setup-node@v4.4.0
         with:
           node-version: "20"
 
       - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+        run: bash scripts/install-wasm-pack.sh
 
       - name: Build WASM
         run: bash platforms/web/build.sh
@@ -49,10 +52,10 @@ jobs:
           cp -r platforms/web/pkg _site/platforms/web/
 
       - name: Setup Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v5.0.0
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v3.0.1
         with:
           path: _site
 
@@ -65,4 +68,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v4.0.5
