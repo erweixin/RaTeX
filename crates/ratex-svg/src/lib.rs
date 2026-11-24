@@ -441,8 +441,11 @@ fn emit_line(
     let color_syntax = context.color_syntax;
     let em = opts.em_px();
     let x0 = tx(x, opts);
-    let yc = ty(y, opts);
-    let t = (thickness * em).max(1e-6);
+    // KaTeX draws a rule (fraction line, \overline, \hline) as a CSS border, which browsers
+    // draw at least 1px thick, growing up from its bottom edge.
+    let bottom = ty(y, opts) + thickness * em / 2.0;
+    let t = (thickness * em).max(1.0);
+    let yc = bottom - t / 2.0;
     let w = width * em;
     use std::fmt::Write;
     if dashed {
@@ -722,6 +725,37 @@ mod tests {
         assert!(svg.contains("<text"));
         assert!(svg.contains("KaTeX_Math"));
         assert!(svg.contains("fill=\"rgba(255,0,0,1)\"") || svg.contains("fill=\"rgba(255,0,0,1"));
+    }
+
+    #[test]
+    fn thin_rule_is_at_least_one_px_from_its_bottom_edge() {
+        // KaTeX's fraction line at a 18.15px em: 0.04em (0.726px), drawn by the browser as a 1px
+        // border whose bottom edge stays put.
+        let list = DisplayList {
+            items: vec![DisplayItem::Line {
+                x: 0.0,
+                y: 0.5,
+                width: 1.0,
+                thickness: 0.04,
+                color: Color::BLACK,
+                dashed: false,
+            }],
+            width: 1.0,
+            height: 1.0,
+            depth: 0.0,
+        };
+        let opts = SvgOptions {
+            font_size: 18.15,
+            padding: 0.0,
+            ..SvgOptions::default()
+        };
+        let svg = render_to_svg(&list, &opts);
+        let bottom = 0.52 * 18.15;
+        let mut want = String::new();
+        want.push_str(r#"<rect x="0" y=""#);
+        fmt_num_to(&mut want, bottom - 1.0);
+        want.push_str(r#"" width="18.15" height="1""#);
+        assert!(svg.contains(&want), "{svg}");
     }
 
     #[test]
