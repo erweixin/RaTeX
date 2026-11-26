@@ -263,3 +263,42 @@ fn render_to_png_preserves_textcolor_hex_alpha() {
     assert!(pixel[3] > 0);
     assert!(pixel[3] <= 16);
 }
+
+#[test]
+fn zero_height_rule_keeps_spacing_without_painting() {
+    let render = |latex| {
+        let nodes = parse(latex).expect("parse formula");
+        let list = to_display_list(&layout(&nodes, &LayoutOptions::default()));
+        let bytes = render_to_png(
+            &list,
+            &RenderOptions {
+                font_size: 40.0,
+                padding: 10.0,
+                background_color: Color::new(0.0, 0.0, 0.0, 0.0),
+                font_dir: project_root().join("fonts").to_string_lossy().into_owned(),
+                device_pixel_ratio: 1.0,
+            },
+        )
+        .expect("render PNG");
+        tiny_skia::Pixmap::decode_png(&bytes).expect("decode PNG")
+    };
+
+    let spacer = render(r"x\kern1em y");
+    let zero = render(r"x\rule{1em}{0pt}y");
+    let thin = render(r"x\rule{1em}{0.01pt}y");
+    let size = |pixmap: &tiny_skia::Pixmap| (pixmap.width(), pixmap.height());
+    let gap_alpha = |pixmap: &tiny_skia::Pixmap| {
+        let x = pixmap.width() / 2;
+        (0..pixmap.height()).any(|y| pixmap.pixel(x, y).unwrap().alpha() != 0)
+    };
+
+    assert_eq!(size(&zero), size(&spacer));
+    assert_eq!(size(&thin), size(&spacer));
+    assert!(!gap_alpha(&spacer), "the control gap must be blank");
+    assert!(gap_alpha(&thin), "a positive thin rule must still paint");
+    assert!(!gap_alpha(&zero), "a zero-height rule must not paint");
+    assert!(
+        zero.data() == spacer.data(),
+        "a zero rule must render as an equal-width kern"
+    );
+}

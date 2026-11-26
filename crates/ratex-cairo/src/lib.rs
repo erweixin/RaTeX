@@ -681,6 +681,11 @@ fn render_line(
     color: Color,
     dashed: bool,
 ) -> Result<(), CairoError> {
+    // Zero-height rules reserve space in layout but should not paint.
+    if thickness == 0.0 {
+        return Ok(());
+    }
+
     let t = thickness.max(0.5);
     set_source_color(cr, color);
     if dashed {
@@ -887,6 +892,51 @@ mod tests {
         let cr = cairo::Context::new(&surface).expect("context should be created");
 
         render_to_cairo(&cr, &display_list, &options).expect("render should succeed");
+    }
+
+    #[test]
+    fn zero_height_rule_keeps_spacing_without_painting() {
+        let options = CairoOptions {
+            font_size: 40.0,
+            padding: 10.0,
+            font_dir: None,
+        };
+        let render = |latex| {
+            let nodes = parse(latex).expect("parse formula");
+            let list = to_display_list(&layout(&nodes, &LayoutOptions::default()));
+            let metrics = measure_display_list(&list, &options);
+            let width = metrics.width.ceil() as i32;
+            let height = metrics.total_height.ceil() as i32;
+            let mut surface = cairo::ImageSurface::create(cairo::Format::ARgb32, width, height)
+                .expect("create image surface");
+            {
+                let cr = cairo::Context::new(&surface).expect("create context");
+                render_to_cairo(&cr, &list, &options).expect("render Cairo surface");
+            }
+
+            let stride = surface.stride() as usize;
+            let data = surface.data().expect("read Cairo pixels");
+            let x = (width as usize / 2) * 4;
+            let gap_has_ink = data.chunks_exact(stride).any(|row| {
+                // Cairo stores ARGB32 in native byte order.
+                u32::from_ne_bytes(row[x..x + 4].try_into().unwrap()) >> 24 != 0
+            });
+            ((width, height), gap_has_ink, data.to_vec())
+        };
+
+        let (spacer_size, spacer_ink, spacer_pixels) = render(r"x\kern1em y");
+        let (zero_size, zero_ink, zero_pixels) = render(r"x\rule{1em}{0pt}y");
+        let (thin_size, thin_ink, _) = render(r"x\rule{1em}{0.01pt}y");
+
+        assert_eq!(zero_size, spacer_size);
+        assert_eq!(thin_size, spacer_size);
+        assert!(!spacer_ink, "the control gap must be blank");
+        assert!(thin_ink, "a positive thin rule must still paint");
+        assert!(!zero_ink, "a zero-height rule must not paint");
+        assert!(
+            zero_pixels == spacer_pixels,
+            "a zero rule must render as an equal-width kern"
+        );
     }
 
     #[test]

@@ -471,6 +471,11 @@ struct LineParams {
 }
 
 fn emit_line(content: &mut Content, line: &LineParams, alpha_states: &AlphaGraphicsStates) {
+    // Zero-height rules reserve space in layout but should not paint.
+    if line.thickness == 0.0 {
+        return;
+    }
+
     let t = line.thickness.max(0.5);
 
     let alpha_applied = apply_non_stroking_alpha(content, &line.color, alpha_states);

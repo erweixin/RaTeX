@@ -437,6 +437,11 @@ fn emit_line(
     dashed: bool,
     context: SvgRenderContext<'_>,
 ) {
+    // Zero-height rules reserve space in layout but should not paint.
+    if thickness == 0.0 {
+        return;
+    }
+
     let opts = context.opts;
     let color_syntax = context.color_syntax;
     let em = opts.em_px();
