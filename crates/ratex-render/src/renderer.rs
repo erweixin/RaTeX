@@ -1381,6 +1381,11 @@ fn render_line(
     color: &Color,
     dashed: bool,
 ) {
+    // Zero-height rules reserve space in layout but should not paint.
+    if thickness == 0.0 {
+        return;
+    }
+
     let t = thickness.max(1.0);
     let paint = paint_for_color(color);
 

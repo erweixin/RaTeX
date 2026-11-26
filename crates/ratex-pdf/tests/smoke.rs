@@ -355,3 +355,32 @@ mod macos_emoji_pdf {
         );
     }
 }
+
+#[test]
+fn zero_height_rule_keeps_spacing_without_painting() {
+    let spacer = latex_to_pdf(r"x\kern1em y");
+    let zero = latex_to_pdf(r"x\rule{1em}{0pt}y");
+    let thin = latex_to_pdf(r"x\rule{1em}{0.01pt}y");
+
+    assert_eq!(extract_media_box(&zero), extract_media_box(&spacer));
+    assert_eq!(extract_media_box(&thin), extract_media_box(&spacer));
+
+    let page_content = |pdf: &[u8]| {
+        decoded_pdf_streams(pdf)
+            .into_iter()
+            .find(|stream| stream.lines().any(|line| line == "BT"))
+            .expect("expected page content with glyphs")
+    };
+    let spacer_stream = page_content(&spacer);
+    let zero_stream = page_content(&zero);
+    let thin_stream = page_content(&thin);
+    assert!(!spacer_stream.lines().any(|line| line.ends_with(" re")));
+    assert!(
+        thin_stream.lines().any(|line| line.ends_with(" 0.5 re")),
+        "a positive thin rule must still paint at the minimum thickness"
+    );
+    assert_eq!(
+        zero_stream, spacer_stream,
+        "a zero rule must render as an equal-width kern"
+    );
+}
